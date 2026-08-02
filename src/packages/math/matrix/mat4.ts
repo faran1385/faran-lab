@@ -402,7 +402,6 @@ export class mat4 {
     }
 
 
-
     static toQuat(out: Float32Array, mat: Float32Array) {
         const t = mat[0] + mat[5] + mat[10];
 
@@ -421,5 +420,116 @@ export class mat4 {
         }
 
         return out;
+    }
+
+    static compose(
+        out: Float32Array,
+        translation: Float32Array,
+        rotation: Float32Array,
+        scale: Float32Array
+    ) {
+        const x = rotation[0];
+        const y = rotation[1];
+        const z = rotation[2];
+        const w = rotation[3];
+
+        const sx = scale[0];
+        const sy = scale[1];
+        const sz = scale[2];
+
+        const xx = x * x;
+        const yy = y * y;
+        const zz = z * z;
+
+        const xy = x * y;
+        const xz = x * z;
+        const yz = y * z;
+
+        const wx = w * x;
+        const wy = w * y;
+        const wz = w * z;
+
+
+        out[0] = (1 - 2 * (yy + zz)) * sx;
+        out[1] = (2 * (xy + wz)) * sx;
+        out[2] = (2 * (xz - wy)) * sx;
+        out[3] = 0;
+
+        out[4] = (2 * (xy - wz)) * sy;
+        out[5] = (1 - 2 * (xx + zz)) * sy;
+        out[6] = (2 * (yz + wx)) * sy;
+        out[7] = 0;
+
+        out[8] = (2 * (xz + wy)) * sz;
+        out[9] = (2 * (yz - wx)) * sz;
+        out[10] = (1 - 2 * (xx + yy)) * sz;
+        out[11] = 0;
+
+        out[12] = translation[0];
+        out[13] = translation[1];
+        out[14] = translation[2];
+        out[15] = 1;
+
+        return out;
+    }
+
+    static decompose(
+        mat: Float32Array,
+        translationV: Float32Array,
+        rotationQ: Float32Array,
+        scaleV: Float32Array,
+    ) {
+        // Translation
+        translationV[0] = mat[12];
+        translationV[1] = mat[13];
+        translationV[2] = mat[14];
+
+        // Scale = length of basis vectors (columns)
+        let sx = Math.hypot(mat[0], mat[1], mat[2]);
+        let sy = Math.hypot(mat[4], mat[5], mat[6]);
+        let sz = Math.hypot(mat[8], mat[9], mat[10]);
+
+        // Preserve reflections (negative scale)
+        const det =
+            mat[0] * (mat[5] * mat[10] - mat[6] * mat[9]) -
+            mat[4] * (mat[1] * mat[10] - mat[2] * mat[9]) +
+            mat[8] * (mat[1] * mat[6] - mat[2] * mat[5]);
+
+        if (det < 0) {
+            sx = -sx;
+        }
+
+        scaleV[0] = sx;
+        scaleV[1] = sy;
+        scaleV[2] = sz;
+
+        // Avoid division by zero
+        if (sx === 0 || sy === 0 || sz === 0) {
+            throw new Error("Cannot decompose matrix with zero scale.");
+        }
+
+        // Build a pure rotation matrix
+        const rot = new Float32Array(9);
+
+        rot[0] = mat[0] / sx;
+        rot[1] = mat[1] / sx;
+        rot[2] = mat[2] / sx;
+
+        rot[3] = mat[4] / sy;
+        rot[4] = mat[5] / sy;
+        rot[5] = mat[6] / sy;
+
+        rot[6] = mat[8] / sz;
+        rot[7] = mat[9] / sz;
+        rot[8] = mat[10] / sz;
+
+        // Convert rotation matrix to quaternion
+        mat3.toQuat(rotationQ, rot);
+
+        return {
+            translation: translationV,
+            rotation: rotationQ,
+            scale: scaleV
+        };
     }
 }

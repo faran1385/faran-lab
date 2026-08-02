@@ -170,9 +170,6 @@ const pipeline = device.createRenderPipeline({
     }
 });
 
-
-
-
 let last = performance.now() / 1000;
 let delta = 0;
 
@@ -181,7 +178,6 @@ function frame(): void {
     delta = performance.now() / 1000 - last;
     last = performance.now() / 1000;
 
-    mat4.identity(modelMat);
 
     device.queue.writeBuffer(modelBuffer, 0, modelMat);
 

@@ -209,7 +209,7 @@ export class quat {
     }
 
 
-    static fromEuler(out: Float32Array, roll: number, yaw: number, pitch: number) {
+    static fromEuler(roll: number, yaw: number, pitch: number) {
         const cr = Math.cos(roll / 2)
         const sr = Math.sin(roll / 2)
         const cp = Math.cos(pitch / 2)
@@ -217,6 +217,7 @@ export class quat {
         const cy = Math.cos(yaw / 2)
         const sy = Math.sin(yaw / 2)
 
+        const out = this.create();
 
         out[0] = cy * sp * cr + sy * cp * sr;
         out[1] = sy * cp * cr - cy * sp * sr;

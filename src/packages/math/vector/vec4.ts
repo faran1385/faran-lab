@@ -41,7 +41,7 @@ export class vec4 {
     }
 
     static div(out: Float32Array, a: Float32Array, b: Float32Array) {
-        if (b[0] === 0 || b[1] === 0 || b[2] === 0 || b[3] === 0) console.warn("Dominator is be 0");
+        if (b[0] === 0 || b[1] === 0 || b[2] === 0 || b[3] === 0) throw new Error("Cannot divide by 0");
         out[0] = a[0] / b[0];
         out[1] = a[1] / b[1];
         out[2] = a[2] / b[2];
