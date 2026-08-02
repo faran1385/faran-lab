@@ -1,3 +1,5 @@
+import {quat} from "../quat/quat.ts";
+
 export class vec3 {
 
 
@@ -39,7 +41,7 @@ export class vec3 {
     }
 
     static div(out: Float32Array, a: Float32Array, b: Float32Array) {
-        if (b[0] === 0 || b[1] === 0 || b[2] === 0) console.warn("Dominator is be 0");
+        if (b[0] === 0 || b[1] === 0 || b[2] === 0) console.warn("Dominator can't be 0");
         out[0] = a[0] / b[0];
         out[1] = a[1] / b[1];
         out[2] = a[2] / b[2];
@@ -138,6 +140,60 @@ export class vec3 {
 
         this.add(out, A, B)
         this.normalize(out, out);
+
+        return out;
+    }
+
+    static transformMat3(out: Float32Array, v: Float32Array, m: Float32Array) {
+
+        out[0] = m[0] * v[0] + m[3] * v[1] + m[6] * v[2];
+        out[1] = m[1] * v[0] + m[4] * v[1] + m[7] * v[2];
+        out[2] = m[2] * v[0] + m[5] * v[1] + m[8] * v[2];
+
+        return out;
+    }
+
+    static transformMat4(out: Float32Array, v: Float32Array, m: Float32Array) {
+
+        out[0] = m[0] * v[0] + m[4] * v[1] + m[8] * v[2];
+        out[1] = m[1] * v[0] + m[5] * v[1] + m[9] * v[2];
+        out[2] = m[2] * v[0] + m[6] * v[1] + m[10] * v[2];
+
+        return out;
+    }
+
+    static transformQuat(out: Float32Array, v: Float32Array, q: Float32Array) {
+        const length = quat.length(q);
+        const lengthSquare = length * length;
+
+        if (lengthSquare === 0) {
+            out.set([0, 0, 0, 0])
+            return out;
+        }
+
+
+        const qx = q[0];
+        const qy = q[1];
+        const qz = q[2];
+        const qw = q[3];
+
+        const [vx, vy, vz] = v;
+        const vw = 0;
+
+        const ax = qw * vx + qx * vw + qy * vz - qz * vy;
+        const ay = qw * vy - qx * vz + qy * vw + qz * vx;
+        const az = qw * vz + qx * vy - qy * vx + qz * vw;
+        const aw = qw * vw - qx * vx - qy * vy - qz * vz;
+
+
+        const qix = -q[0] / lengthSquare;
+        const qiy = -q[1] / lengthSquare;
+        const qiz = -q[2] / lengthSquare;
+        const qiw = q[3] / lengthSquare;
+
+        out[0] = aw * qix + ax * qiw + ay * qiz - az * qiy;
+        out[1] = aw * qiy - ax * qiz + ay * qiw + az * qix;
+        out[2] = aw * qiz + ax * qiy - ay * qix + az * qiw;
 
         return out;
     }

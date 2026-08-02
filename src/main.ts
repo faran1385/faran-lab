@@ -3,6 +3,8 @@ import {cubeVertices, cubeVertexStride, faceNormals} from "./geometry";
 import {mat4} from "./packages/math/matrix/mat4.ts";
 import {vec3} from "./packages/math/vector/vec3.ts";
 import {quat} from "./packages/math/quat/quat.ts";
+import {mat3} from "./packages/math/matrix/mat3.ts";
+import {vec4} from "./packages/math/vector/vec4.ts";
 
 const canvas = document.getElementById("gpu-canvas") as HTMLCanvasElement;
 
@@ -168,28 +170,18 @@ const pipeline = device.createRenderPipeline({
     }
 });
 
+
+
+
 let last = performance.now() / 1000;
 let delta = 0;
 
-const q = quat.fromAxisAndAngle(quat.create(), vec3.fromValues(1, 0, 1), 0.4);
-const q1 = quat.fromAxisAndAngle(quat.create(), vec3.fromValues(1, 1, 0), -0.4);
-
-
-const qs = quat.create();
-const rotationMat = mat4.create();
 
 function frame(): void {
     delta = performance.now() / 1000 - last;
     last = performance.now() / 1000;
 
     mat4.identity(modelMat);
-
-    const dC = Math.min(1, performance.now() / 1000);
-
-    quat.slerp(qs, q, q1, dC)
-
-    quat.toMat4(rotationMat, qs)
-    mat4.mul(modelMat, modelMat, rotationMat);
 
     device.queue.writeBuffer(modelBuffer, 0, modelMat);
 

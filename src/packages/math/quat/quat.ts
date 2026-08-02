@@ -85,6 +85,11 @@ export class quat {
         const length = this.length(q);
         const lengthSquare = length * length;
 
+        if (lengthSquare === 0) {
+            out.set([0, 0, 0, 0])
+            return out;
+        }
+
         out[0] = -q[0] / lengthSquare;
         out[1] = -q[1] / lengthSquare;
         out[2] = -q[2] / lengthSquare;
@@ -132,7 +137,7 @@ export class quat {
         const lengthSquare = length * length;
 
 
-        if (lengthSquare < 0) {
+        if (lengthSquare === 0) {
             out.set([
                 0, 0, 0,
                 0, 0, 0,
@@ -168,7 +173,7 @@ export class quat {
         const lengthSquare = length * length;
 
 
-        if (lengthSquare < 0) {
+        if (lengthSquare === 0) {
             out.set([
                 0, 0, 0, 0,
                 0, 0, 0, 0,
@@ -213,10 +218,10 @@ export class quat {
         const sy = Math.sin(yaw / 2)
 
 
-        out[0] = cy*sp*cr + sy*cp*sr;
-        out[1] = sy*cp*cr - cy*sp*sr;
-        out[2] = cy*cp*sr - sy*sp*cr;
-        out[3] = cy*cp*cr + sy*sp*sr;
+        out[0] = cy * sp * cr + sy * cp * sr;
+        out[1] = sy * cp * cr - cy * sp * sr;
+        out[2] = cy * cp * sr - sy * sp * cr;
+        out[3] = cy * cp * cr + sy * sp * sr;
 
         return out;
     }
