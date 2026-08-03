@@ -146,18 +146,24 @@ export class vec3 {
 
     static transformMat3(out: Float32Array, v: Float32Array, m: Float32Array) {
 
-        out[0] = m[0] * v[0] + m[3] * v[1] + m[6] * v[2];
-        out[1] = m[1] * v[0] + m[4] * v[1] + m[7] * v[2];
-        out[2] = m[2] * v[0] + m[5] * v[1] + m[8] * v[2];
+        const vv = out === v ? this.clone(v) : v;
+
+        out[0] = m[0] * vv[0] + m[3] * vv[1] + m[6] * vv[2];
+        out[1] = m[1] * vv[0] + m[4] * vv[1] + m[7] * vv[2];
+        out[2] = m[2] * vv[0] + m[5] * vv[1] + m[8] * vv[2];
 
         return out;
     }
 
+
     static transformMat4(out: Float32Array, v: Float32Array, m: Float32Array) {
 
-        out[0] = m[0] * v[0] + m[4] * v[1] + m[8] * v[2];
-        out[1] = m[1] * v[0] + m[5] * v[1] + m[9] * v[2];
-        out[2] = m[2] * v[0] + m[6] * v[1] + m[10] * v[2];
+        const vv = out === v ? this.clone(v) : v;
+
+
+        out[0] = m[0] * vv[0] + m[4] * vv[1] + m[8] * vv[2];
+        out[1] = m[1] * vv[0] + m[5] * vv[1] + m[9] * vv[2];
+        out[2] = m[2] * vv[0] + m[6] * vv[1] + m[10] * vv[2];
 
         return out;
     }

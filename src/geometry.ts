@@ -2,7 +2,7 @@
 // Each face is wound CCW as seen from outside, matching WebGPU's default
 // frontFace: 'ccw' so cullMode: 'back' works correctly.
 
-const s = 0.4;
+const s = 1;
 
 // prettier-ignore
 export const cubeVertices = new Float32Array([

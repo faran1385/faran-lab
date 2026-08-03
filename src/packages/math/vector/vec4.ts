@@ -41,6 +41,7 @@ export class vec4 {
     }
 
     static div(out: Float32Array, a: Float32Array, b: Float32Array) {
+
         if (b[0] === 0 || b[1] === 0 || b[2] === 0 || b[3] === 0) throw new Error("Cannot divide by 0");
         out[0] = a[0] / b[0];
         out[1] = a[1] / b[1];
@@ -109,12 +110,13 @@ export class vec4 {
         );
     }
 
-    static transformMat4(out: Float32Array, vec: Float32Array, mat: Float32Array) {
+    static transformMat4(out: Float32Array, v: Float32Array, m: Float32Array) {
+        const vv = out === v ? this.clone(v) : v;
 
-        out[0] = mat[0] * vec[0] + mat[4] * vec[1] + mat[8] * vec[2] + mat[12] * vec[3];
-        out[1] = mat[1] * vec[0] + mat[5] * vec[1] + mat[9] * vec[2] + mat[13] * vec[3];
-        out[2] = mat[2] * vec[0] + mat[6] * vec[1] + mat[10] * vec[2] + mat[14] * vec[3];
-        out[3] = mat[3] * vec[0] + mat[7] * vec[1] + mat[11] * vec[2] + mat[15] * vec[3];
+        out[0] = m[0] * vv[0] + m[4] * vv[1] + m[8] * vv[2] + m[12] * vv[3];
+        out[1] = m[1] * vv[0] + m[5] * vv[1] + m[9] * vv[2] + m[13] * vv[3];
+        out[2] = m[2] * vv[0] + m[6] * vv[1] + m[10] * vv[2] + m[14] * vv[3];
+        out[3] = m[3] * vv[0] + m[7] * vv[1] + m[11] * vv[2] + m[15] * vv[3];
 
         return out;
     }

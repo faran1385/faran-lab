@@ -232,6 +232,8 @@ export class mat4 {
             0, 0, 0, 1
         )
 
+
+
         matrixMultiplication(out, mat, rotationMat, 4)
 
         return out;

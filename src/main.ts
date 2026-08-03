@@ -5,6 +5,8 @@ import {vec3} from "./packages/math/vector/vec3.ts";
 import {quat} from "./packages/math/quat/quat.ts";
 import {mat3} from "./packages/math/matrix/mat3.ts";
 import {vec4} from "./packages/math/vector/vec4.ts";
+import {vec2} from "./packages/math/vector/vec2.ts";
+import {degToRad} from "./packages/math/quat/utils.ts";
 
 const canvas = document.getElementById("gpu-canvas") as HTMLCanvasElement;
 
@@ -71,7 +73,7 @@ const viewBuffer = device.createBuffer({
 
 const viewMatrix = mat4.lookAt(
     mat4.create(),
-    vec3.fromValues(0, 0, 3),
+    vec3.fromValues(0, 0, 10),
     vec3.fromValues(0, 0, 0),
     vec3.fromValues(0, 1, 0),
 )
