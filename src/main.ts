@@ -2,37 +2,32 @@ import shaderCode from "./shader.wgsl?raw";
 import {cubeVertices, cubeVertexStride, faceNormals} from "./geometry";
 import {mat4} from "./packages/math/matrix/mat4.ts";
 import {vec3} from "./packages/math/vector/vec3.ts";
-import {quat} from "./packages/math/quat/quat.ts";
-import {mat3} from "./packages/math/matrix/mat3.ts";
-import {vec4} from "./packages/math/vector/vec4.ts";
-import {vec2} from "./packages/math/vector/vec2.ts";
-import {degToRad} from "./packages/math/quat/utils.ts";
+import {GPUContext} from "./engine/gpu-context.ts";
+import {GLBLoader} from "./engine/loaders/GLBLoader.ts";
+import {GLTFImporter} from "./engine/importers/GLTFImporter.ts";
+import {ImportFromGLB} from "./engine/importers/utils/GLBAdapter.ts";
+import {IRToWrapperConvertor} from "./engine/wrappers/IRToWrapperConvertor.ts";
 
 const canvas = document.getElementById("gpu-canvas") as HTMLCanvasElement;
 
-if (!navigator.gpu) {
-    throw new Error("WebGPU is not supported in this browser.");
-}
+const gpu = await GPUContext.create(canvas);
 
-const adapter = await navigator.gpu.requestAdapter();
-if (!adapter) throw new Error("No suitable GPUAdapter found.");
+let depthTexture: null | GPUTexture = null;
+const device = gpu.device;
+const format = gpu.format;
+const context = gpu.context
 
-const device = await adapter.requestDevice();
-const context = canvas.getContext("webgpu") as GPUCanvasContext;
-const format = navigator.gpu.getPreferredCanvasFormat();
-
-
-context.configure({
-    device,
-    format,
-    alphaMode: "opaque",
-});
-
-const depthTexture = device.createTexture({
-    size: [window.innerWidth, window.innerHeight],
-    usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
-    format: "depth32float"
+gpu.onResize((w, h) => {
+    depthTexture?.destroy();
+    depthTexture = device.createTexture({
+        size: [w, h],
+        usage: GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+        format: "depth32float"
+    })
 })
+
+gpu.resize(canvas.width, canvas.height)
+
 
 // --- geometry buffers ---
 const vertexBuffer = device.createBuffer({
@@ -175,6 +170,14 @@ const pipeline = device.createRenderPipeline({
 let last = performance.now() / 1000;
 let delta = 0;
 
+const glbLoader = new GLBLoader();
+const glbImporter = new GLTFImporter();
+const irToWrapperConvertor = new IRToWrapperConvertor();
+
+const glbParseResult = await glbLoader.load("/test.glb")
+const ir = glbImporter.import(ImportFromGLB(glbParseResult))
+console.log(ir)
+irToWrapperConvertor.convert(ir)
 
 function frame(): void {
     delta = performance.now() / 1000 - last;
@@ -197,7 +200,7 @@ function frame(): void {
             depthLoadOp: "clear",
             depthClearValue: 1,
             depthStoreOp: "store",
-            view: depthTexture.createView(),
+            view: depthTexture?.createView(),
         }
     });
 
@@ -213,12 +216,3 @@ function frame(): void {
 }
 
 requestAnimationFrame(frame);
-
-
-const onResize = () => {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-}
-
-window.addEventListener("resize", onResize);
-onResize()
