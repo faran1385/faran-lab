@@ -26,7 +26,7 @@ export class NodeWrapper {
         this.children.set(child.uuid, child);
     }
 
-    setMesh(mesh: MeshWrapper | undefined) {
+    setMesh(mesh: MeshWrapper) {
         this.mesh = mesh;
     }
 

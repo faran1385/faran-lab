@@ -1,21 +1,17 @@
-import type {
-    SceneIR,
-    Node,
-    Mesh,
-    Primitive,
-    Geometry,
-    Attribute,
-    VertexFormat,
-    Material,
-    Image,
-    Sampler,
-    Texture,
-    TextureRef,
-    PbrMetallicRoughnessComponent,
-    NormalMapComponent,
-    OcclusionComponent,
-    EmissiveComponent,
+import {
+    type SceneIR,
+    type Node,
+    type Mesh,
+    type Primitive,
+    type Geometry,
+    type Attribute,
+    type VertexFormat,
+    type Material,
+    type Sampler,
+    type DecodedImage,
+    type Texture, uvAttributeName, type MaterialComponentIR,
 } from "./utils/IR.ts";
+import {ImageDecoder} from "./utils/ImageDecoder.ts";
 
 export interface GLTFParseResult {
     json: any;
@@ -74,9 +70,9 @@ const SIMPLE_ATTRIBUTE_MAP: Record<
     string,
     { irKey: string; componentCount: number; format: VertexFormat }
 > = {
-    POSITION: { irKey: "position", componentCount: 3, format: "float32x3" },
-    NORMAL: { irKey: "normal", componentCount: 3, format: "float32x3" },
-    TANGENT: { irKey: "tangent", componentCount: 4, format: "float32x4" },
+    POSITION: {irKey: "position", componentCount: 3, format: "float32x3"},
+    NORMAL: {irKey: "normal", componentCount: 3, format: "float32x3"},
+    TANGENT: {irKey: "tangent", componentCount: 4, format: "float32x4"},
 };
 
 // Attributes we know about but don't support yet — skip with a warning
@@ -145,7 +141,7 @@ function decomposeMat4(m: number[]): { translation: Vec3; rotation: Quat; scale:
         qz = 0.25 * s;
     }
 
-    return { translation, rotation: [qx, qy, qz, qw], scale };
+    return {translation, rotation: [qx, qy, qz, qw], scale};
 }
 
 // ── accessor reading ─────────────────────────────────────────────────────
@@ -224,7 +220,7 @@ function readRawAccessor(gltf: any, buffers: ArrayBuffer[], accessorIndex: numbe
         // sparse-only accessors, which we've already rejected above, or for
         // certain animation defaults). Zero-filled Float64Array already
         // satisfies this.
-        return { componentType, componentCount, count, normalized, values };
+        return {componentType, componentCount, count, normalized, values};
     }
 
     const bufferView = gltf.bufferViews[accessor.bufferView];
@@ -270,7 +266,7 @@ function readRawAccessor(gltf: any, buffers: ArrayBuffer[], accessorIndex: numbe
         }
     }
 
-    return { componentType, componentCount, count, normalized, values };
+    return {componentType, componentCount, count, normalized, values};
 }
 
 function dequantize(raw: number, componentType: GLComponentType): number {
@@ -317,42 +313,75 @@ function readIndices(
         throw new Error(`GLTFImporter: index accessor ${accessorIndex} is not scalar`);
     }
     if (raw.componentType === GLComponentType.UNSIGNED_INT) {
-        return { format: "uint32", data: Uint32Array.from(raw.values).buffer };
+        return {format: "uint32", data: Uint32Array.from(raw.values).buffer};
     }
     // BYTE/UNSIGNED_BYTE/SHORT/UNSIGNED_SHORT all fold into uint16 — indices
     // are never normalized in valid glTF, so raw values are already integers.
-    return { format: "uint16", data: Uint16Array.from(raw.values).buffer };
+    return {format: "uint16", data: Uint16Array.from(raw.values).buffer};
 }
 
 // ── geometry ─────────────────────────────────────────────────────────────
+// ── geometry ─────────────────────────────────────────────────────────────
 
-function importGeometry(gltf: any, buffers: ArrayBuffer[], gltfPrimitive: any): Geometry {
-    const attributes: Record<string, Attribute> = {};
+// Per-import-run pool: glTF accessor index -> index into SceneIR.attributes[].
+// Scoped to one import() call, same guarantee as image dedup — not claiming
+// cross-file dedup, which stays deferred (see architecture doc).
+type AttributePool = {
+    attributes: Attribute[];
+    accessorIndexToAttributeIndex: Map<number, number>;
+};
+
+function poolAttribute(pool: AttributePool, accessorIndex: number, attribute: Attribute): number {
+    const existing = pool.accessorIndexToAttributeIndex.get(accessorIndex);
+    if (existing !== undefined) {
+        return existing;
+    }
+    const newIndex = pool.attributes.length;
+    pool.attributes.push(attribute);
+    pool.accessorIndexToAttributeIndex.set(accessorIndex, newIndex);
+    return newIndex;
+}
+
+function importGeometry(
+    gltf: any,
+    buffers: ArrayBuffer[],
+    gltfPrimitive: any,
+    pool: AttributePool,
+): Geometry {
+    const attributes: Record<string, number> = {};
     const gltfAttrs: Record<string, number> = gltfPrimitive.attributes ?? {};
 
     for (const [semantic, accessorIndex] of Object.entries(gltfAttrs)) {
         const simple = SIMPLE_ATTRIBUTE_MAP[semantic];
         if (simple) {
             const data = readFloatAttribute(gltf, buffers, accessorIndex, simple.componentCount);
-            attributes[simple.irKey] = { format: simple.format, data: data.buffer as ArrayBuffer };
+            const attributeIndex = poolAttribute(pool, accessorIndex, {
+                format: simple.format,
+                data: data.buffer as ArrayBuffer,
+            });
+            attributes[simple.irKey] = attributeIndex;
             continue;
         }
 
         const uvMatch = /^TEXCOORD_(\d+)$/.exec(semantic);
         if (uvMatch) {
             const data = readFloatAttribute(gltf, buffers, accessorIndex, 2);
-            attributes[`uv${uvMatch[1]}`] = { format: "float32x2", data: data.buffer as ArrayBuffer };
+            const attributeIndex = poolAttribute(pool, accessorIndex, {
+                format: "float32x2",
+                data: data.buffer as ArrayBuffer,
+            });
+            attributes[uvAttributeName(+(uvMatch[1]))] = attributeIndex;
             continue;
         }
 
         if (semantic === "COLOR_0") {
-            // COLOR_0 may be VEC3 or VEC4 in glTF; normalize to vec4 (alpha=1)
-            // so shader assembly always sees a consistent format.
             const accessor = gltf.accessors[accessorIndex as number];
             const componentCount = GLTF_TYPE_COMPONENT_COUNT[accessor.type];
             const raw = readFloatAttribute(gltf, buffers, accessorIndex, componentCount);
+
+            let colorData: ArrayBuffer;
             if (componentCount === 4) {
-                attributes["color0"] = { format: "float32x4", data: raw.buffer as ArrayBuffer };
+                colorData = raw.buffer as ArrayBuffer;
             } else {
                 const count = raw.length / 3;
                 const vec4 = new Float32Array(count * 4);
@@ -362,8 +391,14 @@ function importGeometry(gltf: any, buffers: ArrayBuffer[], gltfPrimitive: any): 
                     vec4[i * 4 + 2] = raw[i * 3 + 2];
                     vec4[i * 4 + 3] = 1;
                 }
-                attributes["color0"] = { format: "float32x4", data: vec4.buffer };
+                colorData = vec4.buffer;
             }
+
+            const attributeIndex = poolAttribute(pool, accessorIndex, {
+                format: "float32x4",
+                data: colorData,
+            });
+            attributes["color0"] = attributeIndex;
             continue;
         }
 
@@ -375,7 +410,7 @@ function importGeometry(gltf: any, buffers: ArrayBuffer[], gltfPrimitive: any): 
         console.warn(`GLTFImporter: skipping unrecognized attribute "${semantic}"`);
     }
 
-    if (!attributes["position"]) {
+    if (attributes["position"] === undefined) {
         throw new Error("GLTFImporter: primitive has no POSITION attribute");
     }
 
@@ -384,29 +419,7 @@ function importGeometry(gltf: any, buffers: ArrayBuffer[], gltfPrimitive: any): 
         indices = readIndices(gltf, buffers, gltfPrimitive.indices);
     }
 
-    // POSITION accessor min/max is required by spec when present; prefer it
-    // over recomputing (cheaper, and authoritative per the source file).
-    const posAccessor = gltf.accessors[gltfAttrs["POSITION"]];
-    let boundingBox: Geometry["boundingBox"];
-    if (posAccessor.min && posAccessor.max) {
-        boundingBox = {
-            min: [posAccessor.min[0], posAccessor.min[1], posAccessor.min[2]],
-            max: [posAccessor.max[0], posAccessor.max[1], posAccessor.max[2]],
-        };
-    } else {
-        const pos = new Float32Array(attributes["position"].data);
-        const min: Vec3 = [Infinity, Infinity, Infinity];
-        const max: Vec3 = [-Infinity, -Infinity, -Infinity];
-        for (let i = 0; i < pos.length; i += 3) {
-            for (let c = 0; c < 3; c++) {
-                min[c] = Math.min(min[c], pos[i + c]);
-                max[c] = Math.max(max[c], pos[i + c]);
-            }
-        }
-        boundingBox = { min, max };
-    }
-
-    return { attributes, indices, boundingBox };
+    return {attributes: attributes, indices};
 }
 
 // ── images / samplers / textures ────────────────────────────────────────
@@ -420,28 +433,26 @@ function decodeDataUri(uri: string): { mimeType: string; data: ArrayBuffer } {
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return { mimeType, data: bytes.buffer };
+    return {mimeType, data: bytes.buffer};
 }
 
-function importImage(gltf: any, buffers: ArrayBuffer[], gltfImage: any, index: number): Image {
+async function importImage(gltf: any, buffers: ArrayBuffer[], gltfImage: any, index: number): Promise<DecodedImage> {
+
     if (gltfImage.bufferView !== undefined) {
         const bufferData = resolveBufferView(gltf, buffers, gltfImage.bufferView);
         const bv = gltf.bufferViews[gltfImage.bufferView];
         const start = bv.byteOffset ?? 0;
         const data = bufferData.slice(start, start + bv.byteLength);
         const mimeType = gltfImage.mimeType ?? "application/octet-stream";
-        return { mimeType, data };
+        return await ImageDecoder.decode(data, mimeType)
     }
 
     if (typeof gltfImage.uri === "string" && gltfImage.uri.startsWith("data:")) {
-        return decodeDataUri(gltfImage.uri);
+        const {data, mimeType} = decodeDataUri(gltfImage.uri);
+        return await ImageDecoder.decode(data, mimeType)
     }
 
-    // External image reference (image.uri points at a sibling file, e.g.
-    // "texture.png"). Resolving that is a loader-level concern — the loader
-    // would need to fetch the sibling asset and hand this importer either a
-    // data URI or a bufferView-backed buffer, not a bare filename. Not
-    // resolved here regardless of container (GLB or loose .gltf).
+
     throw new Error(
         `GLTFImporter: image ${index} references an external URI ("${gltfImage.uri}"), which this importer does not resolve — the loader must supply image data via bufferView or data URI`,
     );
@@ -516,46 +527,51 @@ function importSampler(gltfSampler: any): Sampler {
 
 // ── materials ────────────────────────────────────────────────────────────
 
-function toTextureRef(gltfTextureInfo: any): TextureRef {
-    return { index: gltfTextureInfo.index, texCoord: gltfTextureInfo.texCoord ?? 0 };
+function toComponentTexture(texInfo: any): MaterialComponentIR["texture"] | undefined {
+    if (!texInfo) return undefined;
+    return {
+        index: texInfo.index,
+        texCoord: `uv${texInfo.texCoord ?? 0}`,
+    };
 }
 
 function importMaterial(gltfMaterial: any): Material {
-    const components: Record<string, unknown> = {};
+    const components: Record<string, MaterialComponentIR> = {};
 
     const pbr = gltfMaterial.pbrMetallicRoughness ?? {};
-    const pbrComponent: PbrMetallicRoughnessComponent = {
-        baseColor: pbr.baseColorFactor ?? [1, 1, 1, 1],
-        metallic: pbr.metallicFactor ?? 1,
-        roughness: pbr.roughnessFactor ?? 1,
-    };
-    if (pbr.baseColorTexture) pbrComponent.baseColorTexture = toTextureRef(pbr.baseColorTexture);
-    if (pbr.metallicRoughnessTexture) pbrComponent.metallicRoughnessTexture = toTextureRef(pbr.metallicRoughnessTexture);
-    components.pbrMetallicRoughness = pbrComponent;
+    const metallicRoughnessTexture = toComponentTexture(pbr.metallicRoughnessTexture);
 
-    if (gltfMaterial.normalTexture) {
-        const normalMap: NormalMapComponent = {
-            texture: toTextureRef(gltfMaterial.normalTexture),
-            scale: gltfMaterial.normalTexture.scale ?? 1,
-        };
-        components.normalMap = normalMap;
-    }
+    components.baseColor = {
+        factor: pbr.baseColorFactor ?? [1, 1, 1, 1],
+        texture: toComponentTexture(pbr.baseColorTexture),
+    };
+
+    // metallic (B channel) and roughness (G channel) are packed into the same
+    // source texture in glTF — same texture ref, two components, since each
+    // component owns exactly one factor slot in the factors buffer.
+    components.metallic = {
+        factor: [pbr.metallicFactor ?? 1],
+        texture: metallicRoughnessTexture,
+    };
+    components.roughness = {
+        factor: [pbr.roughnessFactor ?? 1],
+        texture: metallicRoughnessTexture,
+    };
 
     if (gltfMaterial.occlusionTexture) {
-        const occlusion: OcclusionComponent = {
-            texture: toTextureRef(gltfMaterial.occlusionTexture),
-            strength: gltfMaterial.occlusionTexture.strength ?? 1,
+        components.ao = {
+            factor: [gltfMaterial.occlusionTexture.strength ?? 1],
+            texture: toComponentTexture(gltfMaterial.occlusionTexture),
         };
-        components.occlusion = occlusion;
     }
 
-    const emissiveFactor: Vec3 = gltfMaterial.emissiveFactor ?? [0, 0, 0];
-    if (gltfMaterial.emissiveTexture || emissiveFactor.some((c) => c !== 0)) {
-        const emissive: EmissiveComponent = { color: emissiveFactor };
-        if (gltfMaterial.emissiveTexture) emissive.texture = toTextureRef(gltfMaterial.emissiveTexture);
-        components.emissive = emissive;
-        // Note: KHR_materials_emissive_strength is not read here — deferred
-        // alongside other material extensions until a concrete need arises.
+    if (gltfMaterial.normalTexture) {
+        // normal has no meaningful factor-only form — it's a texture-driven
+        // component; "factor" here holds the glTF normal scale.
+        components.normal = {
+            factor: [gltfMaterial.normalTexture.scale ?? 1],
+            texture: toComponentTexture(gltfMaterial.normalTexture),
+        };
     }
 
     return {
@@ -569,11 +585,15 @@ function importMaterial(gltfMaterial: any): Material {
 function defaultMaterial(): Material {
     return {
         components: {
-            pbrMetallicRoughness: {
-                baseColor: [0.8, 0.8, 0.8, 1.0],
-                metallic: 1,
-                roughness: 1,
-            } as PbrMetallicRoughnessComponent,
+            baseColor: {
+                factor: [1, 1, 1, 1],
+            },
+            metallic: {
+                factor: [1],
+            },
+            roughness: {
+                factor: [1]
+            }
         },
         alphaMode: "opaque",
         doubleSided: false,
@@ -644,25 +664,28 @@ export class GLTFImporter {
      * Container-agnostic — see GLTFParseResult for what "resolved buffers"
      * means for GLB vs loose .gltf+.bin.
      */
-    import(parseResult: GLTFParseResult): SceneIR {
-        const { json: gltf, buffers } = parseResult;
+    async import(parseResult: GLTFParseResult): Promise<SceneIR> {
+        const {json: gltf, buffers} = parseResult;
 
         if (!gltf.asset || !gltf.asset.version?.startsWith("2.")) {
             throw new Error(`GLTFImporter: unsupported glTF version "${gltf.asset?.version}", expected 2.x`);
         }
+        const images: DecodedImage[] = []
+        let imageIndex = 0;
 
-        // -- images / samplers / textures: mirrored 1:1 so glTF indices carry
-        //    over unchanged into SceneIR indices --
-        const images: Image[] = (gltf.images ?? []).map((img: any, i: number) =>
-            importImage(gltf, buffers, img, i),
-        );
+        for (const image of gltf.images) {
+
+            const decodedImage = await importImage(gltf, buffers, image, imageIndex)
+            images.push(decodedImage);
+            imageIndex++
+        }
+
         const samplers: Sampler[] = (gltf.samplers ?? []).map(importSampler);
         const textures: Texture[] = (gltf.textures ?? []).map((t: any) => ({
             image: t.source,
-            sampler: t.sampler, // may be undefined; WireUpLayer resolves the default
+            sampler: t.sampler,
         }));
 
-        // -- materials --
         const materials: Material[] = (gltf.materials ?? []).map((m: any) => importMaterial(m));
         let defaultMaterialIndex = -1;
         const getDefaultMaterialIndex = (): number => {
@@ -673,9 +696,13 @@ export class GLTFImporter {
             return defaultMaterialIndex;
         };
 
-        // -- geometries / primitives / meshes: flatten glTF's inline
-        //    mesh.primitives into IR's flat Geometry[]/Primitive[] arrays,
-        //    with Mesh.primitives holding indices into the flat array --
+        // Shared attribute pool for this import() run — mirrors images[]'s
+        // dedup guarantee, scoped the same way (per-run, not cross-file).
+        const pool: AttributePool = {
+            attributes: [],
+            accessorIndexToAttributeIndex: new Map(),
+        };
+
         const geometries: Geometry[] = [];
         const primitives: Primitive[] = [];
         const meshes: Mesh[] = (gltf.meshes ?? []).map((gltfMesh: any) => {
@@ -689,26 +716,23 @@ export class GLTFImporter {
                 }
 
                 const geometryIndex = geometries.length;
-                geometries.push(importGeometry(gltf, buffers, gltfPrimitive));
+                geometries.push(importGeometry(gltf, buffers, gltfPrimitive, pool));
 
                 const materialIndex =
                     gltfPrimitive.material !== undefined ? gltfPrimitive.material : getDefaultMaterialIndex();
 
                 const primitiveIndex = primitives.length;
-                primitives.push({ geometry: geometryIndex, material: materialIndex, topology });
+                primitives.push({geometry: geometryIndex, material: materialIndex, topology});
                 return primitiveIndex;
             });
-            return { primitives: primitiveIndices };
+            return {primitives: primitiveIndices};
         });
 
-        // -- node tree --
         const sceneIndex = gltf.scene ?? 0;
         let rootNodeIndices: number[];
         if (gltf.scenes && gltf.scenes[sceneIndex]) {
             rootNodeIndices = gltf.scenes[sceneIndex].nodes ?? [];
         } else if (gltf.nodes) {
-            // Fallback for minimal files with no `scenes` array: treat every
-            // node that's nobody's child as a root.
             const childIndices = new Set<number>();
             for (const n of gltf.nodes) {
                 for (const c of n.children ?? []) childIndices.add(c);
@@ -720,6 +744,9 @@ export class GLTFImporter {
 
         const roots: Node[] = rootNodeIndices.map((i) => importNode(gltf, i, new Set()));
 
-        return { roots, geometries, materials, images, samplers, textures, primitives, meshes };
+        return {
+            roots, geometries, materials, images, samplers, textures, primitives, meshes,
+            attributes: pool.attributes,
+        };
     }
 }

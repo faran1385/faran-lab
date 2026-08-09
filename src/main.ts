@@ -6,7 +6,10 @@ import {GPUContext} from "./engine/gpu-context.ts";
 import {GLBLoader} from "./engine/loaders/GLBLoader.ts";
 import {GLTFImporter} from "./engine/importers/GLTFImporter.ts";
 import {ImportFromGLB} from "./engine/importers/utils/GLBAdapter.ts";
-import {IRToWrapperConvertor} from "./engine/wrappers/IRToWrapperConvertor.ts";
+import {IRToWrapperConvertor} from "./engine/importers/utils/IRToWrapperConvertor.ts";
+import {BaseWireUp} from "./engine/WireUp/BaseWireUp.ts";
+import {DescriptorProducer} from "./engine/descriptorProducer/DescriptorProducer.ts";
+import {Hasher} from "./engine/hashing/Hasher.ts";
 
 const canvas = document.getElementById("gpu-canvas") as HTMLCanvasElement;
 
@@ -173,11 +176,16 @@ let delta = 0;
 const glbLoader = new GLBLoader();
 const glbImporter = new GLTFImporter();
 const irToWrapperConvertor = new IRToWrapperConvertor();
-
+const baseWireUp = new BaseWireUp();
 const glbParseResult = await glbLoader.load("/test.glb")
-const ir = glbImporter.import(ImportFromGLB(glbParseResult))
-console.log(ir)
-irToWrapperConvertor.convert(ir)
+const ir = await glbImporter.import(ImportFromGLB(glbParseResult))
+const {materials} = irToWrapperConvertor.convert(ir, baseWireUp.wireUp.bind(baseWireUp));
+const hasher = await Hasher.create();
+
+materials.forEach(material => {
+    console.log(DescriptorProducer.materialDescriptorProducer(material.wrapper, hasher))
+})
+
 
 function frame(): void {
     delta = performance.now() / 1000 - last;
