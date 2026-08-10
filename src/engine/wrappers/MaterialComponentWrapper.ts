@@ -12,6 +12,8 @@ export class MaterialComponentWrapper {
     readonly uuid: string;
     readonly name: string
     private texture?: MaterialComponentTextureSlot
+    private version = 0;
+    private lastSyncedVersion = 0;
 
     constructor(name: string, factors: number[]) {
         this.factors = factors;
@@ -25,10 +27,6 @@ export class MaterialComponentWrapper {
         this.texture = texture;
     }
 
-    setFactors(factors: number[]): void {
-        this.factors = factors;
-    }
-
     getTexture() {
         return this.texture;
     }
@@ -37,12 +35,48 @@ export class MaterialComponentWrapper {
         return this.factors
     }
 
-    convertToHash(hasher: Hasher): string {
-        const factorsPart = this.factors.join(",");
-        const texturePart = this.texture
-            ? `${this.texture.wrapper.convertToHash(hasher)}|${this.texture.texCoord}`
-            : "none";
+    convertToShaderHash(hasher: Hasher): string {
+        const factorType = this.factors.length;
+        const hasTexture = this.texture ? "1" : "0";
+        const texCoord = this.texture ? this.texture.texCoord : "none";
 
-        return hasher.hashString(`${this.name}|${factorsPart}|${texturePart}`);
+        return hasher.hashString(`${this.name}|${factorType}|${hasTexture}|${texCoord}`);
+    }
+
+    convertToBindGroupLayoutHash(hasher: Hasher): string {
+        const hasTexture = this.texture ? "1" : "0";
+
+        return hasher.hashString(`${this.name}|${hasTexture}`);
+    }
+
+    convertToBindGroupHash(hasher: Hasher): string {
+        const layoutPart = this.convertToBindGroupLayoutHash(hasher);
+        const texturePart = this.texture ? this.texture.wrapper.convertToHash(hasher) : "none";
+
+        return hasher.hashString(`${layoutPart}|${texturePart}`);
+    }
+
+
+
+    setFactors(factors: number[]): void {
+        this.factors = factors;
+        this.version++;
+    }
+
+    getVersion(): number {
+        return this.version;
+    }
+
+    isDirty(): boolean {
+        return this.version !== this.lastSyncedVersion;
+    }
+
+    markSynced(): void {
+        this.lastSyncedVersion = this.version;
+    }
+
+    convertToBufferContentHash(hasher: Hasher): string {
+        const factorsPart = this.factors.join(",");
+        return hasher.hashString(`${this.name}|${factorsPart}`);
     }
 }

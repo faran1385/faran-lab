@@ -169,7 +169,6 @@ function assembleLayout(
             texture: textureResult.fields[component.name],
         };
     }
-
     return {
         uniformBufferSize: uniformResult.totalSize,
         uniformBufferBinding,
@@ -187,13 +186,14 @@ function assembleLayout(
 
 // --- Public entry point ---------------------------------------------------
 
-export class DescriptorProducer {
+export class MaterialDescriptorProducer {
     constructor() {
     }
 
-    static materialDescriptorProducer(
+    static produce(
         mat: MaterialWrapper,
-        hasher: Hasher
+        hasher: Hasher,
+        textureBudget: number
     ): MaterialBindingLayout {
 
         const components = mat.getAllComponents().sort((a, b) => a.name.localeCompare(b.name));
@@ -201,13 +201,17 @@ export class DescriptorProducer {
         const uniformResult = computeUniformLayout(components);
         const uniformBufferBinding = uniformResult.totalSize > 0 ? 0 : null;
 
-        // Texture/sampler bindings start right after the buffer binding, if any.
         const textureResult = computeTextureBindings(
             components,
             hasher,
             uniformBufferBinding === null ? 0 : uniformBufferBinding + 1
         );
 
+        if (textureResult.distinctTextureCount > textureBudget) {
+            throw new Error(
+                `DescriptorProducer: material "${mat.uuid}" needs ${textureResult.distinctTextureCount} distinct textures, budget is ${textureBudget}`
+            );
+        }
         return assembleLayout(components, uniformResult, textureResult, uniformBufferBinding);
     }
 }

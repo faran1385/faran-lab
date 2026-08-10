@@ -37,9 +37,7 @@ export class GeometryWrapper {
             .map(([name, attr]) => `${name}:${attr.convertToHash(hasher)}`)
             .join('|');
 
-        const indexPart = this.indices ? this.indices.convertToHash(hasher) : '';
-
-        this.cachedHash = hasher.hashString(`${attrPart}#${indexPart}`);
+        this.cachedHash = hasher.hashString(attrPart);
 
         this.cachedAttributeVersions = new Map(
             Array.from(this.attributes.entries()).map(([name, attr]) => [name, attr.getVersion()])
@@ -48,6 +46,10 @@ export class GeometryWrapper {
         this.hadIndicesLastHash = this.indices !== undefined;
 
         return this.cachedHash;
+    }
+
+    getIndicesHash(hasher: Hasher): string | null {
+        return this.indices ? this.indices.convertToHash(hasher) : null;
     }
 
     private isCacheValid(): boolean {
@@ -64,5 +66,9 @@ export class GeometryWrapper {
             }
         }
         return true;
+    }
+
+    getAttributes(){
+        return this.attributes;
     }
 }

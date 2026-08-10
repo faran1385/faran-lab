@@ -8,7 +8,7 @@ import {GLTFImporter} from "./engine/importers/GLTFImporter.ts";
 import {ImportFromGLB} from "./engine/importers/utils/GLBAdapter.ts";
 import {IRToWrapperConvertor} from "./engine/importers/utils/IRToWrapperConvertor.ts";
 import {BaseWireUp} from "./engine/WireUp/BaseWireUp.ts";
-import {DescriptorProducer} from "./engine/descriptorProducer/DescriptorProducer.ts";
+import {MaterialDescriptorProducer} from "./engine/descriptorProducer/MaterialDescriptorProducer.ts";
 import {Hasher} from "./engine/hashing/Hasher.ts";
 
 const canvas = document.getElementById("gpu-canvas") as HTMLCanvasElement;
@@ -183,7 +183,7 @@ const {materials} = irToWrapperConvertor.convert(ir, baseWireUp.wireUp.bind(base
 const hasher = await Hasher.create();
 
 materials.forEach(material => {
-    console.log(DescriptorProducer.materialDescriptorProducer(material.wrapper, hasher))
+    console.log(MaterialDescriptorProducer.produce(material.wrapper, hasher, 2))
 })
 
 

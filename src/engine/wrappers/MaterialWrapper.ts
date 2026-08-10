@@ -1,6 +1,6 @@
 import type {Material} from "../importers/utils/IR.ts";
 import {MaterialComponentWrapper} from "./MaterialComponentWrapper.ts";
-import { v4 as uuidv4 } from "uuid";
+import {v4 as uuidv4} from "uuid";
 import type {Hasher} from "../hashing/Hasher.ts";
 
 export class MaterialWrapper {
@@ -58,14 +58,62 @@ export class MaterialWrapper {
         this.doubleSided = doubleSided;
     }
 
-    convertToHash(hasher: Hasher): string {
-        const componentsPart = Array.from(this.components.keys())
-            .sort()
-            .map((name) => `${name}:${this.components.get(name)!.convertToHash(hasher)}`)
+
+    convertToShaderHash(hasher: Hasher): string {
+        const parts = this.sortedComponents()
+            .map((c) => {
+                const factorType = c.getFactors().length;
+                const texture = c.getTexture();
+                const hasTexture = texture ? "1" : "0";
+                const texCoord = texture ? texture.texCoord : "none";
+                return `${c.name}|${factorType}|${hasTexture}|${texCoord}`;
+            })
             .join(",");
 
+        return hasher.hashString(parts);
+    }
+
+    convertToFactorsBufferHash(hasher: Hasher): string {
+        const parts = this.sortedComponents()
+            .map((c) => `${c.name}|${c.getFactors().length}`)
+            .join(",");
+
+        return hasher.hashString(parts);
+    }
+
+    convertToBindGroupLayoutHash(hasher: Hasher): string {
+        const hasAnyFactors = this.sortedComponents().some((c) => c.getFactors().length > 0)
+            ? "1"
+            : "0";
+
+        const texturePart = this.sortedComponents()
+            .map((c) => `${c.name}|${c.getTexture() ? "1" : "0"}`)
+            .join(",");
+
+        return hasher.hashString(`factors:${hasAnyFactors}|textures:${texturePart}`);
+    }
+
+    convertToBindGroupHash(hasher: Hasher): string {
+        const layoutPart = this.convertToBindGroupLayoutHash(hasher);
+        const bufferPart = this.convertToFactorsBufferHash(hasher);
+
+        const texturePart = this.sortedComponents()
+            .map((c) => {
+                const texture = c.getTexture();
+                return `${c.name}|${texture ? texture.wrapper.convertToHash(hasher) : "none"}`;
+            })
+            .join(",");
+
+        return hasher.hashString(`${layoutPart}|${bufferPart}|${texturePart}`);
+    }
+
+    private sortedComponents(): MaterialComponentWrapper[] {
+        return Array.from(this.components.values()).sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    convertToHash(hasher: Hasher): string {
         return hasher.hashString(
-            `${componentsPart}|${this.alphaMode}|${this.alphaCutoff ?? "none"}|${this.doubleSided}`
+            `${this.convertToBindGroupLayoutHash(hasher)}|${this.convertToShaderHash(hasher)}|${this.alphaMode}|${this.alphaCutoff ?? "none"}|${this.doubleSided}`
         );
     }
 }

@@ -30,7 +30,7 @@ export class TextureWrapper {
 
     convertToHash(hasher: Hasher): string {
         const imageHash = this.image.convertToHash(hasher);
-        const samplerHash = this.sampler?.convertToHash(hasher) ?? "none";
+        const samplerHash = this.sampler.convertToHash(hasher);
 
         return hasher.hashString(`${imageHash}|${samplerHash}`);
     }
