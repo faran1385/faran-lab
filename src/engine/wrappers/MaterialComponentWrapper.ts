@@ -1,30 +1,31 @@
 import type {TextureWrapper} from "./TextureWrapper.ts";
 import {v4 as uuidv4} from "uuid";
 import type {Hasher} from "../hashing/Hasher.ts";
+import {MaterialComponentHashHandler} from "../hashing/MaterialComponentHashHandler.ts";
 
-type MaterialComponentTextureSlot = {
+export type MaterialComponentTextureSlot = {
     wrapper: TextureWrapper,
     texCoord: `uv${number}`
 }
-
 export class MaterialComponentWrapper {
     private factors: number[];
     readonly uuid: string;
-    readonly name: string
-    private texture?: MaterialComponentTextureSlot
-    private version = 0;
-    private lastSyncedVersion = 0;
+    readonly name: string;
+    private texture?: MaterialComponentTextureSlot;
+
+    private hashHandler: MaterialComponentHashHandler;
 
     constructor(name: string, factors: number[]) {
         this.factors = factors;
         this.name = name;
-
         this.uuid = uuidv4();
-    }
 
+        this.hashHandler = new MaterialComponentHashHandler(name, () => this.texture);
+    }
 
     setTexture(texture: MaterialComponentTextureSlot): void {
         this.texture = texture;
+        this.hashHandler.bumpShaderVersion()
     }
 
     getTexture() {
@@ -32,51 +33,27 @@ export class MaterialComponentWrapper {
     }
 
     getFactors() {
-        return this.factors
+        return this.factors;
     }
-
-    convertToShaderHash(hasher: Hasher): string {
-        const factorType = this.factors.length;
-        const hasTexture = this.texture ? "1" : "0";
-        const texCoord = this.texture ? this.texture.texCoord : "none";
-
-        return hasher.hashString(`${this.name}|${factorType}|${hasTexture}|${texCoord}`);
-    }
-
-    convertToBindGroupLayoutHash(hasher: Hasher): string {
-        const hasTexture = this.texture ? "1" : "0";
-
-        return hasher.hashString(`${this.name}|${hasTexture}`);
-    }
-
-    convertToBindGroupHash(hasher: Hasher): string {
-        const layoutPart = this.convertToBindGroupLayoutHash(hasher);
-        const texturePart = this.texture ? this.texture.wrapper.convertToHash(hasher) : "none";
-
-        return hasher.hashString(`${layoutPart}|${texturePart}`);
-    }
-
-
 
     setFactors(factors: number[]): void {
         this.factors = factors;
-        this.version++;
+        this.hashHandler.bumpFactorsBufferVersion()
     }
 
-    getVersion(): number {
-        return this.version;
+    getShaderVersion(): number {
+        return this.hashHandler.getShaderVersion()
     }
 
-    isDirty(): boolean {
-        return this.version !== this.lastSyncedVersion;
+    getFactorsBufferVersion(): number {
+        return this.hashHandler.getFactorsBufferVersion();
     }
 
-    markSynced(): void {
-        this.lastSyncedVersion = this.version;
+    getBindGroupLayoutHashPart(): string {
+        return this.hashHandler.getBindGroupLayoutHashPart();
     }
 
-    convertToBufferContentHash(hasher: Hasher): string {
-        const factorsPart = this.factors.join(",");
-        return hasher.hashString(`${this.name}|${factorsPart}`);
+    getBindGroupHashPart(hasher: Hasher): string {
+        return this.hashHandler.getBindGroupHashPart(hasher);
     }
 }

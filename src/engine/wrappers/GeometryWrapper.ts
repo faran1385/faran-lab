@@ -3,6 +3,8 @@ import type {AttributeName} from "../importers/utils/IR.ts";
 import {Hasher} from "../hashing/Hasher.ts";
 import type {VertexAttributeWrapper} from "./VertexAttributeWrapper.ts";
 import type {IndexAttributeWrapper} from "./IndexWrapper.ts";
+import type {VertexAttributeLayout} from "../descriptorProducer/GeometryDescriptorProducer.ts";
+import {GeometryHashHandler} from "../hashing/GeometryHashHandler.ts";
 
 export class GeometryWrapper {
     readonly uuid: string;
@@ -10,65 +12,52 @@ export class GeometryWrapper {
     private attributes: Map<AttributeName, VertexAttributeWrapper> = new Map();
     private indices?: IndexAttributeWrapper;
 
-    private cachedHash: string | null = null;
-    private cachedAttributeVersions: Map<AttributeName, number> = new Map();
-    private cachedIndicesVersion: number | null = null;
-    private hadIndicesLastHash: boolean = false;
+    private layoutDescriptor!: Map<string, VertexAttributeLayout>;
+    private hashHandler: GeometryHashHandler;
 
     constructor() {
         this.uuid = uuidv4();
+        this.hashHandler = new GeometryHashHandler(
+            () => this.attributes,
+            () => this.indices,
+        );
+    }
+
+    setLayoutDescriptor(descriptor: Map<string, VertexAttributeLayout>): void {
+        this.layoutDescriptor = descriptor;
+    }
+
+    getLayoutDescriptor() {
+        return this.layoutDescriptor;
     }
 
     addAttribute(attribute: VertexAttributeWrapper) {
         this.attributes.set(attribute.name, attribute);
+        this.hashHandler.bumpStructureVersion()
     }
 
     setIndices(indices: IndexAttributeWrapper) {
         this.indices = indices;
+        this.hashHandler.bumpStructureVersion()
     }
 
-    convertToHash(hasher: Hasher): string {
-        if (this.isCacheValid()) {
-            return this.cachedHash!;
-        }
-
-        const attrPart = Array.from(this.attributes.entries())
-            .sort(([nameA], [nameB]) => nameA.localeCompare(nameB))
-            .map(([name, attr]) => `${name}:${attr.convertToHash(hasher)}`)
-            .join('|');
-
-        this.cachedHash = hasher.hashString(attrPart);
-
-        this.cachedAttributeVersions = new Map(
-            Array.from(this.attributes.entries()).map(([name, attr]) => [name, attr.getVersion()])
-        );
-        this.cachedIndicesVersion = this.indices ? this.indices.getVersion() : null;
-        this.hadIndicesLastHash = this.indices !== undefined;
-
-        return this.cachedHash;
-    }
-
-    getIndicesHash(hasher: Hasher): string | null {
-        return this.indices ? this.indices.convertToHash(hasher) : null;
-    }
-
-    private isCacheValid(): boolean {
-        if (this.cachedHash === null) return false;
-
-        const hasIndicesNow = this.indices !== undefined;
-        if (hasIndicesNow !== this.hadIndicesLastHash) return false;
-        if (hasIndicesNow && this.indices!.getVersion() !== this.cachedIndicesVersion) return false;
-
-        if (this.cachedAttributeVersions.size !== this.attributes.size) return false;
-        for (const [name, attr] of this.attributes) {
-            if (this.cachedAttributeVersions.get(name) !== attr.getVersion()) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    getAttributes(){
+    getAttributes() {
         return this.attributes;
+    }
+
+    convertToAttributesHash(hasher: Hasher): string {
+        return this.hashHandler.convertToAttributesHash(hasher);
+    }
+
+    convertToIndicesHash(hasher: Hasher): string {
+        return this.hashHandler.convertToIndicesHash(hasher);
+    }
+
+    drainAttributesTrash(): string[] {
+        return this.hashHandler.drainAttributesTrash();
+    }
+
+    drainIndicesTrash(): string[] {
+        return this.hashHandler.drainIndicesTrash();
     }
 }

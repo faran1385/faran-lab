@@ -2,14 +2,20 @@ import type {ImageWrapper} from "./ImageWrapper.ts";
 import type {SamplerWrapper} from "./SamplerWrapper.ts";
 import { v4 as uuidv4 } from "uuid";
 import type {Hasher} from "../hashing/Hasher.ts";
+import {AggregateHashHandler} from "../hashing/AggregateHashHandler.ts";
 
 export class TextureWrapper {
     private image!: ImageWrapper;
     private sampler!: SamplerWrapper;
     readonly uuid: string;
 
+    private hashHandler: AggregateHashHandler;
+
     constructor() {
         this.uuid = uuidv4();
+        this.hashHandler = new AggregateHashHandler((hasher) =>
+            `${this.image.convertToHash(hasher)}|${this.sampler.convertToHash(hasher)}`
+        );
     }
 
     getImage(): ImageWrapper {
@@ -29,9 +35,10 @@ export class TextureWrapper {
     }
 
     convertToHash(hasher: Hasher): string {
-        const imageHash = this.image.convertToHash(hasher);
-        const samplerHash = this.sampler.convertToHash(hasher);
+        return this.hashHandler.convertToHash(hasher);
+    }
 
-        return hasher.hashString(`${imageHash}|${samplerHash}`);
+    drainTrash(): string[] {
+        return this.hashHandler.drainTrash();
     }
 }

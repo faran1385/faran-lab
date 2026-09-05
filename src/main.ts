@@ -8,8 +8,10 @@ import {GLTFImporter} from "./engine/importers/GLTFImporter.ts";
 import {ImportFromGLB} from "./engine/importers/utils/GLBAdapter.ts";
 import {IRToWrapperConvertor} from "./engine/importers/utils/IRToWrapperConvertor.ts";
 import {BaseWireUp} from "./engine/WireUp/BaseWireUp.ts";
-import {MaterialDescriptorProducer} from "./engine/descriptorProducer/MaterialDescriptorProducer.ts";
 import {Hasher} from "./engine/hashing/Hasher.ts";
+import {ShaderDescriptorProducer} from "./engine/descriptorProducer/ShaderDescriptorProducer.ts";
+import {GeometryDescriptorProducer} from "./engine/descriptorProducer/GeometryDescriptorProducer.ts";
+import {MaterialDescriptorProducer} from "./engine/descriptorProducer/MaterialDescriptorProducer.ts";
 
 const canvas = document.getElementById("gpu-canvas") as HTMLCanvasElement;
 
@@ -179,11 +181,17 @@ const irToWrapperConvertor = new IRToWrapperConvertor();
 const baseWireUp = new BaseWireUp();
 const glbParseResult = await glbLoader.load("/test.glb")
 const ir = await glbImporter.import(ImportFromGLB(glbParseResult))
-const {materials} = irToWrapperConvertor.convert(ir, baseWireUp.wireUp.bind(baseWireUp));
+const {primitives, materials, geometries} = irToWrapperConvertor.convert(ir, baseWireUp.wireUp.bind(baseWireUp));
 const hasher = await Hasher.create();
 
-materials.forEach(material => {
-    console.log(MaterialDescriptorProducer.produce(material.wrapper, hasher, 2))
+
+materials.map((i) => MaterialDescriptorProducer.produce(i.wrapper, hasher, 2))
+geometries.map((i) => GeometryDescriptorProducer.produce(i.wrapper))
+ShaderDescriptorProducer.produce(primitives.map((i) => i.wrapper))
+
+primitives.forEach(p => {
+    p.wrapper.getVertexAssembler().assemble(p.wrapper)
+    p.wrapper.getFragmentAssembler().assemble(p.wrapper)
 })
 
 

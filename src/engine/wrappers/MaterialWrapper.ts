@@ -2,6 +2,10 @@ import type {Material} from "../importers/utils/IR.ts";
 import {MaterialComponentWrapper} from "./MaterialComponentWrapper.ts";
 import {v4 as uuidv4} from "uuid";
 import type {Hasher} from "../hashing/Hasher.ts";
+import {
+    type MaterialBindingLayout,
+} from "../descriptorProducer/MaterialDescriptorProducer.ts";
+import {MaterialHashHandler} from "../hashing/MaterialHashHandler.ts";
 
 export class MaterialWrapper {
     private components = new Map<string, MaterialComponentWrapper>();
@@ -9,6 +13,10 @@ export class MaterialWrapper {
     private alphaCutoff?: Material["alphaCutoff"];
     private doubleSided: Material["doubleSided"];
     readonly uuid: string;
+
+    private layoutDescriptor!: MaterialBindingLayout;
+
+    private hashHandler: MaterialHashHandler;
 
     constructor(
         alphaMode: Material["alphaMode"],
@@ -18,8 +26,19 @@ export class MaterialWrapper {
         this.alphaMode = alphaMode;
         this.alphaCutoff = alphaCutoff;
         this.doubleSided = doubleSided;
-
         this.uuid = uuidv4();
+
+        this.hashHandler = new MaterialHashHandler(
+            () => this.components,
+        );
+    }
+
+    getLayoutDescriptor() {
+        return this.layoutDescriptor;
+    }
+
+    setLayoutDescriptor(layoutDescriptor: MaterialBindingLayout) {
+        this.layoutDescriptor = layoutDescriptor;
     }
 
     getComponent(name: string): MaterialComponentWrapper | undefined {
@@ -28,92 +47,41 @@ export class MaterialWrapper {
 
     setComponent(wrapper: MaterialComponentWrapper): void {
         this.components.set(wrapper.name, wrapper);
+        this.hashHandler.bumpComponentVersion()
     }
 
     getAllComponents(): MaterialComponentWrapper[] {
         return Array.from(this.components.values());
     }
 
-    getAlphaMode(): Material["alphaMode"] {
-        return this.alphaMode;
+    getAlphaMode(): Material["alphaMode"] { return this.alphaMode; }
+    setAlphaMode(alphaMode: Material["alphaMode"]): void { this.alphaMode = alphaMode; }
+    getAlphaCutoff(): Material["alphaCutoff"] { return this.alphaCutoff; }
+    setAlphaCutoff(alphaCutoff: Material["alphaCutoff"]): void { this.alphaCutoff = alphaCutoff; }
+    getDoubleSided(): Material["doubleSided"] { return this.doubleSided; }
+    setDoubleSided(doubleSided: Material["doubleSided"]): void { this.doubleSided = doubleSided; }
+
+    getShaderVersionKey(): string {
+        return this.hashHandler.getShaderVersionKey();
     }
 
-    setAlphaMode(alphaMode: Material["alphaMode"]): void {
-        this.alphaMode = alphaMode;
-    }
-
-    getAlphaCutoff(): Material["alphaCutoff"] {
-        return this.alphaCutoff;
-    }
-
-    setAlphaCutoff(alphaCutoff: Material["alphaCutoff"]): void {
-        this.alphaCutoff = alphaCutoff;
-    }
-
-    getDoubleSided(): Material["doubleSided"] {
-        return this.doubleSided;
-    }
-
-    setDoubleSided(doubleSided: Material["doubleSided"]): void {
-        this.doubleSided = doubleSided;
-    }
-
-
-    convertToShaderHash(hasher: Hasher): string {
-        const parts = this.sortedComponents()
-            .map((c) => {
-                const factorType = c.getFactors().length;
-                const texture = c.getTexture();
-                const hasTexture = texture ? "1" : "0";
-                const texCoord = texture ? texture.texCoord : "none";
-                return `${c.name}|${factorType}|${hasTexture}|${texCoord}`;
-            })
-            .join(",");
-
-        return hasher.hashString(parts);
-    }
-
-    convertToFactorsBufferHash(hasher: Hasher): string {
-        const parts = this.sortedComponents()
-            .map((c) => `${c.name}|${c.getFactors().length}`)
-            .join(",");
-
-        return hasher.hashString(parts);
+    getFactorsVersionKey(): string {
+        return this.hashHandler.getFactorsVersionKey();
     }
 
     convertToBindGroupLayoutHash(hasher: Hasher): string {
-        const hasAnyFactors = this.sortedComponents().some((c) => c.getFactors().length > 0)
-            ? "1"
-            : "0";
-
-        const texturePart = this.sortedComponents()
-            .map((c) => `${c.name}|${c.getTexture() ? "1" : "0"}`)
-            .join(",");
-
-        return hasher.hashString(`factors:${hasAnyFactors}|textures:${texturePart}`);
+        return this.hashHandler.convertToBindGroupLayoutHash(hasher);
     }
 
     convertToBindGroupHash(hasher: Hasher): string {
-        const layoutPart = this.convertToBindGroupLayoutHash(hasher);
-        const bufferPart = this.convertToFactorsBufferHash(hasher);
-
-        const texturePart = this.sortedComponents()
-            .map((c) => {
-                const texture = c.getTexture();
-                return `${c.name}|${texture ? texture.wrapper.convertToHash(hasher) : "none"}`;
-            })
-            .join(",");
-
-        return hasher.hashString(`${layoutPart}|${bufferPart}|${texturePart}`);
+        return this.hashHandler.convertToBindGroupHash(hasher);
     }
 
-    private sortedComponents(): MaterialComponentWrapper[] {
-        return Array.from(this.components.values()).sort((a, b) => a.name.localeCompare(b.name));
+    drainBindGroupLayoutTrash(): string[] {
+        return this.hashHandler.drainBindGroupLayoutTrash();
     }
 
-    convertToHash(hasher: Hasher): string {
-        return hasher.hashString(
-            `${this.convertToBindGroupLayoutHash(hasher)}|${this.convertToShaderHash(hasher)}|${this.alphaMode}|${this.alphaCutoff ?? "none"}|${this.doubleSided}`
-        );
+    drainBindGroupTrash(): string[] {
+        return this.hashHandler.drainBindGroupTrash();
     }
 }

@@ -1,27 +1,45 @@
 import type {GeometryWrapper} from "./GeometryWrapper.ts";
 import type {MaterialWrapper} from "./MaterialWrapper.ts";
-import type {Primitive} from "../importers/utils/IR.ts";
 import {v4 as uuidv4} from "uuid";
 import type {Hasher} from "../hashing/Hasher.ts";
+import {BasicFragmentAssembler, BasicVertexAssembler} from "../Assemblers/BasicAssembler/BasicAssembler.ts";
+import type {VertexAssemblerBase} from "../Assemblers/VertexShaderAssmblerBase.ts";
+import type {FragmentAssemblerBase} from "../Assemblers/FragmentAssemblerBase.ts";
+import {PipelineWrapper} from "./PipelineWrapper.ts";
 
 export class PrimitiveWrapper {
     readonly uuid: string;
 
     private geometry!: GeometryWrapper;
     private material!: MaterialWrapper;
-    private topology: Primitive["topology"];
 
-    constructor(topology: Primitive["topology"]) {
-        this.topology = topology;
+    private vertexAssembler: VertexAssemblerBase = new BasicVertexAssembler();
+    private fragmentAssembler: FragmentAssemblerBase = new BasicFragmentAssembler();
+    private pipelineWrapper = new PipelineWrapper();
+
+    constructor() {
         this.uuid = uuidv4();
     }
 
-    getTopology(): Primitive["topology"] {
-        return this.topology;
+
+    getPipeline() {
+        return this.pipelineWrapper;
     }
 
-    setTopology(topology: Primitive["topology"]): void {
-        this.topology = topology;
+    setVertexAssembler(a: VertexAssemblerBase): void {
+        this.vertexAssembler = a;
+    }
+
+    getVertexAssembler(): VertexAssemblerBase {
+        return this.vertexAssembler;
+    }
+
+    setFragmentAssembler(a: FragmentAssemblerBase): void {
+        this.fragmentAssembler = a;
+    }
+
+    getFragmentAssembler(): FragmentAssemblerBase {
+        return this.fragmentAssembler;
     }
 
     getGeometry(): GeometryWrapper {
@@ -41,9 +59,6 @@ export class PrimitiveWrapper {
     }
 
     convertToHash(hasher: Hasher): string {
-        const geometryHash = this.geometry.convertToHash(hasher);
-        const materialHash = this.material.convertToHash(hasher);
-
-        return hasher.hashString(`${geometryHash}|${materialHash}|${this.topology}`);
+        return this.pipelineWrapper.computeHash(this.material, this.geometry, hasher)
     }
 }

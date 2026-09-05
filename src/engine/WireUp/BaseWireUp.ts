@@ -135,6 +135,5 @@ export class BaseWireUp {
         this.wirePrimitives(T.primitives, T.materials, T.geometries)
         this.wireMeshes(T.meshes, T.primitives)
         this.wireNodes(T.nodes, T.meshes)
-
     }
 }

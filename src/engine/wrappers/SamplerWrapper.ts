@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 import type {Sampler} from "../importers/utils/IR.ts";
 import type {Hasher} from "../hashing/Hasher.ts";
+import {HashHandler} from "../hashing/HashHandler.ts";
 
 export class SamplerWrapper {
     private minFilter: Sampler["minFilter"];
@@ -10,9 +11,7 @@ export class SamplerWrapper {
     private addressModeV: Sampler["addressModeV"];
     readonly uuid: string;
 
-    private version = 0;
-    private cachedHash?: string;
-    private cachedVersion = -1;
+    private hashHandler: HashHandler;
 
     constructor(
         minFilter: Sampler["minFilter"],
@@ -28,6 +27,10 @@ export class SamplerWrapper {
         this.addressModeV = addressModeV;
 
         this.uuid = uuidv4();
+
+        this.hashHandler = new HashHandler(
+            () => `${this.minFilter}|${this.magFilter}|${this.mipFilter}|${this.addressModeU}|${this.addressModeV}`
+        );
     }
 
     getMinFilter(): Sampler["minFilter"] {
@@ -36,7 +39,7 @@ export class SamplerWrapper {
 
     setMinFilter(minFilter: Sampler["minFilter"]): void {
         this.minFilter = minFilter;
-        this.version++;
+        this.hashHandler.addVersion();
     }
 
     getMagFilter(): Sampler["magFilter"] {
@@ -45,7 +48,7 @@ export class SamplerWrapper {
 
     setMagFilter(magFilter: Sampler["magFilter"]): void {
         this.magFilter = magFilter;
-        this.version++;
+        this.hashHandler.addVersion();
     }
 
     getMipFilter(): Sampler["mipFilter"] {
@@ -54,7 +57,7 @@ export class SamplerWrapper {
 
     setMipFilter(mipFilter: Sampler["mipFilter"]): void {
         this.mipFilter = mipFilter;
-        this.version++;
+        this.hashHandler.addVersion();
     }
 
     getAddressModeU(): Sampler["addressModeU"] {
@@ -63,7 +66,7 @@ export class SamplerWrapper {
 
     setAddressModeU(addressModeU: Sampler["addressModeU"]): void {
         this.addressModeU = addressModeU;
-        this.version++;
+        this.hashHandler.addVersion();
     }
 
     getAddressModeV(): Sampler["addressModeV"] {
@@ -72,20 +75,14 @@ export class SamplerWrapper {
 
     setAddressModeV(addressModeV: Sampler["addressModeV"]): void {
         this.addressModeV = addressModeV;
-        this.version++;
+        this.hashHandler.addVersion();
     }
 
     convertToHash(hasher: Hasher): string {
-        if (this.cachedHash !== undefined && this.cachedVersion === this.version) {
-            return this.cachedHash;
-        }
+        return this.hashHandler.convertToHash(hasher);
+    }
 
-        const hash = hasher.hashString(
-            `${this.minFilter}|${this.magFilter}|${this.mipFilter}|${this.addressModeU}|${this.addressModeV}`
-        );
-
-        this.cachedHash = hash;
-        this.cachedVersion = this.version;
-        return hash;
+    drainTrash(): string[] {
+        return this.hashHandler.drainTrash();
     }
 }

@@ -194,7 +194,7 @@ export class MaterialDescriptorProducer {
         mat: MaterialWrapper,
         hasher: Hasher,
         textureBudget: number
-    ): MaterialBindingLayout {
+    ) {
 
         const components = mat.getAllComponents().sort((a, b) => a.name.localeCompare(b.name));
 
@@ -212,6 +212,7 @@ export class MaterialDescriptorProducer {
                 `DescriptorProducer: material "${mat.uuid}" needs ${textureResult.distinctTextureCount} distinct textures, budget is ${textureBudget}`
             );
         }
-        return assembleLayout(components, uniformResult, textureResult, uniformBufferBinding);
+
+        mat.setLayoutDescriptor(assembleLayout(components, uniformResult, textureResult, uniformBufferBinding))
     }
 }

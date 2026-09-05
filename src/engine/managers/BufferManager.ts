@@ -1,12 +1,12 @@
-import type {AttributeWrapperBase} from "../wrappers/AttributeWrapperBase.ts";
 import type {Hasher} from "../hashing/Hasher.ts";
 import {BufferResourceWrapper} from "./BufferResourceWrapper.ts";
+import type {BufferWrapper} from "../wrappers/BufferWrapper.ts";
 
 export class BufferManager {
     private buffers = new Map<string, BufferResourceWrapper>();
 
     ensure(
-        attr: AttributeWrapperBase<any, any>,
+        attr: BufferWrapper<any>,
         hasher: Hasher,
         device: GPUDevice
     ): BufferResourceWrapper {

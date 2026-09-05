@@ -81,7 +81,10 @@ export class IRToWrapperConvertor {
     }
 
     createPrimitiveWrapper(topology: Primitive["topology"]) {
-        return new PrimitiveWrapper(topology);
+        const primitive = new PrimitiveWrapper();
+        primitive.getPipeline().setTopology(topology);
+
+        return primitive
     }
 
     createNodeWrapper(

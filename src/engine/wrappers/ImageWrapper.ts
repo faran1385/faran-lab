@@ -1,31 +1,24 @@
 import {v4 as uuidv4} from 'uuid';
 import type {Hasher} from "../hashing/Hasher.ts";
+import {HashHandler} from "../hashing/HashHandler.ts";
 
 export class ImageWrapper {
-
     readonly uuid: string;
 
     private data: ArrayBuffer;
     private width: number;
-    private format: GPUTextureFormat = "rgba8unorm"
     private height: number;
-    private version = 0;
+    private format: GPUTextureFormat = "rgba8unorm";
 
-    private cachedHash: string | null = null;
-    private cachedHashVersion = -1;
+    private hashHandler: HashHandler;
 
-
-    constructor(
-        data: ArrayBuffer,
-        width: number,
-        height: number,
-    ) {
+    constructor(data: ArrayBuffer, width: number, height: number) {
         this.uuid = uuidv4();
         this.data = data;
         this.width = width;
         this.height = height;
+        this.hashHandler = new HashHandler(() => `${this.uuid}|${this.hashHandler.getVersion()}`);
     }
-
 
     getFormat(): GPUTextureFormat {
         return this.format;
@@ -35,15 +28,16 @@ export class ImageWrapper {
         return {
             width: this.width,
             height: this.height
-        }
+        };
     }
 
     getData(): ArrayBuffer {
         return this.data;
     }
 
-    setFormat(format: GPUTextureFormat) {
+    setFormat(format: GPUTextureFormat): void {
         this.format = format;
+        this.hashHandler.addVersion();
     }
 
     setImage(data: ArrayBuffer, width: number, height: number, format: GPUTextureFormat): void {
@@ -51,27 +45,14 @@ export class ImageWrapper {
         this.width = width;
         this.height = height;
         this.format = format;
-        this.version++;
+        this.hashHandler.addVersion();
     }
 
     convertToHash(hasher: Hasher): string {
-
-        if (
-            this.cachedHash === null ||
-            this.cachedHashVersion !== this.version
-        ) {
-            this.cachedHash = this.computeHash(hasher);
-            this.cachedHashVersion = this.version;
-        }
-
-        return this.cachedHash;
+        return this.hashHandler.convertToHash(hasher);
     }
 
-
-    private computeHash(hasher: Hasher): string {
-
-        return hasher.hashString(
-            `${this.uuid}|${this.version}`
-        );
+    drainTrash(): string[] {
+        return this.hashHandler.drainTrash();
     }
 }
