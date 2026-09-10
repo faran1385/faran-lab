@@ -10,6 +10,7 @@ export class MaterialHashHandler {
     private lastSortedComponentsVersion: number = -1;
     private readonly getComponents: () => Map<string, MaterialComponentWrapper>
     private componentsVersion: number = 0;
+    private cacheShaderVersion: string | null = null;
 
     constructor(
         getComponents: () => Map<string, MaterialComponentWrapper>,
@@ -22,6 +23,8 @@ export class MaterialHashHandler {
             const texturePart = components.map((c) => c.getBindGroupLayoutHashPart()).join(",");
             return `factors:${hasAnyFactors}|textures:${texturePart}`;
         });
+
+
 
         this.bindGroupHashHandler = new AggregateHashHandler((hasher) => {
             const components = this.sortedComponents();
@@ -45,6 +48,17 @@ export class MaterialHashHandler {
 
     bumpComponentVersion() {
         this.componentsVersion++
+    }
+
+    needsShaderRebuild() {
+        const currentVersion = this.getShaderVersionKey();
+        if (this.cacheShaderVersion !== currentVersion) {
+            this.cacheShaderVersion = currentVersion;
+
+            return true
+        }
+
+        return false
     }
 
     getShaderVersionKey(): string {

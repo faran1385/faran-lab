@@ -11,6 +11,7 @@ export abstract class ShaderModuleWrapper {
 
     protected hashHandler: HashHandler;
     private entryPoint = "main";
+    private code: string = "";
 
     constructor() {
         this.uuid = uuidv4();
@@ -23,6 +24,16 @@ export abstract class ShaderModuleWrapper {
 
     protected static hashBindings(entries: BindGroupEntry[]): string {
         return entries.map(hashBindGroupEntry).join(",");
+    }
+
+    setCode(code: string): void {
+        this.code = code;
+        this.bumpVersion();
+    }
+    getCode(): string { return this.code; }
+
+    protected buildHashKey(): string {
+        return this.code;
     }
 
     convertToHash(hasher: Hasher): string {
@@ -42,6 +53,5 @@ export abstract class ShaderModuleWrapper {
         return this.entryPoint;
     }
 
-    protected abstract buildHashKey(): string;
 }
 

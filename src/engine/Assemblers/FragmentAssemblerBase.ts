@@ -6,12 +6,12 @@ import type {FragmentShaderWrapper} from "../wrappers/FragmentShaderWrapper.ts";
 
 export abstract class FragmentAssemblerBase {
     assemble(primitive: PrimitiveWrapper): void {
-        const vertexWrapper = primitive.getVertexShader();
-        const fragmentWrapper = primitive.getFragmentShader();
+        const vertexWrapper = primitive.getPipeline().getVertexShaderWrapper();
+        const fragmentWrapper = primitive.getPipeline().getFragmentShaderWrapper();
 
         const {preamble, varyingValues, bindingValues} = this.fragmentPhase1(vertexWrapper, fragmentWrapper);
         const colorExpr = this.fragmentPhase2(varyingValues, bindingValues);
-        const code = this.fragmentPhase3(preamble, colorExpr,primitive.getFragmentShader().getEntryPoint());
+        const code = this.fragmentPhase3(preamble, colorExpr,fragmentWrapper.getEntryPoint());
 
         fragmentWrapper.setCode(code);
     }

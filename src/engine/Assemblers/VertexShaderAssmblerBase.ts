@@ -6,11 +6,11 @@ import type {PrimitiveWrapper} from "../wrappers/PrimitiveWrapper.ts";
 
 export abstract class VertexAssemblerBase {
     assemble(primitive: PrimitiveWrapper): void {
-        const wrapper = primitive.getVertexShader();
+        const wrapper = primitive.getPipeline().getVertexShaderWrapper();
 
         const {preamble, inputValues, bindingValues} = this.vertexPhase1(wrapper);
         const clipPositionExpr = this.vertexPhase2(inputValues, bindingValues);
-        const code = this.vertexPhase3(wrapper, preamble, clipPositionExpr, primitive.getVertexShader().getEntryPoint());
+        const code = this.vertexPhase3(wrapper, preamble, clipPositionExpr, wrapper.getEntryPoint());
 
         wrapper.setCode(code);
     }

@@ -10,7 +10,6 @@ export interface ShaderTargetField {
 
 export class FragmentShaderWrapper extends ShaderModuleWrapper {
     private outputs: ShaderTargetField[] = [];
-    private code: string = "";
     private bindings: BindGroupEntry[] = [];
 
     setBindings(bindings: BindGroupEntry[]): void { this.bindings = bindings; this.bumpVersion(); }
@@ -22,13 +21,4 @@ export class FragmentShaderWrapper extends ShaderModuleWrapper {
     }
     getOutputs(): ShaderTargetField[] { return this.outputs; }
 
-    setCode(code: string): void {
-        this.code = code;
-        this.bumpVersion();
-    }
-    getCode(): string { return this.code; }
-
-    protected buildHashKey(): string {
-        return this.code;
-    }
 }

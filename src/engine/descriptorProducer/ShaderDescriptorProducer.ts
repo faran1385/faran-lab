@@ -71,30 +71,9 @@ export function sceneBindings(): BindGroupEntry[] {
             fields: [
                 { name: "view", type: "mat4x4f", offset: 0 },
                 { name: "projection", type: "mat4x4f", offset: 64 },
-                { name: "viewProjection", type: "mat4x4f", offset: 128 },
-                { name: "cameraPosition", type: "vec3f", offset: 192 },
-                { name: "lightCount", type: "u32", offset: 204 },
             ],
-            size: 208,
+            size: 128,
         },
-        {
-            kind: "storage",
-            group: 0,
-            binding: 1,
-            name: "lights",
-            elementStructName: "Light",
-            elementFields: [
-                { name: "position", type: "vec3f", offset: 0 },
-                { name: "lightType", type: "u32", offset: 12 },
-                { name: "direction", type: "vec3f", offset: 16 },
-                { name: "range", type: "f32", offset: 28 },
-                { name: "color", type: "vec3f", offset: 32 },
-                { name: "intensity", type: "f32", offset: 44 },
-            ],
-            access: "read",
-        },
-        // Shadow maps deferred — no shadow-casting light wiring yet.
-        // Will be texture_depth_2d(_array) + sampler_comparison entries here.
     ];
 }
 
@@ -113,7 +92,6 @@ export function nodeBindings(): BindGroupEntry[] {
             ],
             size: 64,
         },
-        // Skinning matrices deferred, same as everywhere else.
     ];
 }
 
@@ -167,12 +145,10 @@ export function materialBindings(layout: MaterialBindingLayout): BindGroupEntry[
 }
 
 export class ShaderDescriptorProducer {
-    static produce(primitives: PrimitiveWrapper[]): void {
-        for (const primitive of primitives) {
-            const materialLayout = primitive.getMaterial().getLayoutDescriptor()
-            ShaderDescriptorProducer.produceVertex(primitive);
-            ShaderDescriptorProducer.produceFragment(primitive, materialLayout);
-        }
+    static produce(primitive: PrimitiveWrapper): void {
+        const materialLayout = primitive.getMaterial().getLayoutDescriptor()
+        ShaderDescriptorProducer.produceVertex(primitive);
+        ShaderDescriptorProducer.produceFragment(primitive, materialLayout);
     }
 
     private static produceVertex(primitive: PrimitiveWrapper): void {

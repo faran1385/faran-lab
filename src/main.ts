@@ -1,17 +1,22 @@
-import shaderCode from "./shader.wgsl?raw";
-import {cubeVertices, cubeVertexStride, faceNormals} from "./geometry";
-import {mat4} from "./packages/math/matrix/mat4.ts";
-import {vec3} from "./packages/math/vector/vec3.ts";
 import {GPUContext} from "./engine/gpu-context.ts";
-import {GLBLoader} from "./engine/loaders/GLBLoader.ts";
-import {GLTFImporter} from "./engine/importers/GLTFImporter.ts";
-import {ImportFromGLB} from "./engine/importers/utils/GLBAdapter.ts";
-import {IRToWrapperConvertor} from "./engine/importers/utils/IRToWrapperConvertor.ts";
-import {BaseWireUp} from "./engine/WireUp/BaseWireUp.ts";
+
+import {GeometryWrapper} from "./engine/wrappers/GeometryWrapper.ts";
+import {VertexAttributeWrapper} from "./engine/wrappers/VertexAttributeWrapper.ts";
+import {MaterialWrapper} from "./engine/wrappers/MaterialWrapper.ts";
+import {MaterialComponentWrapper} from "./engine/wrappers/MaterialComponentWrapper.ts";
+import {PrimitiveWrapper} from "./engine/wrappers/PrimitiveWrapper.ts";
+import {MaterialDescriptorProducer} from "./engine/descriptorProducer/MaterialDescriptorProducer.ts";
+import {GeometryDescriptorProducer} from "./engine/descriptorProducer/GeometryDescriptorProducer.ts";
 import {Hasher} from "./engine/hashing/Hasher.ts";
 import {ShaderDescriptorProducer} from "./engine/descriptorProducer/ShaderDescriptorProducer.ts";
-import {GeometryDescriptorProducer} from "./engine/descriptorProducer/GeometryDescriptorProducer.ts";
-import {MaterialDescriptorProducer} from "./engine/descriptorProducer/MaterialDescriptorProducer.ts";
+import {BindGroupLayoutManager} from "./engine/managers/BindGroupLayoutManager.ts";
+import {BufferManager} from "./engine/managers/BufferManager.ts";
+import {SamplerManager} from "./engine/managers/SamplerManager.ts";
+import {TextureManager} from "./engine/managers/TextureManager.ts";
+import {BindGroupManager} from "./engine/managers/BindGroupManager.ts";
+import {PipelineLayoutManager} from "./engine/managers/PipelineLayoutManager.ts";
+import {PipelineManager} from "./engine/managers/PipelineManager.ts";
+import {ShaderModuleManager} from "./engine/managers/ShaderModuleManager.ts";
 
 const canvas = document.getElementById("gpu-canvas") as HTMLCanvasElement;
 
@@ -34,173 +39,131 @@ gpu.onResize((w, h) => {
 gpu.resize(canvas.width, canvas.height)
 
 
-// --- geometry buffers ---
-const vertexBuffer = device.createBuffer({
-    size: cubeVertices.byteLength,
-    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-});
-device.queue.writeBuffer(vertexBuffer, 0, cubeVertices);
+// Scene uniform buffer (208 bytes)
+const sceneBufferData = new Float32Array(52); // 208 bytes / 4 bytes per float
+// Example scene data (adjust layout as needed)
+sceneBufferData.set([
+    // Projection matrix (16 floats)
+    1, 0, 0, 0,
+    0, 1, 0, 0,
+    0, 0, 1, 0,
+    0, 0, 0, 1,
+    // View matrix (16 floats)
+    1, 0, 0, 0,
+    0, 1, 0, 0,
+    0, 0, 1, 0,
+    0, 0, 0, 1,
+]);
 
-const faceNormalBuffer = device.createBuffer({
-    label: "faceNormals",
-    size: faceNormals.byteLength,
-    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.VERTEX
-})
-
-device.queue.writeBuffer(faceNormalBuffer, 0, faceNormals);
-
-// --- MVP uniform buffer (one 4x4 matrix = 64 bytes) ---
-const modelBuffer = device.createBuffer({
-    size: 64,
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-});
-const modelMat = mat4.fromValues(
+// Node uniform buffer (64 bytes)
+const nodeBufferData = new Float32Array(16); // 64 bytes / 4 bytes per float
+// Example node data
+nodeBufferData.set([
+    // Model matrix (16 floats)
     1, 0, 0, 0,
     0, 1, 0, 0,
     0, 0, 1, 0,
     0, 0, 0, 1
-)
+]);
 
-// const R = mat4.fromMat3(mat4.create(), , .1)))
-
-// mat4.mul(modelMat, modelMat, R);
-
-
-const viewBuffer = device.createBuffer({
-    size: 64,
+// Create the buffers
+const sceneBuffer = device.createBuffer({
+    size: sceneBufferData.byteLength,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    mappedAtCreation: true,
 });
+new Float32Array(sceneBuffer.getMappedRange()).set(sceneBufferData);
+sceneBuffer.unmap();
 
-const viewMatrix = mat4.lookAt(
-    mat4.create(),
-    vec3.fromValues(0, 0, 10),
-    vec3.fromValues(0, 0, 0),
-    vec3.fromValues(0, 1, 0),
-)
-
-device.queue.writeBuffer(viewBuffer, 0, viewMatrix);
-
-const projectionBuffer = device.createBuffer({
-    size: 64,
+const nodeBuffer = device.createBuffer({
+    size: nodeBufferData.byteLength, // 64 bytes
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    mappedAtCreation: true,
 });
+new Float32Array(nodeBuffer.getMappedRange()).set(nodeBufferData);
+nodeBuffer.unmap();
 
-const projectionMat = mat4.perspective(
-    mat4.create(),
-    window.innerWidth / window.innerHeight,
-    45,
-    0.1,
-    100
-)
+// Create bind group layouts
+const sceneBindGroupLayout = device.createBindGroupLayout(BindGroupLayoutManager.SCENE_LAYOUT_DESCRIPTOR);
+const nodeBindGroupLayout = device.createBindGroupLayout(BindGroupLayoutManager.NODE_LAYOUT_DESCRIPTOR);
 
-device.queue.writeBuffer(projectionBuffer, 0, projectionMat);
-
-const bindGroupLayout = device.createBindGroupLayout({
+// Create bind groups
+const sceneBindGroup = device.createBindGroup({
+    layout: sceneBindGroupLayout,
     entries: [
         {
             binding: 0,
-            visibility: GPUShaderStage.VERTEX,
-            buffer: {type: "uniform"},
-        },
-        {
-            binding: 1,
-            visibility: GPUShaderStage.VERTEX,
-            buffer: {type: "uniform"},
-        }
-        ,
-        {
-            binding: 2,
-            visibility: GPUShaderStage.VERTEX,
-            buffer: {type: "uniform"},
-        }
-    ],
-});
-
-const bindGroup = device.createBindGroup({
-    layout: bindGroupLayout,
-    entries: [
-        {
-            binding: 0,
-            resource: {buffer: modelBuffer}
-        },
-        {
-            binding: 1,
-            resource: {buffer: viewBuffer}
-        },
-        {
-            binding: 2,
-            resource: {buffer: projectionBuffer}
+            resource: {
+                buffer: sceneBuffer,
+            },
         },
     ],
 });
 
-const shaderModule = device.createShaderModule({code: shaderCode});
-
-const pipeline = device.createRenderPipeline({
-    layout: device.createPipelineLayout({bindGroupLayouts: [bindGroupLayout]}),
-    vertex: {
-        module: shaderModule,
-        entryPoint: "vs_main",
-        buffers: [
-            {
-                arrayStride: cubeVertexStride,
-                attributes: [
-                    {shaderLocation: 0, offset: 0, format: "float32x3"}, // position
-                    {shaderLocation: 1, offset: 3 * 4, format: "float32x3"}, // color
-                ],
+const nodeBindGroup = device.createBindGroup({
+    layout: nodeBindGroupLayout,
+    entries: [
+        {
+            binding: 0,
+            resource: {
+                buffer: nodeBuffer,
             },
-            {
-                arrayStride: 3 * 4,
-                attributes: [
-                    {shaderLocation: 2, offset: 0, format: "float32x3"}, // face normal
-                ],
-            },
-        ],
-    },
-    fragment: {
-        module: shaderModule,
-        entryPoint: "fs_main",
-        targets: [{format}],
-    },
-    primitive: {
-        topology: "triangle-list",
-    },
-    depthStencil: {
-        depthWriteEnabled: true,
-        depthCompare: "less",
-        format: "depth32float"
-    }
+        },
+    ],
 });
 
-let last = performance.now() / 1000;
-let delta = 0;
+const vertexData = new Float32Array([
+    -0.5, -0.5, 0.0,
+    0.5, -0.5, 0.0,
+    0.0, 0.5, 0.0,
+]);
 
-const glbLoader = new GLBLoader();
-const glbImporter = new GLTFImporter();
-const irToWrapperConvertor = new IRToWrapperConvertor();
-const baseWireUp = new BaseWireUp();
-const glbParseResult = await glbLoader.load("/test.glb")
-const ir = await glbImporter.import(ImportFromGLB(glbParseResult))
-const {primitives, materials, geometries} = irToWrapperConvertor.convert(ir, baseWireUp.wireUp.bind(baseWireUp));
 const hasher = await Hasher.create();
+const posAttr = new VertexAttributeWrapper("position", vertexData.buffer, "float32x3");
+
+const bufferManager = new BufferManager(device, hasher);
+const samplerManager = new SamplerManager(device, hasher);
+const textureManager = new TextureManager(device, hasher);
+const bindgroupLayoutManager = new BindGroupLayoutManager(device, hasher)
+const bindgroupManager = new BindGroupManager(device, hasher)
+const pipelineLayoutManager = new PipelineLayoutManager(device, hasher)
+const pipelineManager = new PipelineManager(device, hasher)
+const shaderModuleManager = new ShaderModuleManager(device, hasher)
 
 
-materials.map((i) => MaterialDescriptorProducer.produce(i.wrapper, hasher, 2))
-geometries.map((i) => GeometryDescriptorProducer.produce(i.wrapper))
-ShaderDescriptorProducer.produce(primitives.map((i) => i.wrapper))
+const geo = new GeometryWrapper()
+geo.addAttribute(posAttr)
+const mat = new MaterialWrapper("opaque", 0.2, false);
+const baseColor = new MaterialComponentWrapper("baseColor", [1, 0, 0])
+const baseColor2 = new MaterialComponentWrapper("baseColor2", [1, 1, 0])
+mat.setComponent(baseColor)
+const primitive = new PrimitiveWrapper()
+primitive.setMaterial(mat)
+primitive.setGeometry(geo);
+console.log(mat)
+MaterialDescriptorProducer.produce(mat, hasher, 2)
+GeometryDescriptorProducer.produce(geo)
+ShaderDescriptorProducer.produce(primitive)
+primitive.getVertexAssembler().assemble(primitive)
+primitive.getFragmentAssembler().assemble(primitive)
 
-primitives.forEach(p => {
-    p.wrapper.getVertexAssembler().assemble(p.wrapper)
-    p.wrapper.getFragmentAssembler().assemble(p.wrapper)
+let matBindgroupTracker = bindgroupManager.createOrGetFromMaterial(mat, bindgroupLayoutManager, textureManager, samplerManager, bufferManager);
+let pipelineTracker = pipelineManager.createOrGetFromPipeline(primitive, bindgroupLayoutManager, pipelineLayoutManager, shaderModuleManager)
+const attr = bufferManager.createOrGetVertexBuffer(posAttr).raw;
+
+window.addEventListener("click", () => {
+    baseColor.setFactors([0, 0, 0])
+    mat.removeComponent(baseColor2)
+    bindgroupManager.createOrGetFromMaterial(mat, bindgroupLayoutManager, textureManager, samplerManager, bufferManager);
 })
 
+window.addEventListener("contextmenu", () => {
+    baseColor.setFactors([0, 0, 1])
+    mat.setComponent(baseColor2)
+    bindgroupManager.createOrGetFromMaterial(mat, bindgroupLayoutManager, textureManager, samplerManager, bufferManager);
+})
 
 function frame(): void {
-    delta = performance.now() / 1000 - last;
-    last = performance.now() / 1000;
-
-
-    device.queue.writeBuffer(modelBuffer, 0, modelMat);
 
     const encoder = device.createCommandEncoder();
     const pass = encoder.beginRenderPass({
@@ -212,20 +175,16 @@ function frame(): void {
                 storeOp: "store",
             },
         ],
-        depthStencilAttachment: {
-            depthLoadOp: "clear",
-            depthClearValue: 1,
-            depthStoreOp: "store",
-            view: depthTexture?.createView(),
-        }
     });
 
-    pass.setPipeline(pipeline);
-    pass.setBindGroup(0, bindGroup);
-    pass.setVertexBuffer(0, vertexBuffer);
-    pass.setVertexBuffer(1, faceNormalBuffer);
-    pass.draw(36)
+    pass.setPipeline(pipelineTracker.raw);
+    pass.setBindGroup(0, sceneBindGroup);
+    pass.setBindGroup(1, matBindgroupTracker.raw);
+    pass.setBindGroup(2, nodeBindGroup);
+    pass.setVertexBuffer(0, attr)
+    pass.draw(3)
     pass.end();
+
 
     device.queue.submit([encoder.finish()]);
     requestAnimationFrame(frame);

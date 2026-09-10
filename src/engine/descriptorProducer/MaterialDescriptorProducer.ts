@@ -33,13 +33,11 @@ export interface ComponentBindingLayout {
 
 export interface MaterialBindingLayout {
     uniformBufferSize: number;
-    uniformBufferBinding: number | null; // null when uniformBufferSize === 0 — nothing to bind
+    uniformBufferBinding: number | null;
     distinctTextureCount: number;
     distinctSamplerCount: number;
     components: Record<string, ComponentBindingLayout>;
-
     getUniformField(name: string): UniformFieldLayout | null | undefined;
-
     getTextureBinding(name: string): TextureFieldLayout | undefined;
 }
 
@@ -187,8 +185,7 @@ function assembleLayout(
 // --- Public entry point ---------------------------------------------------
 
 export class MaterialDescriptorProducer {
-    constructor() {
-    }
+    constructor() {}
 
     static produce(
         mat: MaterialWrapper,

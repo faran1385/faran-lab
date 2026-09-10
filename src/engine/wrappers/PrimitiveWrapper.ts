@@ -59,6 +59,6 @@ export class PrimitiveWrapper {
     }
 
     convertToHash(hasher: Hasher): string {
-        return this.pipelineWrapper.computeHash(this.material, this.geometry, hasher)
+        return this.pipelineWrapper.computeHash(this, hasher)
     }
 }

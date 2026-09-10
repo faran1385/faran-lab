@@ -1,62 +1,74 @@
-import {TextureResourceWrapper} from "./TextureResourceWrapper.ts";
 import type {ImageWrapper} from "../wrappers/ImageWrapper.ts";
-import type {Hasher} from "../hashing/Hasher.ts";
+import {TextureTracker} from "../Trackers/Trackers.ts";
+import {ResourceManager} from "./Manager.ts";
 
-const TEXTURE_FORMAT_BYTES_PER_PIXEL: Partial<Record<GPUTextureFormat, number>> = {
-    "rgba8unorm": 4,
-    "rgba8unorm-srgb": 4,
-    "bgra8unorm": 4,
-    "r8unorm": 1,
-    "rg8unorm": 2,
-};
 
-function bytesPerRowFor(format: GPUTextureFormat, width: number): number {
-    const bpp = TEXTURE_FORMAT_BYTES_PER_PIXEL[format];
-    if (bpp === undefined) {
-        throw new Error(`bytesPerRowFor: unsupported format "${format}"`);
-    }
-    return bpp * width;
+interface TextureCreationInput {
+    wrapper: ImageWrapper;
+    usage: GPUTextureUsageFlags;
 }
 
-export class TextureManager {
-    private textures = new Map<string, TextureResourceWrapper>();
-
-    ensure(
-        image: ImageWrapper,
-        hasher: Hasher,
-        device: GPUDevice
-    ): TextureResourceWrapper {
-        const hash = image.convertToHash(hasher);
-
-        const existing = this.textures.get(hash);
-        if (existing) {
-            existing.retain();
-            return existing;
-        }
-
-        const { width, height } = image.getDimensions();
-        const format = image.getFormat();
-
-        const gpuTexture = device.createTexture({
-            size: { width, height },
-            format,
-            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-        });
-
-        device.queue.writeTexture(
-            { texture: gpuTexture },
-            image.getData(),
-            { bytesPerRow: bytesPerRowFor(format, width) },
-            { width, height }
-        );
-
-        const wrapper = new TextureResourceWrapper(hash, gpuTexture);
-        wrapper.retain();
-        this.textures.set(hash, wrapper);
-        return wrapper;
+export class TextureManager extends ResourceManager<TextureCreationInput, GPUTexture, TextureTracker> {
+    createOrGetSampledTexture(image: ImageWrapper): TextureTracker {
+        return this.createOrGetWithUsage(image, GPUTextureUsage.TEXTURE_BINDING);
     }
 
-    get(hash: string): TextureResourceWrapper | undefined {
-        return this.textures.get(hash);
+    createOrGetRenderTarget(image: ImageWrapper): TextureTracker {
+        return this.createOrGetWithUsage(image, GPUTextureUsage.RENDER_ATTACHMENT);
+    }
+
+    createOrGetStorageTexture(image: ImageWrapper): TextureTracker {
+        return this.createOrGetWithUsage(image, GPUTextureUsage.STORAGE_BINDING);
+    }
+
+    private createOrGetWithUsage(wrapper: ImageWrapper, requiredUsage: GPUTextureUsageFlags): TextureTracker {
+        const usage = requiredUsage | GPUTextureUsage.COPY_DST;
+        return this.createOrGet({ wrapper, usage });
+    }
+
+    protected getHash(input: TextureCreationInput): string {
+        return `${input.wrapper.convertToHash(this.hasher)}|${input.usage}`;
+    }
+
+    protected createResource(input: TextureCreationInput): GPUTexture {
+        const { width, height } = input.wrapper.getDimensions();
+        const texture = this.device.createTexture({
+            size: { width, height, depthOrArrayLayers: 1 },
+            format: input.wrapper.getFormat(),
+            dimension: "2d",
+            mipLevelCount: 1,
+            sampleCount: 1,
+            usage: input.usage,
+        });
+        this.upload(texture, input.wrapper);
+        return texture;
+    }
+
+    protected createTracker(resource: GPUTexture): TextureTracker {
+        return new TextureTracker(resource);
+    }
+
+    private upload(texture: GPUTexture, wrapper: ImageWrapper): void {
+        const { width, height } = wrapper.getDimensions();
+        const bytesPerPixel = this.bytesPerPixel(wrapper.getFormat());
+
+        this.device.queue.writeTexture(
+            { texture },
+            wrapper.getData(),
+            { bytesPerRow: width * bytesPerPixel, rowsPerImage: height },
+            { width, height, depthOrArrayLayers: 1 },
+        );
+    }
+
+    private bytesPerPixel(format: GPUTextureFormat): number {
+        switch (format) {
+            case "rgba8unorm":
+            case "rgba8unorm-srgb":
+            case "bgra8unorm":
+            case "bgra8unorm-srgb":
+                return 4;
+            default:
+                throw new Error(`TextureManager: unhandled format ${format}`);
+        }
     }
 }

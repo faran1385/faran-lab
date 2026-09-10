@@ -2,9 +2,8 @@ import {v4 as uuidv4} from "uuid";
 import type {Hasher} from "../hashing/Hasher.ts";
 import {VertexShaderWrapper} from "./VertexShaderWrapper.ts";
 import {FragmentShaderWrapper} from "./FragmentShaderWrapper.ts";
-import type {MaterialWrapper} from "./MaterialWrapper.ts";
-import type {GeometryWrapper} from "./GeometryWrapper.ts";
 import {PipelineHashHandler} from "../hashing/PipelineHashHandler.ts";
+import type {PrimitiveWrapper} from "./PrimitiveWrapper.ts";
 
 export type PrimitiveTopology =
     | "point-list"
@@ -36,6 +35,7 @@ export class PipelineWrapper {
             () => this.vertexShaderWrapper,
             () => this.fragmentShaderWrapper,
             () => this.settingsKey(),
+            this.rebuildShaders
         );
     }
 
@@ -71,11 +71,11 @@ export class PipelineWrapper {
         this.sampleCount = sampleCount;
     }
 
-    getVertexShaderWrapper(): VertexShaderWrapper | null {
+    getVertexShaderWrapper(): VertexShaderWrapper {
         return this.vertexShaderWrapper;
     }
 
-    getFragmentShaderWrapper(): FragmentShaderWrapper | null {
+    getFragmentShaderWrapper(): FragmentShaderWrapper {
         return this.fragmentShaderWrapper;
     }
 
@@ -103,8 +103,13 @@ export class PipelineWrapper {
         return this.sampleCount;
     }
 
-    computeHash(material: MaterialWrapper, geometry: GeometryWrapper, hasher: Hasher): string {
-        return this.hashHandler.computeHash(material, geometry, hasher);
+    rebuildShaders(primitive: PrimitiveWrapper) {
+        primitive.getVertexAssembler().assemble(primitive)
+        primitive.getFragmentAssembler().assemble(primitive)
+    }
+
+    computeHash(primitive: PrimitiveWrapper, hasher: Hasher): string {
+        return this.hashHandler.computeHash(primitive, hasher);
     }
 
     drainTrash(): string[] {

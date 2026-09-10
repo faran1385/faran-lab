@@ -7,13 +7,12 @@ export class BufferWrapper<TUsage extends GPUBufferUsageFlags = GPUBufferUsageFl
 
     protected usage: TUsage;
     protected data: ArrayBuffer;
-    protected hashHandler: HashHandler;
+    protected hashHandler!: HashHandler;
 
     constructor(data: ArrayBuffer, usage: TUsage) {
         this.uuid = uuidv4();
         this.data = data;
         this.usage = usage;
-        this.hashHandler = new HashHandler(() => `${this.uuid}|${this.hashHandler.getVersion()}`);
     }
 
     getUsage(): TUsage {

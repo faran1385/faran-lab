@@ -11,6 +11,7 @@ export class IndexAttributeWrapper extends BufferWrapper<GPUBufferUsage["INDEX"]
     constructor(data: ArrayBuffer, format: IndexFormat) {
         super(data, GPUBufferUsage.INDEX);
         this.format = format;
+        this.hashHandler = new HashHandler(() => `${this.uuid}|${this.hashHandler.getVersion()}`);
         this.formatHashHandler = new HashHandler(() => `${this.format}`);
     }
 

@@ -8,8 +8,8 @@ export class BasicVertexAssembler extends VertexAssemblerBase {
         bindingValues: Record<string, AccessibleValue>
     ): string {
         const positionAccess = inputValues.position?.access ?? "vec3f(0.0, 0.0, 0.0)";
-        const worldMatrix = bindingValues.worldMatrix?.access ?? "mat4x4f()";
-        const viewProjection = bindingValues.viewProjection?.access ?? "mat4x4f()";
+        const worldMatrix = bindingValues.worldMatrix?.access ?? "mat4x4f(1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1)";
+        const viewProjection = bindingValues.viewProjection?.access ?? "mat4x4f(1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1)";
         return `${viewProjection} * ${worldMatrix} * vec4f(${positionAccess}, 1.0)`;
     }
 }
@@ -19,6 +19,7 @@ export class BasicFragmentAssembler extends FragmentAssemblerBase {
         _varyingValues: Record<string, AccessibleValue>,
         bindingValues: Record<string, AccessibleValue>
     ): string {
-        return bindingValues.baseColor?.access ?? "vec4f(1.0, 0.0, 1.0, 1.0)";
+
+        return bindingValues.baseColor?.access ? `vec4f(${bindingValues.baseColor?.access}.xyz,1.)` : "vec4f(1.0, 0.0, 1.0, 1.0)";
     }
 }

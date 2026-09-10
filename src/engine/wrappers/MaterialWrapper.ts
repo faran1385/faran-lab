@@ -37,6 +37,10 @@ export class MaterialWrapper {
         return this.layoutDescriptor;
     }
 
+    needsShaderRebuild() {
+        return this.hashHandler.needsShaderRebuild()
+    }
+
     setLayoutDescriptor(layoutDescriptor: MaterialBindingLayout) {
         this.layoutDescriptor = layoutDescriptor;
     }
@@ -47,6 +51,11 @@ export class MaterialWrapper {
 
     setComponent(wrapper: MaterialComponentWrapper): void {
         this.components.set(wrapper.name, wrapper);
+        this.hashHandler.bumpComponentVersion()
+    }
+
+    removeComponent(wrapper: MaterialComponentWrapper): void {
+        this.components.delete(wrapper.name);
         this.hashHandler.bumpComponentVersion()
     }
 

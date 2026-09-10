@@ -13,6 +13,7 @@ export class VertexAttributeWrapper extends BufferWrapper<GPUBufferUsage["VERTEX
         super(data, GPUBufferUsage.VERTEX);
         this.name = name;
         this.format = format;
+        this.hashHandler = new HashHandler(() => `${this.uuid}|${this.hashHandler.getVersion()}`);
         this.formatHashHandler = new HashHandler(() => `${this.name}|${this.format}`);
     }
 

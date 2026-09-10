@@ -16,7 +16,6 @@ export class VertexShaderWrapper extends ShaderModuleWrapper {
     private inputs: VertexInputField[] = [];
     private outputs: VertexOutputField[] = [];
     private bindings: BindGroupEntry[] = [];
-    private code: string = "";
 
     setInputs(inputs: VertexInputField[]): void { this.inputs = inputs; this.bumpVersion(); }
     getInputs(): VertexInputField[] { return this.inputs; }
@@ -27,10 +26,4 @@ export class VertexShaderWrapper extends ShaderModuleWrapper {
     setBindings(bindings: BindGroupEntry[]): void { this.bindings = bindings; this.bumpVersion(); }
     getBindings(): BindGroupEntry[] { return this.bindings; }
 
-    setCode(code: string): void { this.code = code; this.bumpVersion(); }
-    getCode(): string { return this.code; }
-
-    protected buildHashKey(): string {
-        return this.code;
-    }
 }
