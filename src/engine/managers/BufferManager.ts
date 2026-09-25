@@ -1,53 +1,27 @@
 import {ResourceManager} from "./Manager.ts";
-import type {BufferWrapper} from "../wrappers/BufferWrapper.ts";
 import {BufferTracker} from "../Trackers/Trackers.ts";
+import type {BufferDescriptor} from "../producers/BufferProducer.ts";
 
-interface BufferCreationInput {
-    wrapper: BufferWrapper;
-    usage: GPUBufferUsageFlags;
-}
+export class BufferManager extends ResourceManager<BufferDescriptor, BufferTracker> {
+    private device: GPUDevice;
+    constructor(device: GPUDevice) { super(); this.device = device; }
 
-
-export class BufferManager extends ResourceManager<BufferCreationInput, GPUBuffer, BufferTracker> {
-    createOrGetUniformBuffer(buffer: BufferWrapper): BufferTracker {
-        return this.createOrGetWithUsage(buffer, GPUBufferUsage.UNIFORM);
+    protected build(getDescriptor: () => BufferDescriptor): BufferTracker {
+        const { label, size, usage, data } = getDescriptor();
+        const buffer = this.device.createBuffer({ label, size, usage, mappedAtCreation: true });
+        new Uint8Array(buffer.getMappedRange()).set(new Uint8Array(data));
+        buffer.unmap();
+        return new BufferTracker(buffer);
     }
 
-    createOrGetVertexBuffer(buffer: BufferWrapper): BufferTracker {
-        return this.createOrGetWithUsage(buffer, GPUBufferUsage.VERTEX);
-    }
+    upload(hash: string, data: GPUAllowSharedBufferSource, offset = 0): void {
+        const tracker = this.cache.get(hash)
+        if (!tracker) throw new Error(`BufferManager.upload: no buffer for "${hash}", call ensure() first`);
 
-    createOrGetIndexBuffer(buffer: BufferWrapper): BufferTracker {
-        return this.createOrGetWithUsage(buffer, GPUBufferUsage.INDEX);
-    }
+        const buffer = tracker.raw
+        if (offset + data.byteLength > buffer.size)
+            throw new Error(`BufferManager.upload: ${data.byteLength}B at offset ${offset} overflows "${hash}" (${buffer.size}B)`);
 
-    createOrGetStorageBuffer(buffer: BufferWrapper): BufferTracker {
-        return this.createOrGetWithUsage(buffer, GPUBufferUsage.STORAGE);
-    }
-
-    private createOrGetWithUsage(wrapper: BufferWrapper, requiredUsage: GPUBufferUsageFlags): BufferTracker {
-        const usage = wrapper.getUsage() | requiredUsage | GPUBufferUsage.COPY_DST;
-        return this.createOrGet({ wrapper, usage });
-    }
-
-    protected getHash(input: BufferCreationInput): string {
-        return `${input.wrapper.convertToHash(this.hasher)}|${input.usage}`;
-    }
-
-    protected createResource(input: BufferCreationInput): GPUBuffer {
-        const gpuBuffer = this.device.createBuffer({
-            size: input.wrapper.getData().byteLength,
-            usage: input.usage,
-        });
-        this.upload(gpuBuffer, input.wrapper);
-        return gpuBuffer;
-    }
-
-    protected createTracker(resource: GPUBuffer): BufferTracker {
-        return new BufferTracker(resource);
-    }
-
-    private upload(gpuBuffer: GPUBuffer, wrapper: BufferWrapper): void {
-        this.device.queue.writeBuffer(gpuBuffer, 0, wrapper.getData());
+        this.device.queue.writeBuffer(buffer, offset, data);
     }
 }

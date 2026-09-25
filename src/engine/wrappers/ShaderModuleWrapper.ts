@@ -1,15 +1,14 @@
 import {v4 as uuidv4} from "uuid";
 
 import type {Hasher} from "../hashing/Hasher.ts";
-import type {BindGroupEntry} from "../descriptorProducer/ShaderDescriptorProducer.ts";
-import {hashBindGroupEntry} from "../descriptorProducer/utils.ts";
 import {HashHandler} from "../hashing/HashHandler.ts";
+import {ShaderModuleWrapperVersionFlag} from "../hashing/ShaderModuleWrapperVersionFlag.ts";
 
-
-export abstract class ShaderModuleWrapper {
+export class ShaderModuleWrapper {
     readonly uuid: string;
 
     protected hashHandler: HashHandler;
+    readonly codeGenVersionFlag = new ShaderModuleWrapperVersionFlag();
     private entryPoint = "main";
     private code: string = "";
 
@@ -18,19 +17,17 @@ export abstract class ShaderModuleWrapper {
         this.hashHandler = new HashHandler(() => this.buildHashKey());
     }
 
-    protected bumpVersion(): void {
+
+
+    setShader(code: string, entryPoint: string): void {
+        this.code = code;
+        this.entryPoint = entryPoint;
         this.hashHandler.addVersion();
     }
 
-    protected static hashBindings(entries: BindGroupEntry[]): string {
-        return entries.map(hashBindGroupEntry).join(",");
+    getCode(): string {
+        return this.code;
     }
-
-    setCode(code: string): void {
-        this.code = code;
-        this.bumpVersion();
-    }
-    getCode(): string { return this.code; }
 
     protected buildHashKey(): string {
         return this.code;
@@ -40,18 +37,8 @@ export abstract class ShaderModuleWrapper {
         return this.hashHandler.convertToHash(hasher);
     }
 
-    drainTrash(): string[] {
-        return this.hashHandler.drainTrash();
-    }
-
-    setEntryPoint(entryPoint: string): void {
-        this.entryPoint = entryPoint;
-        this.bumpVersion();
-    }
-
     getEntryPoint() {
         return this.entryPoint;
     }
-
 }
 

@@ -7,6 +7,15 @@ export class quat {
         return new Float32Array([x, y, z, w]);
     }
 
+    static set(out:Float32Array,x: number, y: number, z: number, w: number): Float32Array {
+        out[0] = x;
+        out[1] = y;
+        out[2] = z;
+        out[3] = w;
+
+        return out;
+    }
+
     static fromAxisAndAngle(out: Float32Array, v: Float32Array, angle: number) {
         out.set([
             v[0] * Math.sin(angle / 2),

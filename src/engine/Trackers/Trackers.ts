@@ -2,16 +2,16 @@ import {DestructibleTracker} from "./DestructibleTracker.ts";
 import {IndestructibleTracker} from "./IndestructibleTracker.ts";
 
 export class BufferTracker extends DestructibleTracker<GPUBuffer> {
-    constructor(resource: GPUBuffer, startLife?: number) {
-        super(resource, "buffer", startLife);
+    constructor(resource: GPUBuffer) {
+        super(resource, "buffer");
     }
 }
 
 export class TextureTracker extends DestructibleTracker<GPUTexture> {
     private views = new Map<string, GPUTextureView>();
 
-    constructor(resource: GPUTexture, startLife?: number) {
-        super(resource, "texture", startLife);
+    constructor(resource: GPUTexture) {
+        super(resource, "texture");
     }
 
     getOrCreateView(key: string, descriptor: GPUTextureViewDescriptor): GPUTextureView {
@@ -24,37 +24,37 @@ export class TextureTracker extends DestructibleTracker<GPUTexture> {
     }
 }
 export class BindGroupTracker extends IndestructibleTracker<GPUBindGroup> {
-    constructor(resource: GPUBindGroup, startLife?: number) {
-        super(resource, "bindGroup", startLife);
+    constructor(resource: GPUBindGroup) {
+        super(resource, "bindGroup");
     }
 }
 
 export class BindGroupLayoutTracker extends IndestructibleTracker<GPUBindGroupLayout> {
-    constructor(resource: GPUBindGroupLayout, startLife?: number) {
-        super(resource, "bindGroupLayout", startLife);
+    constructor(resource: GPUBindGroupLayout) {
+        super(resource, "bindGroupLayout");
     }
 }
 
 export class PipelineLayoutTracker extends IndestructibleTracker<GPUPipelineLayout> {
-    constructor(resource: GPUPipelineLayout, startLife?: number) {
-        super(resource, "pipelineLayout", startLife);
+    constructor(resource: GPUPipelineLayout) {
+        super(resource, "pipelineLayout");
     }
 }
 
 export class PipelineTracker extends IndestructibleTracker<GPURenderPipeline> {
-    constructor(resource: GPURenderPipeline, startLife?: number) {
-        super(resource, "pipeline", startLife);
+    constructor(resource: GPURenderPipeline) {
+        super(resource, "pipeline");
     }
 }
 
 export class ShaderModuleTracker extends IndestructibleTracker<GPUShaderModule> {
-    constructor(resource: GPUShaderModule, startLife?: number) {
-        super(resource, "shaderModule", startLife);
+    constructor(resource: GPUShaderModule) {
+        super(resource, "shaderModule");
     }
 }
 
 export class SamplerTracker extends IndestructibleTracker<GPUSampler> {
-    constructor(resource: GPUSampler, startLife?: number) {
-        super(resource, "sampler", startLife);
+    constructor(resource: GPUSampler) {
+        super(resource, "sampler");
     }
 }

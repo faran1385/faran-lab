@@ -1,122 +1,77 @@
 import {v4 as uuidv4} from "uuid";
 import type {Hasher} from "../hashing/Hasher.ts";
-import {VertexShaderWrapper} from "./VertexShaderWrapper.ts";
-import {FragmentShaderWrapper} from "./FragmentShaderWrapper.ts";
-import {PipelineHashHandler} from "../hashing/PipelineHashHandler.ts";
-import type {PrimitiveWrapper} from "./PrimitiveWrapper.ts";
-
-export type PrimitiveTopology =
-    | "point-list"
-    | "line-list"
-    | "line-strip"
-    | "triangle-list"
-    | "triangle-strip";
-
-export type AlphaMode = "OPAQUE" | "MASK" | "BLEND";
+import {AggregateHashHandler} from "../hashing/AggregateHashHandler.ts";
+import {ShaderModuleWrapper} from "./ShaderModuleWrapper.ts";
 
 export class PipelineWrapper {
-    private vertexShaderWrapper: VertexShaderWrapper = new VertexShaderWrapper();
-    private fragmentShaderWrapper: FragmentShaderWrapper = new FragmentShaderWrapper();
-
-    private topology: PrimitiveTopology = "triangle-list";
-    private alphaMode: AlphaMode = "OPAQUE";
-    private alphaCutoff: number = 0.5;
-    private doubleSided: boolean = false;
-    private targetFormat: GPUTextureFormat = "bgra8unorm";
-    private sampleCount: number = 1;
-
     readonly uuid: string;
 
-    private hashHandler: PipelineHashHandler;
+    private vertexShaderWrapper: ShaderModuleWrapper;
+    private fragmentShaderWrapper: ShaderModuleWrapper;
+
+    private currentVertexHash = "";
+    private currentFragmentHash = "";
+    private currentBindgroupLayoutHash = "";
+    private currentAttributesHash = "";
+    private currentPipelineSettingsHash = "";
+    private currentFacePass: "single" | "back" | "front" = "single";
+
+    private hashHandler: AggregateHashHandler;
 
     constructor() {
         this.uuid = uuidv4();
-        this.hashHandler = new PipelineHashHandler(
-            () => this.vertexShaderWrapper,
-            () => this.fragmentShaderWrapper,
-            () => this.settingsKey(),
-            this.rebuildShaders
+        this.vertexShaderWrapper = new ShaderModuleWrapper();
+        this.fragmentShaderWrapper = new ShaderModuleWrapper();
+
+        this.hashHandler = new AggregateHashHandler(() =>
+            [
+                this.currentVertexHash,
+                this.currentFragmentHash,
+                this.currentBindgroupLayoutHash,
+                this.currentAttributesHash,
+                this.currentPipelineSettingsHash,
+                this.currentFacePass,
+            ].join("|")
         );
     }
 
-    setVertexShaderWrapper(vertexShaderWrapper: VertexShaderWrapper): void {
-        this.vertexShaderWrapper = vertexShaderWrapper;
+    setInputs(
+        vertexHash: string,
+        fragmentHash: string,
+        bindgroupLayoutHash: string,
+        attributesHash: string,
+        pipelineSettingsHash: string,
+        facePass: "single" | "back" | "front"
+    ): void {
+        this.currentVertexHash = vertexHash;
+        this.currentFragmentHash = fragmentHash;
+        this.currentBindgroupLayoutHash = bindgroupLayoutHash;
+        this.currentAttributesHash = attributesHash;
+        this.currentPipelineSettingsHash = pipelineSettingsHash;
+        this.currentFacePass = facePass;
     }
 
-    setFragmentShaderWrapper(fragmentShaderWrapper: FragmentShaderWrapper): void {
-        this.fragmentShaderWrapper = fragmentShaderWrapper;
+    markVertexShaderDirty(){
+        this.vertexShaderWrapper.codeGenVersionFlag.addVersion()
     }
 
-    setTopology(topology: PrimitiveTopology): void {
-        this.topology = topology;
+    markFragmentShaderDirty(){
+        this.fragmentShaderWrapper.codeGenVersionFlag.addVersion()
     }
 
-    setAlphaMode(alphaMode: AlphaMode): void {
-        this.alphaMode = alphaMode;
+    convertToHash(hasher: Hasher): string {
+        return this.hashHandler.convertToHash(hasher);
     }
 
-    setAlphaCutoff(alphaCutoff: number): void {
-        this.alphaCutoff = alphaCutoff;
-    }
-
-    setDoubleSided(doubleSided: boolean): void {
-        this.doubleSided = doubleSided;
-    }
-
-    setTargetFormat(targetFormat: GPUTextureFormat): void {
-        this.targetFormat = targetFormat;
-    }
-
-    setSampleCount(sampleCount: number): void {
-        this.sampleCount = sampleCount;
-    }
-
-    getVertexShaderWrapper(): VertexShaderWrapper {
+    getVertexShaderWrapper(): ShaderModuleWrapper  {
         return this.vertexShaderWrapper;
     }
 
-    getFragmentShaderWrapper(): FragmentShaderWrapper {
+    getFragmentShaderWrapper(): ShaderModuleWrapper {
         return this.fragmentShaderWrapper;
     }
 
-    getTopology(): PrimitiveTopology {
-        return this.topology;
-    }
-
-    getAlphaMode(): AlphaMode {
-        return this.alphaMode;
-    }
-
-    getAlphaCutoff(): number {
-        return this.alphaCutoff;
-    }
-
-    getDoubleSided(): boolean {
-        return this.doubleSided;
-    }
-
-    getTargetFormat(): GPUTextureFormat {
-        return this.targetFormat;
-    }
-
-    getSampleCount(): number {
-        return this.sampleCount;
-    }
-
-    rebuildShaders(primitive: PrimitiveWrapper) {
-        primitive.getVertexAssembler().assemble(primitive)
-        primitive.getFragmentAssembler().assemble(primitive)
-    }
-
-    computeHash(primitive: PrimitiveWrapper, hasher: Hasher): string {
-        return this.hashHandler.computeHash(primitive, hasher);
-    }
-
-    drainTrash(): string[] {
-        return this.hashHandler.drainTrash();
-    }
-
-    private settingsKey(): string {
-        return `${this.topology}|${this.alphaMode}|${this.alphaCutoff}|${this.doubleSided}|${this.targetFormat}|${this.sampleCount}`;
+    getFacePass(): "single" | "back" | "front" {
+        return this.currentFacePass;
     }
 }

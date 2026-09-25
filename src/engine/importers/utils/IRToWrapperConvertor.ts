@@ -17,7 +17,7 @@ import {MeshWrapper} from "../../wrappers/MeshWrapper.ts";
 import {NodeWrapper} from "../../wrappers/NodeWrapper.ts";
 import {TextureWrapper} from "../../wrappers/TextureWrapper.ts";
 import type {NodeHierarchy, WireUpInput} from "../../WireUp/BaseWireUp.ts";
-import {VertexAttributeWrapper} from "../../wrappers/VertexAttributeWrapper.ts";
+import {AttributeWrapper} from "../../wrappers/AttributeWrapper.ts";
 import {IndexAttributeWrapper} from "../../wrappers/IndexWrapper.ts";
 import {MaterialComponentWrapper} from "../../wrappers/MaterialComponentWrapper.ts";
 
@@ -30,7 +30,7 @@ export class IRToWrapperConvertor {
     }
 
     createVertexAttributeWrapper(name: AttributeName, attr: Attribute) {
-        return new VertexAttributeWrapper(name, attr.data, attr.format);
+        return new AttributeWrapper(name, attr.data, attr.format);
     }
 
     createGeometryWrapper() {
@@ -44,7 +44,7 @@ export class IRToWrapperConvertor {
     private convertGeos(geoList: Geometry[], attributes: Attribute[]) {
 
         return geoList.map((item) => {
-            const attributeWrapperList: VertexAttributeWrapper[] = [];
+            const attributeWrapperList: AttributeWrapper[] = [];
             for (let key in item.attributes) {
                 attributeWrapperList.push(this.createVertexAttributeWrapper(key as AttributeName, attributes[item.attributes[key as AttributeName]]));
             }

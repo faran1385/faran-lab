@@ -1,14 +1,10 @@
 import {GPUContext} from "./engine/gpu-context.ts";
 
 import {GeometryWrapper} from "./engine/wrappers/GeometryWrapper.ts";
-import {VertexAttributeWrapper} from "./engine/wrappers/VertexAttributeWrapper.ts";
+import {AttributeWrapper} from "./engine/wrappers/AttributeWrapper.ts";
 import {MaterialWrapper} from "./engine/wrappers/MaterialWrapper.ts";
-import {MaterialComponentWrapper} from "./engine/wrappers/MaterialComponentWrapper.ts";
 import {PrimitiveWrapper} from "./engine/wrappers/PrimitiveWrapper.ts";
-import {MaterialDescriptorProducer} from "./engine/descriptorProducer/MaterialDescriptorProducer.ts";
-import {GeometryDescriptorProducer} from "./engine/descriptorProducer/GeometryDescriptorProducer.ts";
 import {Hasher} from "./engine/hashing/Hasher.ts";
-import {ShaderDescriptorProducer} from "./engine/descriptorProducer/ShaderDescriptorProducer.ts";
 import {BindGroupLayoutManager} from "./engine/managers/BindGroupLayoutManager.ts";
 import {BufferManager} from "./engine/managers/BufferManager.ts";
 import {SamplerManager} from "./engine/managers/SamplerManager.ts";
@@ -17,6 +13,15 @@ import {BindGroupManager} from "./engine/managers/BindGroupManager.ts";
 import {PipelineLayoutManager} from "./engine/managers/PipelineLayoutManager.ts";
 import {PipelineManager} from "./engine/managers/PipelineManager.ts";
 import {ShaderModuleManager} from "./engine/managers/ShaderModuleManager.ts";
+import {MeshWrapper} from "./engine/wrappers/MeshWrapper.ts";
+import {NodeWrapper} from "./engine/wrappers/NodeWrapper.ts";
+import {DescriptorProducer} from "./engine/producers/CentralProducer.ts";
+import {MaterialComponentWrapper} from "./engine/wrappers/MaterialComponentWrapper.ts";
+import {TextureWrapper} from "./engine/wrappers/TextureWrapper.ts";
+import {ImageWrapper} from "./engine/wrappers/ImageWrapper.ts";
+import {SamplerWrapper} from "./engine/wrappers/SamplerWrapper.ts";
+import {mat4} from "./packages/math/matrix/mat4.ts";
+import {PerspectiveCamera} from "./engine/Camera/PerspectiveCamera.ts";
 
 const canvas = document.getElementById("gpu-canvas") as HTMLCanvasElement;
 
@@ -24,7 +29,6 @@ const gpu = await GPUContext.create(canvas);
 
 let depthTexture: null | GPUTexture = null;
 const device = gpu.device;
-const format = gpu.format;
 const context = gpu.context
 
 gpu.onResize((w, h) => {
@@ -38,79 +42,15 @@ gpu.onResize((w, h) => {
 
 gpu.resize(canvas.width, canvas.height)
 
+const bufferManager = new BufferManager(device);
+const shaderModuleManager = new ShaderModuleManager(device);
+const samplerManager = new SamplerManager(device);
+const textureManager = new TextureManager(device);
+const pipelineLayoutManager = new PipelineLayoutManager(device);
+const bindgroupManager = new BindGroupManager(device);
+const pipelineManager = new PipelineManager(device);
+const bindgroupLayoutManager = new BindGroupLayoutManager(device);
 
-// Scene uniform buffer (208 bytes)
-const sceneBufferData = new Float32Array(52); // 208 bytes / 4 bytes per float
-// Example scene data (adjust layout as needed)
-sceneBufferData.set([
-    // Projection matrix (16 floats)
-    1, 0, 0, 0,
-    0, 1, 0, 0,
-    0, 0, 1, 0,
-    0, 0, 0, 1,
-    // View matrix (16 floats)
-    1, 0, 0, 0,
-    0, 1, 0, 0,
-    0, 0, 1, 0,
-    0, 0, 0, 1,
-]);
-
-// Node uniform buffer (64 bytes)
-const nodeBufferData = new Float32Array(16); // 64 bytes / 4 bytes per float
-// Example node data
-nodeBufferData.set([
-    // Model matrix (16 floats)
-    1, 0, 0, 0,
-    0, 1, 0, 0,
-    0, 0, 1, 0,
-    0, 0, 0, 1
-]);
-
-// Create the buffers
-const sceneBuffer = device.createBuffer({
-    size: sceneBufferData.byteLength,
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    mappedAtCreation: true,
-});
-new Float32Array(sceneBuffer.getMappedRange()).set(sceneBufferData);
-sceneBuffer.unmap();
-
-const nodeBuffer = device.createBuffer({
-    size: nodeBufferData.byteLength, // 64 bytes
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    mappedAtCreation: true,
-});
-new Float32Array(nodeBuffer.getMappedRange()).set(nodeBufferData);
-nodeBuffer.unmap();
-
-// Create bind group layouts
-const sceneBindGroupLayout = device.createBindGroupLayout(BindGroupLayoutManager.SCENE_LAYOUT_DESCRIPTOR);
-const nodeBindGroupLayout = device.createBindGroupLayout(BindGroupLayoutManager.NODE_LAYOUT_DESCRIPTOR);
-
-// Create bind groups
-const sceneBindGroup = device.createBindGroup({
-    layout: sceneBindGroupLayout,
-    entries: [
-        {
-            binding: 0,
-            resource: {
-                buffer: sceneBuffer,
-            },
-        },
-    ],
-});
-
-const nodeBindGroup = device.createBindGroup({
-    layout: nodeBindGroupLayout,
-    entries: [
-        {
-            binding: 0,
-            resource: {
-                buffer: nodeBuffer,
-            },
-        },
-    ],
-});
 
 const vertexData = new Float32Array([
     -0.5, -0.5, 0.0,
@@ -118,50 +58,47 @@ const vertexData = new Float32Array([
     0.0, 0.5, 0.0,
 ]);
 
+const uvs = new Float32Array([
+    1 / 6, 0.5,   // vertex 0 → RED
+    0.5, 0.5,   // vertex 1 → GREEN
+    5 / 6, 0.5,   // vertex 2 → BLUE
+]);
+const camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.setPosition(0, 0, 3)
+
 const hasher = await Hasher.create();
-const posAttr = new VertexAttributeWrapper("position", vertexData.buffer, "float32x3");
-
-const bufferManager = new BufferManager(device, hasher);
-const samplerManager = new SamplerManager(device, hasher);
-const textureManager = new TextureManager(device, hasher);
-const bindgroupLayoutManager = new BindGroupLayoutManager(device, hasher)
-const bindgroupManager = new BindGroupManager(device, hasher)
-const pipelineLayoutManager = new PipelineLayoutManager(device, hasher)
-const pipelineManager = new PipelineManager(device, hasher)
-const shaderModuleManager = new ShaderModuleManager(device, hasher)
-
-
+const posAttr = new AttributeWrapper("position", vertexData.buffer, "float32x3");
+const uvAttr = new AttributeWrapper("uv0", uvs.buffer, "float32x2");
 const geo = new GeometryWrapper()
 geo.addAttribute(posAttr)
-const mat = new MaterialWrapper("opaque", 0.2, false);
-const baseColor = new MaterialComponentWrapper("baseColor", [1, 0, 0])
-const baseColor2 = new MaterialComponentWrapper("baseColor2", [1, 1, 0])
-mat.setComponent(baseColor)
-const primitive = new PrimitiveWrapper()
-primitive.setMaterial(mat)
-primitive.setGeometry(geo);
-console.log(mat)
-MaterialDescriptorProducer.produce(mat, hasher, 2)
-GeometryDescriptorProducer.produce(geo)
-ShaderDescriptorProducer.produce(primitive)
-primitive.getVertexAssembler().assemble(primitive)
-primitive.getFragmentAssembler().assemble(primitive)
-
-let matBindgroupTracker = bindgroupManager.createOrGetFromMaterial(mat, bindgroupLayoutManager, textureManager, samplerManager, bufferManager);
-let pipelineTracker = pipelineManager.createOrGetFromPipeline(primitive, bindgroupLayoutManager, pipelineLayoutManager, shaderModuleManager)
-const attr = bufferManager.createOrGetVertexBuffer(posAttr).raw;
-
-window.addEventListener("click", () => {
-    baseColor.setFactors([0, 0, 0])
-    mat.removeComponent(baseColor2)
-    bindgroupManager.createOrGetFromMaterial(mat, bindgroupLayoutManager, textureManager, samplerManager, bufferManager);
+geo.addAttribute(uvAttr)
+const mat = new MaterialWrapper("opaque", 0, false)
+mat.setComponent(new MaterialComponentWrapper("baseColor", [1, 1, 1]))
+mat.getComponent("baseColor")?.setTexture({
+    texCoord: "uv0",
+    wrapper: new TextureWrapper(
+        new ImageWrapper(
+            new Uint8Array([
+                255, 0, 0, 1,   // texel 0: RED
+                0, 255, 0, 1,   // texel 1: GREEN
+                0, 0, 255, 1,   // texel 2: BLUE
+            ]).buffer,
+            3,   // width  = 3 texels
+            1,
+            "rgba8unorm"
+        ),
+        new SamplerWrapper("linear", "linear", "linear", "repeat", "repeat")
+    )
 })
 
-window.addEventListener("contextmenu", () => {
-    baseColor.setFactors([0, 0, 1])
-    mat.setComponent(baseColor2)
-    bindgroupManager.createOrGetFromMaterial(mat, bindgroupLayoutManager, textureManager, samplerManager, bufferManager);
-})
+const producer = new DescriptorProducer();
+const primitive = new PrimitiveWrapper(mat, geo)
+const mesh = new MeshWrapper()
+mesh.setPrimitive(primitive)
+const node = new NodeWrapper()
+node.setMesh(mesh)
+
+
 
 function frame(): void {
 
@@ -170,23 +107,145 @@ function frame(): void {
         colorAttachments: [
             {
                 view: context.getCurrentTexture().createView(),
-                clearValue: {r: 0.043, g: 0.047, b: 0.063, a: 1},
                 loadOp: "clear",
+                clearValue: [1, 1, 1, 1],
                 storeOp: "store",
             },
         ],
     });
 
-    pass.setPipeline(pipelineTracker.raw);
-    pass.setBindGroup(0, sceneBindGroup);
-    pass.setBindGroup(1, matBindgroupTracker.raw);
-    pass.setBindGroup(2, nodeBindGroup);
-    pass.setVertexBuffer(0, attr)
+    // global
+    bufferManager.ensure(camera.uuid, () => producer.produceCameraBuffer(camera))
+    if (camera.isUploadViewDirty()) {
+        bufferManager.upload(camera.uuid, camera.getViewMatrix().buffer, 0)
+        camera.syncUploadView()
+    }
+    if (camera.isUploadProjectionDirty()) {
+        bufferManager.upload(camera.uuid, camera.getProjectionMatrix().buffer, 64)
+        camera.syncUploadProjection()
+    }
+    // hash should change as we add items
+    bindgroupManager.ensure(camera.uuid, () => producer.produceSceneBindgroup({
+        layouts: bindgroupLayoutManager,
+        camera,
+        buffers: bufferManager
+    }))
+
+    // mesh
+    if (mat.needsShaderRebuild(hasher)) {
+        primitive.getPipeline().markVertexShaderDirty()
+        primitive.getPipeline().markFragmentShaderDirty()
+        mat.syncShaderRebuild()
+    }
+
+    if (primitive.getPipeline().getVertexShaderWrapper().codeGenVersionFlag.needsUpdate()) {
+        const entryPoint = "main"
+        const code = primitive.getVertexAssembler().assemble(producer.produceVertexShader({
+            geometry: primitive.getGeometry(),
+            material: primitive.getMaterial(),
+        }), entryPoint)
+        primitive.getPipeline().getVertexShaderWrapper().setShader(code, entryPoint)
+        primitive.getPipeline().getVertexShaderWrapper().codeGenVersionFlag.sync()
+    }
+
+    if (primitive.getPipeline().getFragmentShaderWrapper().codeGenVersionFlag.needsUpdate()) {
+        const entryPoint = "main"
+        const code = primitive.getFragmentAssembler().assemble(producer.produceFragmentShader({
+            geometry: primitive.getGeometry(),
+            vertexShader: primitive.getPipeline().getVertexShaderWrapper(),
+            material: primitive.getMaterial()
+        }), entryPoint)
+        console.log(code)
+        primitive.getPipeline().getFragmentShaderWrapper().setShader(code, entryPoint)
+        primitive.getPipeline().getFragmentShaderWrapper().codeGenVersionFlag.sync()
+    }
+    geo.getAttributes().forEach(attribute => {
+        bufferManager.ensure(attribute.convertToHash(hasher), () => producer.produceBuffer(attribute))
+    })
+
+    bufferManager.ensure(mat.convertToFactorsHash(hasher), () => producer.produceBufferFromMatFactors(mat))
+    shaderModuleManager.ensure(primitive.getPipeline().getVertexShaderWrapper().convertToHash(hasher), () => producer.produceShaderModule(primitive.getPipeline().getVertexShaderWrapper()))
+    shaderModuleManager.ensure(primitive.getPipeline().getFragmentShaderWrapper().convertToHash(hasher), () => producer.produceShaderModule(primitive.getPipeline().getFragmentShaderWrapper()))
+
+    mat.getAllComponents().forEach(component => {
+
+        if (component.getTexture()) {
+            samplerManager.ensure(component.getTexture()!.wrapper.getSampler().convertToHash(hasher), () => producer.produceSampler(component.getTexture()!.wrapper.getSampler()))
+            textureManager.ensure(component.getTexture()!.wrapper.getImage().convertToHash(hasher), () => producer.produceTexture(component.getTexture()!.wrapper.getImage()))
+        }
+
+        if (component.needsFactorUpdate()) {
+            const plan = producer.getFactorPlan(mat)
+            const item = plan.get(component.name)!
+
+            bufferManager.upload(mat.convertToFactorsHash(hasher), new Float32Array([item.factor].flat()), item.offset)
+            component.syncFactorUpdate()
+        }
+    })
+
+    bindgroupLayoutManager.ensure(mat.convertToBindgroupLayoutHash(hasher), () => producer.produceBindGroupLayout(mat))
+    bindgroupManager.ensure(mat.convertToBindgroupHash(hasher), () => producer.produceBindGroup({
+        material: mat,
+        samplers: samplerManager,
+        hasher: hasher,
+        buffers: bufferManager,
+        layouts: bindgroupLayoutManager,
+        textures: textureManager,
+    }))
+    pipelineLayoutManager.ensure(mat.convertToBindgroupLayoutHash(hasher), () => producer.producePipelineLayout({
+        material: mat,
+        hasher: hasher,
+        layouts: bindgroupLayoutManager
+    }))
+    primitive.getPipeline().setInputs(
+        primitive.getPipeline().getVertexShaderWrapper().convertToHash(hasher),
+        primitive.getPipeline().getFragmentShaderWrapper().convertToHash(hasher),
+        mat.convertToBindgroupLayoutHash(hasher),
+        geo.convertToAttributesHash(hasher),
+        mat.convertToPipelineSettingsHash(hasher),
+        "back"
+    )
+    pipelineManager.ensure(primitive.getPipeline().convertToHash(hasher), () => producer.producePipeline({
+        frame: {
+            sampleCount: 1,
+            colorFormat: "bgra8unorm",
+            depthFormat: "depth32float"
+        },
+        hasher: hasher,
+        geometry: geo,
+        material: mat,
+        pipelineLayouts: pipelineLayoutManager,
+        pipeline: primitive.getPipeline(),
+        shaderModules: shaderModuleManager
+    }))
+
+    /// node
+    bufferManager.ensure(node.uuid, () => producer.produceBufferFromNodeMatrix(node));
+    bindgroupManager.ensure(node.uuid, () => producer.produceBindgroupFromNode({
+        layouts: bindgroupLayoutManager,
+        buffers: bufferManager,
+        node
+    }));
+
+    if (node.isTransformDirty()) {
+        console.log(node.isTransformDirty())
+        node.buildWorldMatrix(mat4.create(), bufferManager.upload.bind(bufferManager))
+    }
+
+    pass.setPipeline(pipelineManager.getRaw(primitive.getPipeline().convertToHash(hasher)))
+    pass.setBindGroup(0, bindgroupManager.getRaw(camera.uuid))
+    pass.setBindGroup(1, bindgroupManager.getRaw(mat.convertToBindgroupHash(hasher)))
+    pass.setBindGroup(2, bindgroupManager.getRaw(node.uuid))
+    pass.setVertexBuffer(0, bufferManager.getRaw(posAttr.convertToHash(hasher)))
+    pass.setVertexBuffer(1, bufferManager.getRaw(uvAttr.convertToHash(hasher)))
+
     pass.draw(3)
+
     pass.end();
 
-
     device.queue.submit([encoder.finish()]);
+
+    producer.clear()
     requestAnimationFrame(frame);
 }
 

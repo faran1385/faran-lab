@@ -5,11 +5,7 @@ interface Destructible {
 }
 
 export abstract class DestructibleTracker<T extends Destructible> extends Tracker<T> {
-    constructor(resource: T, kind: ResourceKind, startLife?: number) {
-        super(resource, kind, startLife);
-    }
-
-    protected onDispose(resource: T): void {
-        resource.destroy();
+    constructor(resource: T, kind: ResourceKind) {
+        super(resource, kind);
     }
 }

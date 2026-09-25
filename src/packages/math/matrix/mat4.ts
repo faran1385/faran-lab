@@ -430,6 +430,7 @@ export class mat4 {
         rotation: Float32Array,
         scale: Float32Array
     ) {
+
         const x = rotation[0];
         const y = rotation[1];
         const z = rotation[2];

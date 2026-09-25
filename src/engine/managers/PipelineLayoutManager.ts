@@ -1,42 +1,16 @@
 import {ResourceManager} from "./Manager.ts";
-import type {MaterialWrapper} from "../wrappers/MaterialWrapper.ts";
-import type {BindGroupLayoutManager} from "./BindGroupLayoutManager.ts";
-import {BindGroupLayoutTracker, PipelineLayoutTracker} from "../Trackers/Trackers.ts";
+import {PipelineLayoutTracker} from "../Trackers/Trackers.ts";
 
-interface PipelineLayoutCreationInput {
-    material: MaterialWrapper;
-    materialLayout: BindGroupLayoutTracker;
-    sceneLayout: BindGroupLayoutTracker;
-    nodeLayout: BindGroupLayoutTracker;
-}
 
-export class PipelineLayoutManager extends ResourceManager<PipelineLayoutCreationInput, GPUPipelineLayout, PipelineLayoutTracker> {
-    createOrGetFromMaterial(
-        material: MaterialWrapper,
-        layoutManager: BindGroupLayoutManager,
-    ): PipelineLayoutTracker {
-        const materialLayout = layoutManager.createOrGetFromMaterial(material);
-        const sceneLayout = layoutManager.getOrCreateSceneLayout();
-        const nodeLayout = layoutManager.getOrCreateNodeLayout();
+export class PipelineLayoutManager extends ResourceManager<GPUPipelineLayoutDescriptor, PipelineLayoutTracker> {
+    private device: GPUDevice;
 
-        return this.createOrGet({ material, materialLayout, sceneLayout, nodeLayout });
+    constructor(device: GPUDevice) {
+        super();
+        this.device = device;
     }
 
-    protected getHash(input: PipelineLayoutCreationInput): string {
-        return input.material.convertToBindGroupLayoutHash(this.hasher);
-    }
-
-    protected createResource(input: PipelineLayoutCreationInput): GPUPipelineLayout {
-        return this.device.createPipelineLayout({
-            bindGroupLayouts: [
-                input.sceneLayout.raw,
-                input.materialLayout.raw,
-                input.nodeLayout.raw,
-            ],
-        });
-    }
-
-    protected createTracker(resource: GPUPipelineLayout): PipelineLayoutTracker {
-        return new PipelineLayoutTracker(resource);
+    protected build(getDescriptor: () => GPUPipelineLayoutDescriptor): PipelineLayoutTracker {
+        return new PipelineLayoutTracker(this.device.createPipelineLayout(getDescriptor()));
     }
 }

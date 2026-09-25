@@ -1,42 +1,22 @@
-import type {Hasher} from "../hashing/Hasher.ts";
 import type {Tracker} from "../Trackers/Tracker.ts";
 
-export abstract class ResourceManager<TInput, TResource, TTracker extends Tracker<TResource>> {
-    protected readonly device: GPUDevice;
-    protected readonly hasher: Hasher;
-    protected readonly trackers = new Map<string, TTracker>();
+export abstract class ResourceManager<TDescriptor, TTracker extends Tracker<unknown>> {
+    protected cache = new Map<string, TTracker>();
 
-    constructor(device: GPUDevice, hasher: Hasher) {
-        this.device = device;
-        this.hasher = hasher;
+    ensure(hash: string, getDescriptor: () => TDescriptor): void {
+        if (this.cache.has(hash)) return;
+        this.cache.set(hash, this.build(getDescriptor));
     }
 
-    protected createOrGet(input: TInput): TTracker {
-        const hash = this.getHash(input);
-        const existing = this.trackers.get(hash);
-        if (existing) {
-            existing.addRef();
-            return existing;
-        }
-
-        const resource = this.createResource(input);
-        const tracker = this.createTracker(resource);
-
-        this.trackers.set(hash, tracker);
+    get(hash: string): TTracker {
+        const tracker = this.cache.get(hash);
+        if (!tracker) throw new Error(`No resource for hash ${hash}, did you forget ensure()?`);
         return tracker;
     }
 
-    release(hash: string): void {
-        const tracker = this.trackers.get(hash);
-        if (!tracker) return;
-
-        tracker.release();
-        if (tracker.isDisposed) {
-            this.trackers.delete(hash);
-        }
+    getRaw(hash: string): TTracker["raw"] {
+        return this.get(hash).raw;
     }
 
-    protected abstract getHash(input: TInput): string;
-    protected abstract createResource(input: TInput): TResource;
-    protected abstract createTracker(resource: TResource): TTracker;
+    protected abstract build(getDescriptor: () => TDescriptor): TTracker;
 }

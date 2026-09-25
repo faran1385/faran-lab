@@ -1,64 +1,34 @@
-import type {AttributeName} from "../importers/utils/IR.ts";
-import type {VertexAttributeWrapper} from "../wrappers/VertexAttributeWrapper.ts";
-import {AggregateHashHandler} from "./AggregateHashHandler.ts";
-import type {IndexAttributeWrapper} from "../wrappers/IndexWrapper.ts";
+import type {AttributeWrapper} from "../wrappers/AttributeWrapper.ts";
+import type {GeometryWrapper} from "../wrappers/GeometryWrapper.ts";
 import type {Hasher} from "./Hasher.ts";
+import {TriggerableAggregateHashHandler} from "./TriggerableAggregateHashHandler.ts";
 
 export class GeometryHashHandler {
-    private attributesHashHandler: AggregateHashHandler;
-    private indicesHashHandler: AggregateHashHandler;
-    private structureVersion: number = 0;
-    private cachedSortedEntries: [AttributeName, VertexAttributeWrapper][] = [];
-    private cachedSortedEntriesStructureVersion: number = -1;
-    private readonly getAttributes: () => Map<AttributeName, VertexAttributeWrapper>
+    private attributesHash: TriggerableAggregateHashHandler;
+    private sortedAttributes: AttributeWrapper[] = [];
 
-
-    constructor(
-        getAttributes: () => Map<AttributeName, VertexAttributeWrapper>,
-        getIndices: () => IndexAttributeWrapper | undefined,
-    ) {
-        this.getAttributes = getAttributes;
-
-        this.attributesHashHandler = new AggregateHashHandler((hasher) =>
-            this.sortedEntries()
-                .map(([name, attr]) => `${name}:${attr.convertToFormatHash(hasher)}`)
+    constructor() {
+        this.attributesHash = new TriggerableAggregateHashHandler((hasher) =>
+            this.sortedAttributes
+                .map((wrapper) => `${wrapper.name}:${wrapper.convertToHash(hasher)}`)
                 .join("|")
         );
-
-        this.indicesHashHandler = new AggregateHashHandler((hasher) => {
-            const indices = getIndices();
-            return indices ? indices.convertToFormatHash(hasher) : "none";
-        });
     }
 
-    private sortedEntries(): [AttributeName, VertexAttributeWrapper][] {
-        const structureVersion = this.structureVersion;
-        if (structureVersion !== this.cachedSortedEntriesStructureVersion) {
-            this.cachedSortedEntries = Array.from(this.getAttributes().entries()).sort(([a], [b]) =>
-                a.localeCompare(b),
-            );
-            this.cachedSortedEntriesStructureVersion = structureVersion;
-        }
-        return this.cachedSortedEntries;
-    }
-
-    bumpStructureVersion() {
-        this.structureVersion++
+    sortAttributes(attributes: GeometryWrapper["attributes"]): void {
+        this.sortedAttributes = Array.from(attributes.values())
+            .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
     }
 
     convertToAttributesHash(hasher: Hasher): string {
-        return this.attributesHashHandler.convertToHash(hasher);
+        return this.attributesHash.convertToHash(hasher);
     }
 
-    convertToIndicesHash(hasher: Hasher): string {
-        return this.indicesHashHandler.convertToHash(hasher);
+    syncAttributesHash(){
+        return this.attributesHash.sync()
     }
 
-    drainAttributesTrash(): string[] {
-        return this.attributesHashHandler.drainTrash();
-    }
-
-    drainIndicesTrash(): string[] {
-        return this.indicesHashHandler.drainTrash();
+    needsShaderRebuild(hasher: Hasher){
+        return this.attributesHash.needsUpdate(hasher)
     }
 }

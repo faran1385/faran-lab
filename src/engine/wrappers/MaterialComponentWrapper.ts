@@ -1,31 +1,47 @@
 import type {TextureWrapper} from "./TextureWrapper.ts";
 import {v4 as uuidv4} from "uuid";
-import type {Hasher} from "../hashing/Hasher.ts";
 import {MaterialComponentHashHandler} from "../hashing/MaterialComponentHashHandler.ts";
+import type {Hasher} from "../hashing/Hasher.ts";
+import {HashHandler} from "../hashing/HashHandler.ts";
+import {AggregateHashHandler} from "../hashing/AggregateHashHandler.ts";
 
 export type MaterialComponentTextureSlot = {
     wrapper: TextureWrapper,
-    texCoord: `uv${number}`
+    texCoord: string
 }
+
 export class MaterialComponentWrapper {
-    private factors: number[];
     readonly uuid: string;
     readonly name: string;
-    private texture?: MaterialComponentTextureSlot;
 
+    private factors: number[];
+    private texture?: MaterialComponentTextureSlot;
     private hashHandler: MaterialComponentHashHandler;
 
     constructor(name: string, factors: number[]) {
-        this.factors = factors;
-        this.name = name;
         this.uuid = uuidv4();
+        this.name = name;
+        this.factors = factors;
 
-        this.hashHandler = new MaterialComponentHashHandler(name, () => this.texture);
+        this.hashHandler = new MaterialComponentHashHandler(
+            new HashHandler(() => (this.texture ? "1" : "0")),
+            new HashHandler(() => (this.texture ? this.texture.texCoord : "0")),
+            new AggregateHashHandler((hasher) =>
+                this.texture ? this.texture.wrapper.convertToHash(hasher) : "notex"
+            ),
+        )
     }
 
     setTexture(texture: MaterialComponentTextureSlot): void {
         this.texture = texture;
-        this.hashHandler.bumpShaderVersion()
+        this.hashHandler.shapeHash.addVersion();
+        this.hashHandler.shaderKeyHash.addVersion();
+    }
+
+    removeTexture(): void {
+        this.texture = undefined;
+        this.hashHandler.shapeHash.addVersion();
+        this.hashHandler.shaderKeyHash.addVersion();
     }
 
     getTexture() {
@@ -38,22 +54,26 @@ export class MaterialComponentWrapper {
 
     setFactors(factors: number[]): void {
         this.factors = factors;
-        this.hashHandler.bumpFactorsBufferVersion()
+        this.hashHandler.factorVersionFlag.addVersion()
     }
 
-    getShaderVersion(): number {
-        return this.hashHandler.getShaderVersion()
+    convertToShapeHash(hasher: Hasher): string {
+        return this.hashHandler.shapeHash.convertToHash(hasher);
     }
 
-    getFactorsBufferVersion(): number {
-        return this.hashHandler.getFactorsBufferVersion();
+    convertToShaderKeyHash(hasher: Hasher): string {
+        return this.hashHandler.shaderKeyHash.convertToHash(hasher);
     }
 
-    getBindGroupLayoutHashPart(): string {
-        return this.hashHandler.getBindGroupLayoutHashPart();
+    convertToResourceHash(hasher: Hasher): string {
+        return this.hashHandler.resourceHash.convertToHash(hasher);
     }
 
-    getBindGroupHashPart(hasher: Hasher): string {
-        return this.hashHandler.getBindGroupHashPart(hasher);
+    needsFactorUpdate() {
+        return this.hashHandler.factorVersionFlag.needsUpdate()
+    }
+
+    syncFactorUpdate() {
+        this.hashHandler.factorVersionFlag.sync()
     }
 }

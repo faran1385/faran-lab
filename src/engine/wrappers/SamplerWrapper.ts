@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from "uuid";
+import {v4 as uuidv4} from "uuid";
 import type {Sampler} from "../importers/utils/IR.ts";
 import type {Hasher} from "../hashing/Hasher.ts";
 import {HashHandler} from "../hashing/HashHandler.ts";
@@ -14,11 +14,11 @@ export class SamplerWrapper {
     private hashHandler: HashHandler;
 
     constructor(
-        minFilter: Sampler["minFilter"],
-        magFilter: Sampler["magFilter"],
-        mipFilter: Sampler["mipFilter"],
-        addressModeU: Sampler["addressModeU"],
-        addressModeV: Sampler["addressModeV"]
+        minFilter: Sampler["minFilter"] = "linear",
+        magFilter: Sampler["magFilter"] = "linear",
+        mipFilter: Sampler["mipFilter"] = "linear",
+        addressModeU: Sampler["addressModeU"] = "clamp-to-edge",
+        addressModeV: Sampler["addressModeV"] = "clamp-to-edge",
     ) {
         this.minFilter = minFilter;
         this.magFilter = magFilter;
@@ -28,9 +28,7 @@ export class SamplerWrapper {
 
         this.uuid = uuidv4();
 
-        this.hashHandler = new HashHandler(
-            () => `${this.minFilter}|${this.magFilter}|${this.mipFilter}|${this.addressModeU}|${this.addressModeV}`
-        );
+        this.hashHandler = new HashHandler(() => `${this.minFilter}|${this.magFilter}|${this.mipFilter}|${this.addressModeU}|${this.addressModeV}`);
     }
 
     getMinFilter(): Sampler["minFilter"] {
@@ -80,9 +78,5 @@ export class SamplerWrapper {
 
     convertToHash(hasher: Hasher): string {
         return this.hashHandler.convertToHash(hasher);
-    }
-
-    drainTrash(): string[] {
-        return this.hashHandler.drainTrash();
     }
 }

@@ -13,6 +13,11 @@ export class BufferWrapper<TUsage extends GPUBufferUsageFlags = GPUBufferUsageFl
         this.uuid = uuidv4();
         this.data = data;
         this.usage = usage;
+        this.hashHandler = new HashHandler(() => `${this.uuid}|${this.hashHandler.getVersion()}`);
+    }
+
+    setBuildKey(buildKey: (...args: any[]) => string): void {
+        this.hashHandler.setBuildKey(buildKey);
     }
 
     getUsage(): TUsage {
@@ -34,9 +39,5 @@ export class BufferWrapper<TUsage extends GPUBufferUsageFlags = GPUBufferUsageFl
 
     convertToHash(hasher: Hasher): string {
         return this.hashHandler.convertToHash(hasher);
-    }
-
-    drainTrash(): string[] {
-        return this.hashHandler.drainTrash();
     }
 }

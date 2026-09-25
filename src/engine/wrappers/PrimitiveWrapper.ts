@@ -1,24 +1,25 @@
 import type {GeometryWrapper} from "./GeometryWrapper.ts";
 import type {MaterialWrapper} from "./MaterialWrapper.ts";
 import {v4 as uuidv4} from "uuid";
-import type {Hasher} from "../hashing/Hasher.ts";
 import {BasicFragmentAssembler, BasicVertexAssembler} from "../Assemblers/BasicAssembler/BasicAssembler.ts";
-import type {VertexAssemblerBase} from "../Assemblers/VertexShaderAssmblerBase.ts";
-import type {FragmentAssemblerBase} from "../Assemblers/FragmentAssemblerBase.ts";
 import {PipelineWrapper} from "./PipelineWrapper.ts";
+import {FragmentAssemblerBase, type VertexAssemblerBase} from "../Assemblers/BaseAssembler.ts";
 
 export class PrimitiveWrapper {
     readonly uuid: string;
 
-    private geometry!: GeometryWrapper;
-    private material!: MaterialWrapper;
+    private geometry: GeometryWrapper;
+    private material: MaterialWrapper;
 
     private vertexAssembler: VertexAssemblerBase = new BasicVertexAssembler();
     private fragmentAssembler: FragmentAssemblerBase = new BasicFragmentAssembler();
     private pipelineWrapper = new PipelineWrapper();
 
-    constructor() {
+    constructor(mat: MaterialWrapper, geo: GeometryWrapper) {
         this.uuid = uuidv4();
+
+        this.geometry = geo;
+        this.material = mat;
     }
 
 
@@ -28,6 +29,7 @@ export class PrimitiveWrapper {
 
     setVertexAssembler(a: VertexAssemblerBase): void {
         this.vertexAssembler = a;
+        this.pipelineWrapper.markVertexShaderDirty()
     }
 
     getVertexAssembler(): VertexAssemblerBase {
@@ -36,6 +38,7 @@ export class PrimitiveWrapper {
 
     setFragmentAssembler(a: FragmentAssemblerBase): void {
         this.fragmentAssembler = a;
+        this.pipelineWrapper.markFragmentShaderDirty()
     }
 
     getFragmentAssembler(): FragmentAssemblerBase {
@@ -48,6 +51,8 @@ export class PrimitiveWrapper {
 
     setGeometry(geometry: GeometryWrapper): void {
         this.geometry = geometry;
+        this.pipelineWrapper.markFragmentShaderDirty()
+        this.pipelineWrapper.markVertexShaderDirty()
     }
 
     getMaterial(): MaterialWrapper {
@@ -56,9 +61,7 @@ export class PrimitiveWrapper {
 
     setMaterial(material: MaterialWrapper): void {
         this.material = material;
-    }
-
-    convertToHash(hasher: Hasher): string {
-        return this.pipelineWrapper.computeHash(this, hasher)
+        this.pipelineWrapper.markFragmentShaderDirty()
+        this.pipelineWrapper.markVertexShaderDirty()
     }
 }

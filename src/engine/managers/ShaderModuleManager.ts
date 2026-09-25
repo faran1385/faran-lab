@@ -1,29 +1,20 @@
 import {ResourceManager} from "./Manager.ts";
 import {ShaderModuleTracker} from "../Trackers/Trackers.ts";
-import type {ShaderModuleWrapper} from "../wrappers/ShaderModuleWrapper.ts";
 
-interface ShaderModuleCreationInput {
-    code: string;
-    hash: string;
-}
+export class ShaderModuleManager extends ResourceManager<GPUShaderModuleDescriptor, ShaderModuleTracker> {
+    private device: GPUDevice;
+    constructor(device: GPUDevice) { super(); this.device = device; }
 
-export class ShaderModuleManager extends ResourceManager<ShaderModuleCreationInput, GPUShaderModule, ShaderModuleTracker> {
-    createOrGetFromSource(shaderWrapper: ShaderModuleWrapper): ShaderModuleTracker {
-        return this.createOrGet({
-            hash: shaderWrapper.convertToHash(this.hasher),
-            code:shaderWrapper.getCode()
+    protected build(getDescriptor: () => GPUShaderModuleDescriptor): ShaderModuleTracker {
+        const descriptor = getDescriptor();
+        const module = this.device.createShaderModule(descriptor);
+        module.getCompilationInfo().then((info) => {
+            const errors = info.messages.filter((m) => m.type === "error");
+            if (errors.length === 0) return;
+            const details = errors.map((m) => `  line ${m.lineNum}:${m.linePos} ${m.message}`).join("\n");
+            console.error(`WGSL compile errors in shader ${descriptor.label}:\n${details}`);
         });
-    }
 
-    protected getHash(input: ShaderModuleCreationInput): string {
-        return input.hash;
-    }
-
-    protected createResource(input: ShaderModuleCreationInput): GPUShaderModule {
-        return this.device.createShaderModule({code: input.code});
-    }
-
-    protected createTracker(resource: GPUShaderModule): ShaderModuleTracker {
-        return new ShaderModuleTracker(resource);
+        return new ShaderModuleTracker(module);
     }
 }

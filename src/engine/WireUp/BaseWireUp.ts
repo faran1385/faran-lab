@@ -7,14 +7,14 @@ import type {MeshWrapper} from "../wrappers/MeshWrapper.ts";
 import {NodeWrapper} from "../wrappers/NodeWrapper.ts";
 import type {TextureWrapper} from "../wrappers/TextureWrapper.ts";
 import type {IndexAttributeWrapper} from "../wrappers/IndexWrapper.ts";
-import type {VertexAttributeWrapper} from "../wrappers/VertexAttributeWrapper.ts";
+import type {AttributeWrapper} from "../wrappers/AttributeWrapper.ts";
 import type {TextureRef} from "../importers/utils/IR.ts";
 import type {MaterialComponentWrapper} from "../wrappers/MaterialComponentWrapper.ts";
 
 type Geometries = {
     wrapper: GeometryWrapper,
     indexWrapper: IndexAttributeWrapper | null,
-    attributes: VertexAttributeWrapper[]
+    attributes: AttributeWrapper[]
 }[]
 
 export type NodeHierarchy = {

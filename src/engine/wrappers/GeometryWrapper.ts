@@ -1,44 +1,41 @@
 import {v4 as uuidv4} from "uuid";
-import type {AttributeName} from "../importers/utils/IR.ts";
-import {Hasher} from "../hashing/Hasher.ts";
-import type {VertexAttributeWrapper} from "./VertexAttributeWrapper.ts";
+import type {AttributeWrapper} from "./AttributeWrapper.ts";
 import type {IndexAttributeWrapper} from "./IndexWrapper.ts";
-import type {VertexAttributeLayout} from "../descriptorProducer/GeometryDescriptorProducer.ts";
 import {GeometryHashHandler} from "../hashing/GeometryHashHandler.ts";
+import type {Hasher} from "../hashing/Hasher.ts";
 
 export class GeometryWrapper {
     readonly uuid: string;
 
-    private attributes: Map<AttributeName, VertexAttributeWrapper> = new Map();
+    private attributes: Map<string, AttributeWrapper> = new Map();
     private indices?: IndexAttributeWrapper;
-
-    private layoutDescriptor!: Map<string, VertexAttributeLayout>;
     private hashHandler: GeometryHashHandler;
 
     constructor() {
         this.uuid = uuidv4();
-        this.hashHandler = new GeometryHashHandler(
-            () => this.attributes,
-            () => this.indices,
-        );
+        this.hashHandler = new GeometryHashHandler()
     }
 
-    setLayoutDescriptor(descriptor: Map<string, VertexAttributeLayout>): void {
-        this.layoutDescriptor = descriptor;
-    }
-
-    getLayoutDescriptor() {
-        return this.layoutDescriptor;
-    }
-
-    addAttribute(attribute: VertexAttributeWrapper) {
+    addAttribute(attribute: AttributeWrapper) {
         this.attributes.set(attribute.name, attribute);
-        this.hashHandler.bumpStructureVersion()
+        this.hashHandler.sortAttributes(this.attributes)
+    }
+
+    removeAttribute(name: string) {
+        this.attributes.delete(name)
+        this.hashHandler.sortAttributes(this.attributes)
     }
 
     setIndices(indices: IndexAttributeWrapper) {
         this.indices = indices;
-        this.hashHandler.bumpStructureVersion()
+    }
+
+    clearIndices() {
+        this.indices = undefined;
+    }
+
+    getIndices() {
+        return this.indices;
     }
 
     getAttributes() {
@@ -49,15 +46,11 @@ export class GeometryWrapper {
         return this.hashHandler.convertToAttributesHash(hasher);
     }
 
-    convertToIndicesHash(hasher: Hasher): string {
-        return this.hashHandler.convertToIndicesHash(hasher);
+    syncAttributesHash() {
+        return this.hashHandler.syncAttributesHash()
     }
 
-    drainAttributesTrash(): string[] {
-        return this.hashHandler.drainAttributesTrash();
-    }
-
-    drainIndicesTrash(): string[] {
-        return this.hashHandler.drainIndicesTrash();
+    needsShaderRebuild(hasher: Hasher) {
+        return this.hashHandler.needsShaderRebuild(hasher)
     }
 }

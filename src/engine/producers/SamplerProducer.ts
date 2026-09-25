@@ -1,6 +1,6 @@
 import type {SamplerWrapper} from "../wrappers/SamplerWrapper.ts";
 
-export class SamplerDescriptorProducer {
+export class SamplerProducer {
     static produce(sampler: SamplerWrapper): GPUSamplerDescriptor {
         return {
             minFilter: sampler.getMinFilter(),

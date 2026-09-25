@@ -9,14 +9,14 @@ export class ImageWrapper {
     private width: number;
     private height: number;
     private format: GPUTextureFormat = "rgba8unorm";
-
     private hashHandler: HashHandler;
 
-    constructor(data: ArrayBuffer, width: number, height: number) {
+    constructor(data: ArrayBuffer, width: number, height: number,format:GPUTextureFormat = "rgba8unorm") {
         this.uuid = uuidv4();
         this.data = data;
         this.width = width;
         this.height = height;
+        this.format = format;
         this.hashHandler = new HashHandler(() => `${this.uuid}|${this.hashHandler.getVersion()}`);
     }
 
@@ -35,11 +35,6 @@ export class ImageWrapper {
         return this.data;
     }
 
-    setFormat(format: GPUTextureFormat): void {
-        this.format = format;
-        this.hashHandler.addVersion();
-    }
-
     setImage(data: ArrayBuffer, width: number, height: number, format: GPUTextureFormat): void {
         this.data = data;
         this.width = width;
@@ -50,9 +45,5 @@ export class ImageWrapper {
 
     convertToHash(hasher: Hasher): string {
         return this.hashHandler.convertToHash(hasher);
-    }
-
-    drainTrash(): string[] {
-        return this.hashHandler.drainTrash();
     }
 }

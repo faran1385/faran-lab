@@ -2,13 +2,21 @@ import {quat} from "../quat/quat.ts";
 
 export class vec3 {
 
-
     static fromValues(x: number, y: number, z: number): Float32Array {
         return new Float32Array([x, y, z]);
     }
 
     static create(): Float32Array {
         return new Float32Array([0, 0, 0]);
+    }
+
+
+    static set(out: Float32Array,x: number, y: number, z: number) {
+        out[0] = x;
+        out[1] = y;
+        out[2] = z;
+
+        return out;
     }
 
 
