@@ -128,7 +128,7 @@ export class DescriptorProducer {
         return plan;
     }
 
-    private getAttributePlan(geometry: GeometryWrapper): GeometryAttributePlan {
+    getAttributePlan(geometry: GeometryWrapper): GeometryAttributePlan {
         let plan = this.geometryAttributePlans.get(geometry.uuid);
         if (!plan) {
             plan = planGeometryAttributes(geometry);

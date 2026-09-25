@@ -9,7 +9,6 @@ import type {GeometryAttributePlan} from "./utils.ts";
 export interface FrameTargetInfo {
     colorFormat: GPUTextureFormat;
     depthFormat: GPUTextureFormat;
-    sampleCount: number;
 }
 
 export interface PipelineProduceArgs {
@@ -63,12 +62,11 @@ export class PipelineProducer {
                 topology: "triangle-list",
                 cullMode: PipelineProducer.cullMode(material, pipeline.getFacePass()),
             },
-            // depthStencil: {
-            //     format: frame.depthFormat,
-            //     depthWriteEnabled: !isBlend,
-            //     depthCompare: "less",
-            // },
-            multisample: { count: frame.sampleCount },
+            depthStencil: {
+                format: frame.depthFormat,
+                depthWriteEnabled: !isBlend,
+                depthCompare: "less",
+            },
         };
     }
 
