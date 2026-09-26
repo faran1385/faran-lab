@@ -1,99 +1,60 @@
-import {GeometryWrapper} from "./engine/wrappers/GeometryWrapper.ts";
 import {AttributeWrapper} from "./engine/wrappers/AttributeWrapper.ts";
+import {PerspectiveCamera} from "./engine/Camera/PerspectiveCamera.ts";
+import {Scene} from "./engine/Scene/Scene.ts";
+import {Renderer} from "./engine/Renderer/Renderer.ts";
+import {GeometryWrapper} from "./engine/wrappers/GeometryWrapper.ts";
 import {MaterialWrapper} from "./engine/wrappers/MaterialWrapper.ts";
 import {PrimitiveWrapper} from "./engine/wrappers/PrimitiveWrapper.ts";
 import {MeshWrapper} from "./engine/wrappers/MeshWrapper.ts";
 import {NodeWrapper} from "./engine/wrappers/NodeWrapper.ts";
-import {MaterialComponentWrapper} from "./engine/wrappers/MaterialComponentWrapper.ts";
-import {TextureWrapper} from "./engine/wrappers/TextureWrapper.ts";
-import {ImageWrapper} from "./engine/wrappers/ImageWrapper.ts";
-import {SamplerWrapper} from "./engine/wrappers/SamplerWrapper.ts";
-import {PerspectiveCamera} from "./engine/Camera/PerspectiveCamera.ts";
-import {Scene} from "./engine/Scene/Scene.ts";
-import {Renderer} from "./engine/Renderer/Renderer.ts";
+import {IndexAttributeWrapper} from "./engine/wrappers/IndexWrapper.ts";
 
 const canvas = document.getElementById("gpu-canvas") as HTMLCanvasElement;
 
-const vertexData = new Float32Array([
-    -0.5, -0.5, 0.0,
-    0.5, -0.5, 0.0,
-    0.0, 0.5, 0.0,
+
+const cubePositions = new Float32Array([
+    // Front
+    -1, -1, 1, 1, -1, 1, 1, 1, 1, -1, 1, 1,
+    // Back
+    1, -1, -1, -1, -1, -1, -1, 1, -1, 1, 1, -1,
+    // Top
+    -1, 1, 1, 1, 1, 1, 1, 1, -1, -1, 1, -1,
+    // Bottom
+    -1, -1, -1, 1, -1, -1, 1, -1, 1, -1, -1, 1,
+    // Right
+    1, -1, 1, 1, -1, -1, 1, 1, -1, 1, 1, 1,
+    // Left
+    -1, -1, -1, -1, -1, 1, -1, 1, 1, -1, 1, -1,
 ]);
 
-const uvs = new Float32Array([
-    1 / 6, 0.5,   // vertex 0 → RED
-    0.5, 0.5,   // vertex 1 → GREEN
-    5 / 6, 0.5,   // vertex 2 → BLUE
+const cubeIndices = new Uint16Array([
+    0, 1, 2, 0, 2, 3,  // front
+    4, 5, 6, 4, 6, 7,  // back
+    8, 9, 10, 8, 10, 11,  // top
+    12, 13, 14, 12, 14, 15,  // bottom
+    16, 17, 18, 16, 18, 19,  // right
+    20, 21, 22, 20, 22, 23,  // left
 ]);
+
 const camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.setPosition(0, 0, 3)
-
+camera.setPosition(0, 1, 5)
 
 const scene = new Scene();
 const renderer = new Renderer(canvas);
 await renderer.init()
-renderer.setSize(window.innerWidth,window.innerHeight)
+renderer.setSize(window.innerWidth, window.innerHeight)
 
-const posAttr = new AttributeWrapper("position", vertexData.buffer, "float32x3");
-const uvAttr = new AttributeWrapper("uv0", uvs.buffer, "float32x2");
-const geo = new GeometryWrapper()
-geo.addAttribute(posAttr)
-geo.addAttribute(uvAttr)
-const mat = new MaterialWrapper("opaque", 0, false)
-mat.setComponent(new MaterialComponentWrapper("baseColor", [1, 1, 1]))
-mat.getComponent("baseColor")?.setTexture({
-    texCoord: "uv0",
-    wrapper: new TextureWrapper(
-        new ImageWrapper(
-            new Uint8Array([
-                255, 0, 0, 1,
-                0, 255, 0, 1,
-                0, 0, 255, 1,
-            ]).buffer,
-            3,
-            1,
-            "rgba8unorm"
-        ),
-        new SamplerWrapper("linear", "linear", "linear", "repeat", "repeat")
-    )
-})
+const geo = new GeometryWrapper();
+geo.addAttribute(new AttributeWrapper("position", cubePositions.buffer, "float32x3"));
+geo.setIndices(new IndexAttributeWrapper(cubeIndices.buffer, "uint16"));
+const mat = new MaterialWrapper();
 
-const mat2 = new MaterialWrapper("opaque", 0, false)
-mat2.setComponent(new MaterialComponentWrapper("baseColor", [1, 1, 1]))
-mat2.getComponent("baseColor")?.setTexture({
-    texCoord: "uv0",
-    wrapper: new TextureWrapper(
-        new ImageWrapper(
-            new Uint8Array([
-                1, 0, 0, 1,
-                120, 0, 0, 1,
-                0, 0, 255, 1,
-            ]).buffer,
-            3,
-            1,
-            "rgba8unorm"
-        ),
-        new SamplerWrapper("linear", "linear", "linear", "repeat", "repeat")
-    )
-})
-
-
-
-const primitive = new PrimitiveWrapper(mat, geo)
-const primitive2 = new PrimitiveWrapper(mat2, geo)
-const mesh = new MeshWrapper()
-const mesh2 = new MeshWrapper()
-mesh2.setPrimitive(primitive2)
+const primitive = new PrimitiveWrapper(mat, geo);
+const mesh = new MeshWrapper();
 mesh.setPrimitive(primitive)
-const nd = new NodeWrapper()
-nd.setMesh(mesh)
-
-const nd2 = new NodeWrapper()
-nd2.setMesh(mesh2)
-nd2.setTranslation(.5, 0, 0.01)
-
-scene.addNode(nd)
-scene.addNode(nd2)
+const node = new NodeWrapper();
+node.setMesh(mesh)
+scene.addNode(node);
 
 function frame(): void {
 

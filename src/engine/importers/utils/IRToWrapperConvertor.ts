@@ -16,7 +16,6 @@ import {PrimitiveWrapper} from "../../wrappers/PrimitiveWrapper.ts";
 import {MeshWrapper} from "../../wrappers/MeshWrapper.ts";
 import {NodeWrapper} from "../../wrappers/NodeWrapper.ts";
 import {TextureWrapper} from "../../wrappers/TextureWrapper.ts";
-import type {NodeHierarchy, WireUpInput} from "../../WireUp/BaseWireUp.ts";
 import {AttributeWrapper} from "../../wrappers/AttributeWrapper.ts";
 import {IndexAttributeWrapper} from "../../wrappers/IndexWrapper.ts";
 import {MaterialComponentWrapper} from "../../wrappers/MaterialComponentWrapper.ts";

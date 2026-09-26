@@ -6,7 +6,7 @@ import {v4 as uuidv4} from "uuid";
 export abstract class Camera {
     readonly uuid: string
     protected position = vec3.fromValues(0, 0, 0);
-    protected target = vec3.fromValues(0, 0, -1);
+    protected target = vec3.fromValues(0, 0, 0);
     protected up = vec3.fromValues(0, 1, 0);
 
     private viewMatrix = mat4.create();

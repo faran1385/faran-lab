@@ -94,7 +94,7 @@ export interface Primitive {
 }
 
 export interface Mesh {
-    primitives: number[]; // indices into Primitive[]
+    primitives: number[];
 }
 
 export interface Node {

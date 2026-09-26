@@ -8,6 +8,12 @@ import {MaterialHashHandler} from "../hashing/MaterialHashHandler.ts";
 import {TriggerableAggregateHashHandler} from "../hashing/TriggerableAggregateHashHandler.ts";
 import {planMaterialBindings} from "../producers/utils.ts";
 
+type MaterialArgs = {
+    alphaMode?: Material["alphaMode"],
+    alphaCutoff?: Material["alphaCutoff"],
+    doubleSided?: Material["doubleSided"],
+}
+
 export class MaterialWrapper {
     readonly uuid: string;
 
@@ -20,15 +26,11 @@ export class MaterialWrapper {
 
     private hashHandler: MaterialHashHandler;
 
-    constructor(
-        alphaMode: Material["alphaMode"],
-        alphaCutoff: Material["alphaCutoff"],
-        doubleSided: Material["doubleSided"],
-    ) {
+    constructor(args: MaterialArgs={}) {
         this.uuid = uuidv4();
-        this.alphaMode = alphaMode;
-        this.alphaCutoff = alphaCutoff ?? 0;
-        this.doubleSided = doubleSided;
+        this.alphaMode = args?.alphaMode ?? "opaque";
+        this.alphaCutoff = args?.alphaCutoff ?? 0;
+        this.doubleSided = args?.doubleSided ?? false;
 
         this.hashHandler = new MaterialHashHandler(
             new HashHandler(() => `${this.alphaMode}|${this.doubleSided}`),
@@ -132,11 +134,11 @@ export class MaterialWrapper {
         return this.hashHandler.factorsHash.convertToHash(hasher);
     }
 
-    needsShaderRebuild(hasher:Hasher){
+    needsShaderRebuild(hasher: Hasher) {
         return this.hashHandler.shaderHash.needsUpdate(hasher)
     }
 
-    syncShaderRebuild(){
+    syncShaderRebuild() {
         this.hashHandler.shaderHash.sync()
     }
 }

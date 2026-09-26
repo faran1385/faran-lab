@@ -37,7 +37,7 @@ import {
 import type {NodeWrapper} from "../wrappers/NodeWrapper.ts";
 import type {Camera} from "../Camera/Camera.ts";
 
-export class DescriptorProducer {
+export class CentralProducer {
     private materialBindingPlans = new Map<string, MaterialBindingPlan>();
     private materialFactorPlans = new Map<string, MaterialFactorsPlan>();
     private geometryAttributePlans = new Map<string, GeometryAttributePlan>();

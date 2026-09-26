@@ -1,10 +1,11 @@
 import type {Scene} from "../Scene/Scene.ts";
 import {Hasher} from "../hashing/Hasher.ts";
-import {DescriptorProducer} from "../producers/CentralProducer.ts";
+import {CentralProducer} from "../producers/CentralProducer.ts";
 import type {Camera} from "../Camera/Camera.ts";
 import {v4 as uuidv4} from "uuid";
 import {CentralManager} from "../managers/CentralManager.ts";
 import {RenderTarget} from "./RenderTarget.ts";
+import {RenderItemBuilder} from "./RenderItemBuilder.ts";
 
 
 export class Renderer {
@@ -21,7 +22,7 @@ export class Renderer {
     depthRenderTarget!: RenderTarget;
 
     private hasher!: Hasher;
-    private readonly producer = new DescriptorProducer();
+    private readonly producer = new CentralProducer();
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -104,110 +105,25 @@ export class Renderer {
         scene.updateWorldMatrices(this.managers.bufferManager.upload.bind(this.managers.bufferManager));
 
         scene.traverse((node) => {
+            RenderItemBuilder.build(node, {
+                managers: this.managers,
+                producer: this.producer,
+                hasher: this.hasher,
+                frame: {colorFormat: this.format, depthFormat: this.depthRenderTarget.format},
+                camera,
+            }).forEach((item) => {
+                pass.setPipeline(item.pipeline);
+                item.bindGroups.forEach(bg => pass.setBindGroup(bg.slot, bg.bindGroup));
+                item.vertexBuffers.forEach(vb => pass.setVertexBuffer(vb.slot, vb.buffer));
 
-            if (node.getMesh()) {
-                node.getMesh()!.getAllPrimitives().forEach((p) => {
-                    if (p.getMaterial().needsShaderRebuild(this.hasher)) {
-                        p.getPipeline().markVertexShaderDirty()
-                        p.getPipeline().markFragmentShaderDirty()
-                        p.getMaterial().syncShaderRebuild()
-                    }
-
-                    if (p.getPipeline().getVertexShaderWrapper().codeGenVersionFlag.needsUpdate()) {
-                        const entryPoint = "main"
-                        const code = p.getVertexAssembler().assemble(this.producer.produceVertexShader({
-                            geometry: p.getGeometry(),
-                            material: p.getMaterial(),
-                        }), entryPoint)
-                        p.getPipeline().getVertexShaderWrapper().setShader(code, entryPoint)
-                        p.getPipeline().getVertexShaderWrapper().codeGenVersionFlag.sync()
-                    }
-
-                    if (p.getPipeline().getFragmentShaderWrapper().codeGenVersionFlag.needsUpdate()) {
-                        const entryPoint = "main"
-                        const code = p.getFragmentAssembler().assemble(this.producer.produceFragmentShader({
-                            geometry: p.getGeometry(),
-                            vertexShader: p.getPipeline().getVertexShaderWrapper(),
-                            material: p.getMaterial()
-                        }), entryPoint)
-                        p.getPipeline().getFragmentShaderWrapper().setShader(code, entryPoint)
-                        p.getPipeline().getFragmentShaderWrapper().codeGenVersionFlag.sync()
-                    }
-                    p.getGeometry().getAttributes().forEach(attribute => {
-                        this.managers.bufferManager.ensure(attribute.convertToHash(this.hasher), () => this.producer.produceBuffer(attribute))
-                    })
-
-                    this.managers.bufferManager.ensure(p.getMaterial().convertToFactorsHash(this.hasher), () => this.producer.produceBufferFromMatFactors(p.getMaterial()))
-                    this.managers.shaderModuleManager.ensure(p.getPipeline().getVertexShaderWrapper().convertToHash(this.hasher), () => this.producer.produceShaderModule(p.getPipeline().getVertexShaderWrapper()))
-                    this.managers.shaderModuleManager.ensure(p.getPipeline().getFragmentShaderWrapper().convertToHash(this.hasher), () => this.producer.produceShaderModule(p.getPipeline().getFragmentShaderWrapper()))
-
-                    p.getMaterial().getAllComponents().forEach(component => {
-
-                        if (component.getTexture()) {
-                            this.managers.samplerManager.ensure(component.getTexture()!.wrapper.getSampler().convertToHash(this.hasher), () => this.producer.produceSampler(component.getTexture()!.wrapper.getSampler()))
-                            this.managers.textureManager.ensure(component.getTexture()!.wrapper.getImage().convertToHash(this.hasher), () => this.producer.produceTexture(component.getTexture()!.wrapper.getImage()))
-                        }
-
-                        if (component.needsFactorUpdate()) {
-                            const plan = this.producer.getFactorPlan(p.getMaterial())
-                            const item = plan.get(component.name)!
-
-                            this.managers.bufferManager.upload(p.getMaterial().convertToFactorsHash(this.hasher), new Float32Array([item.factor].flat()), item.offset)
-                            component.syncFactorUpdate()
-                        }
-                    })
-
-                    this.managers.bindgroupLayoutManager.ensure(p.getMaterial().convertToBindgroupLayoutHash(this.hasher), () => this.producer.produceBindGroupLayout(p.getMaterial()))
-                    this.managers.bindgroupManager.ensure(p.getMaterial().convertToBindgroupHash(this.hasher), () => this.producer.produceBindGroup({
-                        material: p.getMaterial(),
-                        samplers: this.managers.samplerManager,
-                        hasher: this.hasher,
-                        buffers: this.managers.bufferManager,
-                        layouts: this.managers.bindgroupLayoutManager,
-                        textures: this.managers.textureManager,
-                    }))
-                    this.managers.pipelineLayoutManager.ensure(p.getMaterial().convertToBindgroupLayoutHash(this.hasher), () => this.producer.producePipelineLayout({
-                        material: p.getMaterial(),
-                        hasher: this.hasher,
-                        layouts: this.managers.bindgroupLayoutManager
-                    }))
-                    p.getPipeline().setInputs(
-                        p.getPipeline().getVertexShaderWrapper().convertToHash(this.hasher),
-                        p.getPipeline().getFragmentShaderWrapper().convertToHash(this.hasher),
-                        p.getMaterial().convertToBindgroupLayoutHash(this.hasher),
-                        p.getGeometry().convertToAttributesHash(this.hasher),
-                        p.getMaterial().convertToPipelineSettingsHash(this.hasher),
-                        "back"
-                    )
-                    this.managers.pipelineManager.ensure(p.getPipeline().convertToHash(this.hasher), () => this.producer.producePipeline({
-                        frame: {
-                            colorFormat: this.format,
-                            depthFormat: this.depthRenderTarget.format
-                        },
-                        hasher: this.hasher,
-                        geometry: p.getGeometry(),
-                        material: p.getMaterial(),
-                        pipelineLayouts: this.managers.pipelineLayoutManager,
-                        pipeline: p.getPipeline(),
-                        shaderModules: this.managers.shaderModuleManager
-                    }))
-
-                    pass.setPipeline(this.managers.pipelineManager.getRaw(p.getPipeline().convertToHash(this.hasher)))
-                    pass.setBindGroup(0, this.managers.bindgroupManager.getRaw(camera.uuid))
-                    pass.setBindGroup(1, this.managers.bindgroupManager.getRaw(p.getMaterial().convertToBindgroupHash(this.hasher)))
-                    pass.setBindGroup(2, this.managers.bindgroupManager.getRaw(node.uuid))
-
-                    const attrPlan = this.producer.getAttributePlan(p.getGeometry())
-                    attrPlan.slots.forEach((i) => {
-                        const attr = p.getGeometry().getAttributes().get(i.name)!
-                        pass.setVertexBuffer(i.slot, this.managers.bufferManager.getRaw(attr.convertToHash(this.hasher)))
-                    })
-
-                    pass.draw(3)
-                })
-
-            }
-        })
+                if (item.draw.indexed) {
+                    pass.setIndexBuffer(item.draw.indexBuffer!, item.draw.indexFormat!);
+                    pass.drawIndexed(item.draw.count);
+                } else {
+                    pass.draw(item.draw.count);
+                }
+            });
+        });
 
         pass.end();
         this.device.queue.submit([encoder.finish()]);
