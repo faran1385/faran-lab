@@ -12,6 +12,9 @@ import {
     type Texture, uvAttributeName, type MaterialComponentIR,
 } from "./utils/IR.ts";
 import {ImageDecoder} from "./utils/ImageDecoder.ts";
+import {mat4} from "../../packages/math/matrix/mat4.ts";
+import {vec3} from "../../packages/math/vector/vec3.ts";
+import {quat} from "../../packages/math/quat/quat.ts";
 
 export interface GLTFParseResult {
     json: any;
@@ -80,69 +83,6 @@ const SIMPLE_ATTRIBUTE_MAP: Record<
 // (see architecture doc, "Deferred" section) so this is expected, not a bug.
 const KNOWN_DEFERRED_ATTRIBUTES = new Set(["JOINTS_0", "WEIGHTS_0"]);
 
-// ── small local vec/quat helpers (dependency-free) ──────────────────────────
-
-type Vec3 = [number, number, number];
-type Quat = [number, number, number, number];
-
-function decomposeMat4(m: number[]): { translation: Vec3; rotation: Quat; scale: Vec3 } {
-    // m is column-major, glTF convention: m[12..14] = translation.
-    const translation: Vec3 = [m[12], m[13], m[14]];
-
-    let sx = Math.hypot(m[0], m[1], m[2]);
-    const sy = Math.hypot(m[4], m[5], m[6]);
-    const sz = Math.hypot(m[8], m[9], m[10]);
-
-    // Determinant sign tells us if the basis is mirrored; if so, fold the
-    // flip into one axis so decomposed scale reproduces the original matrix.
-    const det =
-        m[0] * (m[5] * m[10] - m[6] * m[9]) -
-        m[1] * (m[4] * m[10] - m[6] * m[8]) +
-        m[2] * (m[4] * m[9] - m[5] * m[8]);
-    if (det < 0) sx = -sx;
-
-    const scale: Vec3 = [sx, sy, sz];
-
-    // Normalize the 3x3 rotation basis out of the scaled matrix.
-    const invSx = sx !== 0 ? 1 / sx : 0;
-    const invSy = sy !== 0 ? 1 / sy : 0;
-    const invSz = sz !== 0 ? 1 / sz : 0;
-
-    const r00 = m[0] * invSx, r01 = m[1] * invSx, r02 = m[2] * invSx;
-    const r10 = m[4] * invSy, r11 = m[5] * invSy, r12 = m[6] * invSy;
-    const r20 = m[8] * invSz, r21 = m[9] * invSz, r22 = m[10] * invSz;
-
-    // Standard matrix -> quaternion (column-major rotation basis above).
-    const trace = r00 + r11 + r22;
-    let qx: number, qy: number, qz: number, qw: number;
-    if (trace > 0) {
-        const s = Math.sqrt(trace + 1.0) * 2;
-        qw = 0.25 * s;
-        qx = (r21 - r12) / s;
-        qy = (r02 - r20) / s;
-        qz = (r10 - r01) / s;
-    } else if (r00 > r11 && r00 > r22) {
-        const s = Math.sqrt(1.0 + r00 - r11 - r22) * 2;
-        qw = (r21 - r12) / s;
-        qx = 0.25 * s;
-        qy = (r01 + r10) / s;
-        qz = (r02 + r20) / s;
-    } else if (r11 > r22) {
-        const s = Math.sqrt(1.0 + r11 - r00 - r22) * 2;
-        qw = (r02 - r20) / s;
-        qx = (r01 + r10) / s;
-        qy = 0.25 * s;
-        qz = (r12 + r21) / s;
-    } else {
-        const s = Math.sqrt(1.0 + r22 - r00 - r11) * 2;
-        qw = (r10 - r01) / s;
-        qx = (r02 + r20) / s;
-        qy = (r12 + r21) / s;
-        qz = 0.25 * s;
-    }
-
-    return {translation, rotation: [qx, qy, qz, qw], scale};
-}
 
 // ── accessor reading ─────────────────────────────────────────────────────
 
@@ -623,12 +563,17 @@ function importNode(gltf: any, nodeIndex: number, visiting: Set<number>): Node {
 
     const gltfNode = gltf.nodes[nodeIndex];
 
-    let translation: Vec3 = [0, 0, 0];
-    let rotation: Quat = [0, 0, 0, 1];
-    let scale: Vec3 = [1, 1, 1];
+    let translation: vec3 = vec3.fromValues(0, 0, 0);
+    let rotation: quat = quat.fromValues(0, 0, 0, 1);
+    let scale: vec3 = vec3.fromValues(1, 1, 1);
 
     if (gltfNode.matrix) {
-        const decomposed = decomposeMat4(gltfNode.matrix);
+        const decomposed = mat4.decompose(
+            gltfNode.matrix,
+            translation as Float32Array,
+            rotation as Float32Array,
+            scale as Float32Array
+        );
         translation = decomposed.translation;
         rotation = decomposed.rotation;
         scale = decomposed.scale;
@@ -664,7 +609,7 @@ export class GLTFImporter {
      * Container-agnostic — see GLTFParseResult for what "resolved buffers"
      * means for GLB vs loose .gltf+.bin.
      */
-    async import(parseResult: GLTFParseResult): Promise<SceneIR> {
+    static async import(parseResult: GLTFParseResult): Promise<SceneIR> {
         const {json: gltf, buffers} = parseResult;
 
         if (!gltf.asset || !gltf.asset.version?.startsWith("2.")) {

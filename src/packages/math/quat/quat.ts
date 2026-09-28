@@ -7,7 +7,7 @@ export class quat {
         return new Float32Array([x, y, z, w]);
     }
 
-    static set(out:Float32Array,x: number, y: number, z: number, w: number): Float32Array {
+    static set(out: Float32Array, x: number, y: number, z: number, w: number): Float32Array {
         out[0] = x;
         out[1] = y;
         out[2] = z;
@@ -218,15 +218,13 @@ export class quat {
     }
 
 
-    static fromEuler(roll: number, yaw: number, pitch: number) {
+    static fromEuler(out: Float32Array, roll: number, yaw: number, pitch: number) {
         const cr = Math.cos(roll / 2)
         const sr = Math.sin(roll / 2)
         const cp = Math.cos(pitch / 2)
         const sp = Math.sin(pitch / 2)
         const cy = Math.cos(yaw / 2)
         const sy = Math.sin(yaw / 2)
-
-        const out = this.create();
 
         out[0] = cy * sp * cr + sy * cp * sr;
         out[1] = sy * cp * cr - cy * sp * sr;

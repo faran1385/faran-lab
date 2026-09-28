@@ -3,6 +3,8 @@ import type {Hasher} from "../hashing/Hasher.ts";
 import {AggregateHashHandler} from "../hashing/AggregateHashHandler.ts";
 import {ShaderModuleWrapper} from "./ShaderModuleWrapper.ts";
 
+export type FacePass= "single" | "back" | "front"
+
 export class PipelineWrapper {
     readonly uuid: string;
 
@@ -41,7 +43,7 @@ export class PipelineWrapper {
         bindgroupLayoutHash: string,
         attributesHash: string,
         pipelineSettingsHash: string,
-        facePass: "single" | "back" | "front"
+        facePass:FacePass
     ): void {
         this.currentVertexHash = vertexHash;
         this.currentFragmentHash = fragmentHash;

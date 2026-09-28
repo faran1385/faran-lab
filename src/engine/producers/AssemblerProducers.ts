@@ -51,8 +51,6 @@ export interface BindGroupTextureEntry {
     binding: number;
     name: string;
     textureType: string;
-    componentName?: string;
-    uvAttribute?: string;
 }
 
 export interface BindGroupSamplerEntry {
@@ -61,7 +59,6 @@ export interface BindGroupSamplerEntry {
     binding: number;
     name: string;
     samplerType: string;
-    componentName?: string
 }
 
 
@@ -164,7 +161,6 @@ function materialBindings(bindingPlan: MaterialBindingPlan, factorPlan: Material
     }
 
     for (const slot of bindingPlan.slots) {
-        const info = owner.get(slot.binding);
         entries.push(
             slot.kind === "texture"
                 ? {
@@ -173,8 +169,6 @@ function materialBindings(bindingPlan: MaterialBindingPlan, factorPlan: Material
                     binding: slot.binding,
                     name: `texture${slot.binding}`,
                     textureType: "texture_2d<f32>",
-                    componentName: info?.componentName,
-                    uvAttribute: info ? info.texCoord : undefined,
                 }
                 : {
                     kind: "sampler",
@@ -182,11 +176,47 @@ function materialBindings(bindingPlan: MaterialBindingPlan, factorPlan: Material
                     binding: slot.binding,
                     name: `sampler${slot.binding}`,
                     samplerType: "sampler",
-                    componentName: info?.componentName,
                 }
         );
     }
     return entries;
+}
+
+export interface FragmentComponentData {
+    hasFactor: boolean;
+    textureBindingName?: string;
+    samplerBindingName?: string;
+    texCoord?: string;
+}
+
+export interface FragmentShaderDescriptor {
+    bindings: BindGroupEntry[];
+    componentDataMap: Map<string, FragmentComponentData>;
+}
+
+function fragmentComponentDataMap(
+    bindingPlan: MaterialBindingPlan,
+    factorPlan: MaterialFactorsPlan,
+): Map<string, FragmentComponentData> {
+    const map = new Map<string, FragmentComponentData>();
+    const touch = (name: string) => {
+        let entry = map.get(name);
+        if (!entry) map.set(name, (entry = { hasFactor: false }));
+        return entry;
+    };
+
+    for (const name of factorPlan.keys()) {
+        touch(name).hasFactor = true;
+    }
+
+    for (const [name, { texture, sampler, texCoord }] of bindingPlan.byComponent) {
+        const entry = touch(name);
+        entry.textureBindingName = `texture${texture}`;
+        entry.samplerBindingName = `sampler${sampler}`;
+        entry.texCoord = texCoord;
+    }
+
+    return map;
 }
 
 export class FragmentShaderProducer {
@@ -194,8 +224,12 @@ export class FragmentShaderProducer {
         getBindingPlan: () => MaterialBindingPlan,
         getFactorsPlan: () => MaterialFactorsPlan,
     ): FragmentShaderDescriptor {
+        const bindingPlan = getBindingPlan();
+        const factorPlan = getFactorsPlan();
+
         return {
-            bindings: [...sceneBindings(), ...materialBindings(getBindingPlan(), getFactorsPlan())],
+            bindings: [...sceneBindings(), ...materialBindings(bindingPlan, factorPlan)],
+            componentDataMap: fragmentComponentDataMap(bindingPlan, factorPlan),
         };
     }
 }

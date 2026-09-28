@@ -28,15 +28,16 @@ export class NodeWrapper {
         scale?: Node["scale"],
         name?: string,
     ) {
-        translation = translation ?? [0, 0, 0];
-        rotation = rotation ?? [0, 0, 0, 0];
-        scale = scale ?? [1, 1, 1];
+        const t = translation ?? [0, 0, 0] as any;
+        const r = rotation ?? [0, 0, 0, 1] as any;
+        const s = scale ?? [1, 1, 1] as any;
+
 
         this.uuid = uuidv4();
         this.name = name;
-        this.scale = vec3.fromValues(scale[0], scale[1], scale[2]);
-        this.translation = vec3.fromValues(translation[0], translation[1], translation[2]);
-        this.rotation = quat.fromValues(rotation[0], rotation[1], rotation[2], rotation[3]);
+        this.scale = vec3.fromValues(s[0], s[1], s[2]);
+        this.translation = vec3.fromValues(t[0], t[1], t[2]);
+        this.rotation = quat.fromValues(r[0], r[1], r[2], r[3]);
         this.markSubtreeDirty();
     }
 
@@ -69,8 +70,8 @@ export class NodeWrapper {
         return this.rotation;
     }
 
-    setRotation(x: number, y: number, z: number, w: number) {
-        quat.set(this.rotation, x, y, z, w);
+    setRotation(x: number, y: number, z: number) {
+        quat.fromEuler(this.rotation, z, y, x)
         this.markSubtreeDirty();
     }
 
@@ -103,7 +104,7 @@ export class NodeWrapper {
     }
 
     getChildren() {
-        return Array.from(this.children).map((value)=>value[1]);
+        return Array.from(this.children).map((value) => value[1]);
     }
 
     isTransformDirty(): boolean {

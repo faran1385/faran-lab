@@ -1,3 +1,6 @@
+import {GLTFImporter} from "../importers/GLTFImporter.ts";
+import {IRToSceneConvertor} from "../importers/utils/IRToSceneConvertor.ts";
+
 export interface GLBParseResult {
     json: any;
     binaryChunk: ArrayBuffer | null;
@@ -9,31 +12,21 @@ const CHUNK_TYPE_BIN = 0x004e4942; // "BIN\0"
 
 export class GLBLoader {
     private cache = new Map<string, GLBParseResult>();
-    private inFlight = new Map<string, Promise<GLBParseResult>>();
 
-    constructor() {}
+    constructor() {
+    }
 
-    async load(url: string): Promise<GLBParseResult> {
-        const cached = this.cache.get(url);
-        if (cached) {
-            return cached;
-        }
+    async load(url: string) {
+        const result = this.cache.get(url) ?? await this.fetchAndParse(url);
 
-        const pending = this.inFlight.get(url);
-        if (pending) {
-            return pending;
-        }
+        const sceneIR = await GLTFImporter.import({
+            buffers: [result.binaryChunk ?? new ArrayBuffer()],
+            json: result.json
+        })
+        const convertedData = IRToSceneConvertor.convert(sceneIR);
+        this.cache.set(url, result);
 
-        const promise = this.fetchAndParse(url);
-        this.inFlight.set(url, promise);
-
-        try {
-            const result = await promise;
-            this.cache.set(url, result);
-            return result;
-        } finally {
-            this.inFlight.delete(url);
-        }
+        return convertedData;
     }
 
     clearCache(url?: string) {
@@ -91,6 +84,6 @@ export class GLBLoader {
             throw new Error("GLBLoader: no JSON chunk found");
         }
 
-        return { json, binaryChunk };
+        return {json, binaryChunk};
     }
 }

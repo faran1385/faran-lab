@@ -1,5 +1,4 @@
 import type {
-    BindGroupEntry,
     FragmentShaderDescriptor,
     VertexShaderDescriptor
 } from "../producers/AssemblerProducers.ts";
@@ -41,40 +40,34 @@ function toValueMap(record: Record<string, AccessibleValue>): ValueMap {
 }
 
 function buildComponentsMap(
-    bindings: BindGroupEntry[],
+    componentDataMap: FragmentShaderDescriptor["componentDataMap"],
     bindingValues: ValueMap,
     uvSource: ValueMap,
 ): ComponentsMap {
     const map: ComponentsMap = new Map();
-    const touch = (name: string): ComponentAccess => {
-        let entry = map.get(name);
-        if (!entry) map.set(name, (entry = {}));
-        return entry;
-    };
 
-    for (const entry of bindings) {
-        if (entry.kind === "uniform" && entry.name === "material") {
-            for (const field of entry.fields) {
-                if (field.name.startsWith("_padding")) continue;
-                const value = bindingValues.get(field.name);
-                if (value) touch(field.name).factor = value;
-            }
+    componentDataMap.forEach((data, componentName) => {
+        const entry: ComponentAccess = {};
+
+        if (data.hasFactor) {
+            const value = bindingValues.get(componentName);
+            if (value) entry.factor = value;
+        }
+        if (data.textureBindingName) {
+            const value = bindingValues.get(data.textureBindingName);
+            if (value) entry.texture = value;
+        }
+        if (data.samplerBindingName) {
+            const value = bindingValues.get(data.samplerBindingName);
+            if (value) entry.sampler = value;
+        }
+        if (data.texCoord) {
+            const uv = uvSource.get(data.texCoord);
+            if (uv) entry.uv = uv;
         }
 
-        if (entry.kind === "texture" && entry.componentName) {
-            const value = bindingValues.get(entry.name);
-            if (value) touch(entry.componentName).texture = value;
-            if (entry.uvAttribute) {
-                const uv = uvSource.get(entry.uvAttribute);
-                if (uv) touch(entry.componentName).uv = uv;
-            }
-        }
-
-        if (entry.kind === "sampler" && entry.componentName) {
-            const value = bindingValues.get(entry.name);
-            if (value) touch(entry.componentName).sampler = value;
-        }
-    }
+        map.set(componentName, entry);
+    });
 
     return map;
 }
@@ -170,6 +163,7 @@ export type FragmentPhase2Output = {
 export abstract class FragmentAssemblerBase {
     assemble(d: FragmentShaderDescriptor, entryPoint: string): string {
         const {preamble, varyingValues, bindingValues, componentsMap, builtinValues} = this.fragmentPhase1(d);
+
         const {
             body,
             usedBuiltins,
@@ -187,7 +181,7 @@ export abstract class FragmentAssemblerBase {
         const bindingValues = toValueMap(values);
         parts.push(bindingCode);
 
-        const componentsMap = buildComponentsMap(d.bindings, bindingValues, varyingValues);
+        const componentsMap = buildComponentsMap(d.componentDataMap, bindingValues, varyingValues);
 
         const builtinValues: ValueMap = new Map(
             FRAGMENT_INPUT_BUILTINS.map((b) => [b.name, {type: b.type, access: b.name}]),

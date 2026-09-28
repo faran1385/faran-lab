@@ -258,10 +258,10 @@ type FactorsPlanEntry = {
 
 export type MaterialFactorsPlan = Map<string, FactorsPlanEntry>;
 
-function resolveWgslType(factor: number | number[]): { wgslType: WGSLType; size: number; align: number } {
-    if (typeof factor === "number") return {wgslType: "f32", size: 4, align: 4};
-
+function resolveWgslType(factor: number[]): { wgslType: WGSLType; size: number; align: number } {
     switch (factor.length) {
+        case 1:
+            return {wgslType: "f32", size: 4, align: 4};
         case 2:
             return {wgslType: "vec2f", size: 8, align: 8};
         case 3:
@@ -290,7 +290,7 @@ export function planMaterialFactors(material: MaterialWrapper): MaterialFactorsP
         cursor += gap;
     };
 
-    const push = (name: string, factor: number | number[]) => {
+    const push = (name: string, factor: number[]) => {
         const {wgslType, size, align: a} = resolveWgslType(factor);
         align(a);
         plan.set(name, {offset: cursor, wgslType, factor});
@@ -301,7 +301,7 @@ export function planMaterialFactors(material: MaterialWrapper): MaterialFactorsP
         push(component.name, component.getFactors());
     }
 
-    push("alphaCutOff", material.getAlphaCutoff());
+    push("alphaCutOff", [material.getAlphaCutoff()]);
 
     align(16);
 

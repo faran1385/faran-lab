@@ -1,3 +1,6 @@
+import type {vec3} from "../../../packages/math/vector/vec3.ts";
+import type {quat} from "../../../packages/math/quat/quat.ts";
+
 export const ATTR_POSITION = "position";
 export const ATTR_NORMAL = "normal";
 export const ATTR_TANGENT = "tangent";
@@ -100,9 +103,9 @@ export interface Mesh {
 export interface Node {
     name?: string;
     mesh?: number;
-    translation: [number, number, number];
-    rotation: [number, number, number, number];
-    scale: [number, number, number];
+    translation: vec3;
+    rotation: quat;
+    scale: vec3;
     children: Node[];
 }
 

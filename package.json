@@ -9,11 +9,13 @@
     "preview": "vite preview"
   },
   "devDependencies": {
+    "@types/stats.js": "^0.17.4",
     "@webgpu/types": "^0.1.44",
     "typescript": "~6.0.2",
     "vite": "^8.1.1"
   },
   "dependencies": {
+    "stats.js": "^0.17.0",
     "uuid": "^14.0.1",
     "xxhash-wasm": "^1.1.0"
   }

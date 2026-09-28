@@ -56,7 +56,7 @@ export class Renderer {
     render(scene: Scene, camera: Camera): void {
         this.colorRenderTarget?.ensureTexture(this.device)
         this.depthRenderTarget?.ensureTexture(this.device)
-
+        console.log(this.managers.bufferManager)
         const encoder = this.device.createCommandEncoder();
         const pass = encoder.beginRenderPass({
             colorAttachments: [

@@ -430,42 +430,35 @@ export class mat4 {
         rotation: Float32Array,
         scale: Float32Array
     ) {
-
         const x = rotation[0];
         const y = rotation[1];
         const z = rotation[2];
         const w = rotation[3];
 
+        const lengthSquare = x * x + y * y + z * z + w * w;
+        const s = lengthSquare > 0 ? 2 / lengthSquare : 0;
+
         const sx = scale[0];
         const sy = scale[1];
         const sz = scale[2];
 
-        const xx = x * x;
-        const yy = y * y;
-        const zz = z * z;
+        const xx = x * x * s, yy = y * y * s, zz = z * z * s;
+        const xy = x * y * s, xz = x * z * s, yz = y * z * s;
+        const wx = w * x * s, wy = w * y * s, wz = w * z * s;
 
-        const xy = x * y;
-        const xz = x * z;
-        const yz = y * z;
-
-        const wx = w * x;
-        const wy = w * y;
-        const wz = w * z;
-
-
-        out[0] = (1 - 2 * (yy + zz)) * sx;
-        out[1] = (2 * (xy + wz)) * sx;
-        out[2] = (2 * (xz - wy)) * sx;
+        out[0] = (1 - (yy + zz)) * sx;
+        out[1] = (xy + wz) * sx;
+        out[2] = (xz - wy) * sx;
         out[3] = 0;
 
-        out[4] = (2 * (xy - wz)) * sy;
-        out[5] = (1 - 2 * (xx + zz)) * sy;
-        out[6] = (2 * (yz + wx)) * sy;
+        out[4] = (xy - wz) * sy;
+        out[5] = (1 - (xx + zz)) * sy;
+        out[6] = (yz + wx) * sy;
         out[7] = 0;
 
-        out[8] = (2 * (xz + wy)) * sz;
-        out[9] = (2 * (yz - wx)) * sz;
-        out[10] = (1 - 2 * (xx + yy)) * sz;
+        out[8] = (xz + wy) * sz;
+        out[9] = (yz - wx) * sz;
+        out[10] = (1 - (xx + yy)) * sz;
         out[11] = 0;
 
         out[12] = translation[0];
