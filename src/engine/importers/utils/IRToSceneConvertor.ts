@@ -81,7 +81,7 @@ export class IRToSceneConvertor {
 
         for (const key in geometry.attributes) {
             const name = key as AttributeName;
-            wrapper.addAttribute(
+            wrapper.setAttribute(
                 this.createAttributeWrapper(name, attributePool[geometry.attributes[name]]),
             );
         }

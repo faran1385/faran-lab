@@ -54,9 +54,9 @@ export class Renderer {
     }
 
     render(scene: Scene, camera: Camera): void {
+
         this.colorRenderTarget?.ensureTexture(this.device)
         this.depthRenderTarget?.ensureTexture(this.device)
-        console.log(this.managers.bufferManager)
         const encoder = this.device.createCommandEncoder();
         const pass = encoder.beginRenderPass({
             colorAttachments: [
@@ -129,5 +129,6 @@ export class Renderer {
         this.device.queue.submit([encoder.finish()]);
 
         this.producer.clear()
+        console.log(this.managers.pipelineManager.getCacheLength())
     }
 }

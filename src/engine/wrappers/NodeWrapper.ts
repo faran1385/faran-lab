@@ -9,7 +9,7 @@ import {quat} from "../../packages/math/quat/quat.ts";
 export class NodeWrapper {
     readonly uuid: string;
     private name?: string;
-    private mesh?: MeshWrapper;
+    mesh?: MeshWrapper;
     private children = new Map<string, NodeWrapper>();
     private parent?: NodeWrapper;
 

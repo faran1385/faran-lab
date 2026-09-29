@@ -4,7 +4,6 @@ import type {Hasher} from "../hashing/Hasher.ts";
 import type {CentralProducer} from "../producers/CentralProducer.ts";
 import {NodeWrapper} from "../wrappers/NodeWrapper.ts";
 import {PrimitiveWrapper} from "../wrappers/PrimitiveWrapper.ts";
-import type {FacePass} from "../wrappers/PipelineWrapper.ts";
 
 export interface FrameInfo {
     colorFormat: GPUTextureFormat;
@@ -48,52 +47,10 @@ export class RenderItemBuilder {
     static build(node: NodeWrapper, ctx: RenderItemBuilderContext): RenderItem[] {
         const mesh = node.getMesh();
         if (!mesh) return [];
+
         RenderItemBuilder.ensureNodeResources(node, ctx);
-        return mesh.getAllPrimitives().flatMap((p) => RenderItemBuilder.buildPrimitive(node, p, ctx));
-    }
 
-    private static buildPrimitive(node: NodeWrapper, p: PrimitiveWrapper, ctx: RenderItemBuilderContext): RenderItem[] {
-        RenderItemBuilder.ensureShaderRebuild(p, ctx);
-        RenderItemBuilder.ensureShaderCode(p, ctx);
-        RenderItemBuilder.ensureGeometryBuffers(p, ctx);
-        RenderItemBuilder.ensureMaterialResources(p, ctx);
-
-        const {managers, hasher, camera} = ctx;
-        const material = p.getMaterial();
-
-        const passes: FacePass[] = material.getDoubleSided() && material.getAlphaMode() === "blend"
-            ? ["back", "front"]
-            : ["single"];
-
-        // shared by every pass
-        const bindGroups = [
-            {slot: 0, bindGroup: managers.bindgroupManager.getRaw(camera.uuid)},
-            {slot: 1, bindGroup: managers.bindgroupManager.getRaw(material.convertToBindgroupHash(hasher))},
-            {slot: 2, bindGroup: managers.bindgroupManager.getRaw(node.uuid)},
-        ];
-        const vertexBuffers = RenderItemBuilder.buildVertexBuffers(p, ctx);
-        const draw = RenderItemBuilder.resolveDrawInfo(p, ctx);
-
-        return passes.map((facePass) => {
-            RenderItemBuilder.ensurePipelineInputs(p, ctx, facePass);
-            RenderItemBuilder.ensurePipeline(p, ctx);
-            return {
-                pipeline: managers.pipelineManager.getRaw(p.getPipeline().convertToHash(hasher)),
-                bindGroups, vertexBuffers, draw,
-            };
-        });
-    }
-
-    private static ensurePipelineInputs(p: PrimitiveWrapper, ctx: RenderItemBuilderContext, facePass: FacePass): void {
-        const {hasher} = ctx;
-        p.getPipeline().setInputs(
-            p.getPipeline().getVertexShaderWrapper().convertToHash(hasher),
-            p.getPipeline().getFragmentShaderWrapper().convertToHash(hasher),
-            p.getMaterial().convertToBindgroupLayoutHash(hasher),
-            p.getGeometry().convertToAttributesHash(hasher),
-            p.getMaterial().convertToPipelineSettingsHash(hasher),
-            facePass
-        );
+        return mesh.getAllPrimitives().map((p) => RenderItemBuilder.buildPrimitive(node, p, ctx));
     }
 
     // ---- node-level (once per node, shared by all its primitives) ----
@@ -108,6 +65,29 @@ export class RenderItemBuilder {
         }));
     }
 
+    // ---- primitive-level ----
+
+    private static buildPrimitive(node: NodeWrapper, p: PrimitiveWrapper, ctx: RenderItemBuilderContext): RenderItem {
+        RenderItemBuilder.ensureShaderRebuild(p, ctx);
+        RenderItemBuilder.ensureShaderCode(p, ctx);
+        RenderItemBuilder.ensureGeometryBuffers(p, ctx);
+        RenderItemBuilder.ensureMaterialResources(p, ctx);
+        RenderItemBuilder.ensurePipelineInputs(p, ctx);
+        RenderItemBuilder.ensurePipeline(p, ctx);
+
+        const {managers, hasher, camera} = ctx;
+
+        return {
+            pipeline: managers.pipelineManager.getRaw(p.getPipeline().convertToHash(hasher)),
+            bindGroups: [
+                {slot: 0, bindGroup: managers.bindgroupManager.getRaw(camera.uuid)},
+                {slot: 1, bindGroup: managers.bindgroupManager.getRaw(p.getMaterial().convertToBindgroupHash(hasher))},
+                {slot: 2, bindGroup: managers.bindgroupManager.getRaw(node.uuid)},
+            ],
+            vertexBuffers: RenderItemBuilder.buildVertexBuffers(p, ctx),
+            draw: RenderItemBuilder.resolveDrawInfo(p, ctx),
+        };
+    }
 
     private static ensureShaderRebuild(p: PrimitiveWrapper, ctx: RenderItemBuilderContext): void {
         const {hasher} = ctx;
@@ -196,6 +176,18 @@ export class RenderItemBuilder {
         managers.pipelineLayoutManager.ensure(material.convertToBindgroupLayoutHash(hasher), () => producer.producePipelineLayout({
             material, hasher, layouts: managers.bindgroupLayoutManager
         }));
+    }
+
+    private static ensurePipelineInputs(p: PrimitiveWrapper, ctx: RenderItemBuilderContext): void {
+        const {hasher} = ctx;
+        p.getPipeline().setInputs(
+            p.getPipeline().getVertexShaderWrapper().convertToHash(hasher),
+            p.getPipeline().getFragmentShaderWrapper().convertToHash(hasher),
+            p.getMaterial().convertToBindgroupLayoutHash(hasher),
+            p.getGeometry().convertToAttributesShapeHash(hasher),
+            p.getMaterial().convertToPipelineSettingsHash(hasher),
+            "front" 
+        );
     }
 
     private static ensurePipeline(p: PrimitiveWrapper, ctx: RenderItemBuilderContext): void {

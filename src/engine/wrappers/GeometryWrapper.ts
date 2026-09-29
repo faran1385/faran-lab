@@ -16,7 +16,7 @@ export class GeometryWrapper {
         this.hashHandler = new GeometryHashHandler()
     }
 
-    addAttribute(attribute: AttributeWrapper) {
+    setAttribute(attribute: AttributeWrapper) {
         this.attributes.set(attribute.name, attribute);
         this.hashHandler.sortAttributes(this.attributes)
     }
@@ -44,6 +44,10 @@ export class GeometryWrapper {
 
     convertToAttributesHash(hasher: Hasher): string {
         return this.hashHandler.convertToAttributesHash(hasher);
+    }
+
+    convertToAttributesShapeHash(hasher: Hasher): string {
+        return this.hashHandler.convertToAttributesShapeHash(hasher);
     }
 
     syncAttributesHash() {
