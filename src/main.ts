@@ -9,6 +9,7 @@ import {PrimitiveWrapper} from "./engine/wrappers/PrimitiveWrapper.ts";
 import {MeshWrapper} from "./engine/wrappers/MeshWrapper.ts";
 import {NodeWrapper} from "./engine/wrappers/NodeWrapper.ts";
 import {AttributeWrapper} from "./engine/wrappers/AttributeWrapper.ts";
+import {MaterialComponentWrapper} from "./engine/wrappers/MaterialComponentWrapper.ts";
 
 const canvas = document.getElementById("gpu-canvas") as HTMLCanvasElement;
 let stats = new Stats.default();
@@ -32,7 +33,28 @@ const scene = new Scene();
 const renderer = new Renderer(canvas);
 await renderer.init()
 renderer.setSize(window.innerWidth, window.innerHeight)
-scene.addNode(root);
+
+
+const pa1 = new AttributeWrapper("position", new Float32Array([
+    -0.5, -0.5, 0.0,  // Bottom left
+    0.5, -0.5, 0.0,  // Bottom right
+    0.0, 0.5, 0.0
+]).buffer, "float32x3")
+
+const mat1 = new MaterialWrapper();
+mat1.setComponent(new MaterialComponentWrapper("baseColor", [0, 1, 0]))
+const geo1 = new GeometryWrapper();
+geo1.setAttribute(pa1);
+const mesh1 = new MeshWrapper();
+const p1 = new PrimitiveWrapper(mat1, geo1);
+const node1 = new NodeWrapper();
+mesh1.setPrimitive(p1)
+node1.setMesh(mesh1)
+scene.addNode(node1)
+
+window.addEventListener("click", () => {
+    mat1.getComponent("baseColor")?.setFactors([0, 0, 1])
+})
 
 
 function frame(): void {

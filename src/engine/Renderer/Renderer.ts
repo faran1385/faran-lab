@@ -139,6 +139,5 @@ export class Renderer {
         this.device.queue.submit([encoder.finish()]);
 
         this.producer.clear()
-        console.log(this.managers.pipelineManager.getCacheLength())
     }
 }
