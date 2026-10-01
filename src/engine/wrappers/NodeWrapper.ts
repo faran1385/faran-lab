@@ -5,6 +5,7 @@ import type {Node} from "../importers/utils/IR.ts";
 import {v4 as uuidv4} from "uuid";
 import {vec3} from "../../packages/math/vector/vec3.ts";
 import {quat} from "../../packages/math/quat/quat.ts";
+import {ChangeStamp} from "../hashing/ChangeStamp.ts";
 
 export class NodeWrapper {
     readonly uuid: string;
@@ -21,6 +22,7 @@ export class NodeWrapper {
     private localMatrix = mat4.create();
 
     private readonly transformFlag = new VersionFlag();
+    private readonly meshStamp = new ChangeStamp();
 
     constructor(
         translation?: Node["translation"],
@@ -47,6 +49,16 @@ export class NodeWrapper {
 
     setMesh(mesh: MeshWrapper) {
         this.mesh = mesh;
+        this.meshStamp.mark();
+    }
+
+    /**
+     * Stamp of what this node draws: the mesh assignment or the mesh's primitive list. Transforms are deliberately
+     * not part of it, they are uploaded through the world-matrix path and never invalidate render items.
+     */
+    getStructureChangedAt(): number {
+        const own = this.meshStamp.get();
+        return this.mesh ? Math.max(own, this.mesh.getChangedAt()) : own;
     }
 
     setName(name: string | undefined) {

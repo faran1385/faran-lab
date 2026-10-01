@@ -4,6 +4,7 @@ import {MaterialComponentHashHandler} from "../hashing/MaterialComponentHashHand
 import type {Hasher} from "../hashing/Hasher.ts";
 import {HashHandler} from "../hashing/HashHandler.ts";
 import {AggregateHashHandler} from "../hashing/AggregateHashHandler.ts";
+import {ChangeStamp} from "../hashing/ChangeStamp.ts";
 
 export type MaterialComponentTextureSlot = {
     wrapper: TextureWrapper,
@@ -17,6 +18,7 @@ export class MaterialComponentWrapper {
     private factors: number[];
     private texture?: MaterialComponentTextureSlot;
     private hashHandler: MaterialComponentHashHandler;
+    private readonly changeStamp = new ChangeStamp();
 
     constructor(name: string, factors: number[]) {
         this.uuid = uuidv4();
@@ -36,12 +38,14 @@ export class MaterialComponentWrapper {
         this.texture = texture;
         this.hashHandler.shapeHash.addVersion();
         this.hashHandler.shaderKeyHash.addVersion();
+        this.changeStamp.mark();
     }
 
     removeTexture(): void {
         this.texture = undefined;
         this.hashHandler.shapeHash.addVersion();
         this.hashHandler.shaderKeyHash.addVersion();
+        this.changeStamp.mark();
     }
 
     getTexture() {
@@ -55,6 +59,13 @@ export class MaterialComponentWrapper {
     setFactors(factors: number[]): void {
         this.factors = factors;
         this.hashHandler.factorVersionFlag.addVersion()
+        this.changeStamp.mark();
+    }
+
+    /** Latest change stamp of this component or of its texture. */
+    getChangedAt(): number {
+        const own = this.changeStamp.get();
+        return this.texture ? Math.max(own, this.texture.wrapper.getChangedAt()) : own;
     }
 
     convertToShapeHash(hasher: Hasher): string {

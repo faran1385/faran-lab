@@ -1,6 +1,7 @@
 import {v4 as uuidv4} from 'uuid';
 import type {Hasher} from "../hashing/Hasher.ts";
 import {HashHandler} from "../hashing/HashHandler.ts";
+import {ChangeStamp} from "../hashing/ChangeStamp.ts";
 
 export class ImageWrapper {
     readonly uuid: string;
@@ -10,6 +11,7 @@ export class ImageWrapper {
     private height: number;
     private format: GPUTextureFormat = "rgba8unorm";
     private hashHandler: HashHandler;
+    private readonly changeStamp = new ChangeStamp();
 
     constructor(data: ArrayBuffer, width: number, height: number,format:GPUTextureFormat = "rgba8unorm") {
         this.uuid = uuidv4();
@@ -41,6 +43,11 @@ export class ImageWrapper {
         this.height = height;
         this.format = format;
         this.hashHandler.addVersion();
+        this.changeStamp.mark();
+    }
+
+    getChangedAt(): number {
+        return this.changeStamp.get();
     }
 
     convertToHash(hasher: Hasher): string {

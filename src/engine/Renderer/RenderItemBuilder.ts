@@ -4,6 +4,8 @@ import type {Hasher} from "../hashing/Hasher.ts";
 import type {CentralProducer} from "../producers/CentralProducer.ts";
 import {NodeWrapper} from "../wrappers/NodeWrapper.ts";
 import {PrimitiveWrapper} from "../wrappers/PrimitiveWrapper.ts";
+import type {RenderCache} from "./RenderCache.ts";
+import {getEpoch} from "../hashing/epoch.ts";
 
 export interface FrameInfo {
     colorFormat: GPUTextureFormat;
@@ -16,6 +18,7 @@ export interface RenderItemBuilderContext {
     hasher: Hasher;
     frame: FrameInfo;
     camera: Camera;
+    cache: RenderCache;
 }
 
 // RenderItem.ts
@@ -50,7 +53,41 @@ export class RenderItemBuilder {
 
         RenderItemBuilder.ensureNodeResources(node, ctx);
 
-        return mesh.getAllPrimitives().map((p) => RenderItemBuilder.buildPrimitive(node, p, ctx));
+        const {cache, camera} = ctx;
+        const entry = cache.get(node);
+
+        // Quiet frame: no setter anywhere has run since the last frame, so nothing can have changed. No hashing,
+        // no ensure(), no allocation: hand back the items built before.
+        if (entry && entry.cameraUuid === camera.uuid && cache.lastFrameEpoch === getEpoch()) {
+            return entry.items;
+        }
+
+        const primitives = mesh.getAllPrimitives();
+
+        // First time we see this node, another camera, or its mesh / primitive list changed: build everything.
+        if (!entry || entry.cameraUuid !== camera.uuid || node.getStructureChangedAt() > entry.structureBuiltAt) {
+            const items = primitives.map((p) => RenderItemBuilder.buildPrimitive(node, p, ctx));
+            const builtAt = getEpoch(); // after building: building itself may stamp (shader rebuild marks)
+            cache.set(node, {
+                items,
+                primitives,
+                builtAt: primitives.map(() => builtAt),
+                structureBuiltAt: builtAt,
+                cameraUuid: camera.uuid,
+            });
+            return items;
+        }
+
+        // Something changed somewhere: rebuild only the primitives whose own stamp (material, geometry, pipeline,
+        // and everything under them) is newer than the epoch their item was built at. Nothing is cleared, so a
+        // material shared by many primitives is picked up by every one of them.
+        for (let i = 0; i < entry.primitives.length; i++) {
+            if (entry.primitives[i].getChangedAt() > entry.builtAt[i]) {
+                entry.items[i] = RenderItemBuilder.buildPrimitive(node, entry.primitives[i], ctx);
+                entry.builtAt[i] = getEpoch();
+            }
+        }
+        return entry.items;
     }
 
     // ---- node-level (once per node, shared by all its primitives) ----

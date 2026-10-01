@@ -7,6 +7,8 @@ import type {Hasher} from "../hashing/Hasher.ts";
 import {MaterialHashHandler} from "../hashing/MaterialHashHandler.ts";
 import {TriggerableAggregateHashHandler} from "../hashing/TriggerableAggregateHashHandler.ts";
 import {planMaterialBindings} from "../producers/utils.ts";
+import {ChangeStamp} from "../hashing/ChangeStamp.ts";
+import {getEpoch} from "../hashing/epoch.ts";
 
 type MaterialArgs = {
     alphaMode?: Material["alphaMode"],
@@ -25,6 +27,11 @@ export class MaterialWrapper {
     private doubleSided: Material["doubleSided"];
 
     private hashHandler: MaterialHashHandler;
+    private readonly changeStamp = new ChangeStamp();
+    // getChangedAt() walks the components; the result stays valid until the epoch moves, so it is computed once
+    // per change no matter how many primitives share this material.
+    private memoEpoch = -1;
+    private memoChangedAt = 0;
 
     constructor(args: MaterialArgs={}) {
         this.uuid = uuidv4();
@@ -77,11 +84,13 @@ export class MaterialWrapper {
     setComponent(wrapper: MaterialComponentWrapper): void {
         this.components.set(wrapper.name, wrapper);
         this.sortComponents();
+        this.changeStamp.mark();
     }
 
     removeComponent(name: string): void {
         this.components.delete(name);
         this.sortComponents();
+        this.changeStamp.mark();
     }
 
     getAllComponents(): MaterialComponentWrapper[] {
@@ -95,6 +104,7 @@ export class MaterialWrapper {
     setAlphaMode(alphaMode: Material["alphaMode"]): void {
         this.alphaMode = alphaMode;
         this.hashHandler.pipelineSettingsHash.addVersion();
+        this.changeStamp.mark();
     }
 
     getAlphaCutoff() {
@@ -112,6 +122,23 @@ export class MaterialWrapper {
     setDoubleSided(doubleSided: Material["doubleSided"]): void {
         this.doubleSided = doubleSided;
         this.hashHandler.pipelineSettingsHash.addVersion();
+        this.changeStamp.mark();
+    }
+
+    /** Latest change stamp of this material or of anything it is built from (components, textures, images, samplers). */
+    getChangedAt(): number {
+        const epoch = getEpoch();
+        if (this.memoEpoch === epoch) return this.memoChangedAt;
+
+        let at = this.changeStamp.get();
+        for (const component of this.sortedComponents) {
+            const componentAt = component.getChangedAt();
+            if (componentAt > at) at = componentAt;
+        }
+
+        this.memoEpoch = epoch;
+        this.memoChangedAt = at;
+        return at;
     }
 
     convertToPipelineSettingsHash(hasher: Hasher): string {

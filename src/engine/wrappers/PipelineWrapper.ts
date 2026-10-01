@@ -2,6 +2,7 @@ import {v4 as uuidv4} from "uuid";
 import type {Hasher} from "../hashing/Hasher.ts";
 import {AggregateHashHandler} from "../hashing/AggregateHashHandler.ts";
 import {ShaderModuleWrapper} from "./ShaderModuleWrapper.ts";
+import {ChangeStamp} from "../hashing/ChangeStamp.ts";
 
 export type FacePass= "single" | "back" | "front"
 
@@ -19,6 +20,7 @@ export class PipelineWrapper {
     private currentFacePass: "single" | "back" | "front" = "single";
 
     private hashHandler: AggregateHashHandler;
+    private readonly changeStamp = new ChangeStamp();
 
     constructor() {
         this.uuid = uuidv4();
@@ -55,10 +57,16 @@ export class PipelineWrapper {
 
     markVertexShaderDirty(){
         this.vertexShaderWrapper.codeGenVersionFlag.addVersion()
+        this.changeStamp.mark();
     }
 
     markFragmentShaderDirty(){
         this.fragmentShaderWrapper.codeGenVersionFlag.addVersion()
+        this.changeStamp.mark();
+    }
+
+    getChangedAt(): number {
+        return this.changeStamp.get();
     }
 
     convertToHash(hasher: Hasher): string {

@@ -27,6 +27,18 @@ export class PrimitiveWrapper {
         return this.pipelineWrapper;
     }
 
+    /**
+     * Latest change stamp of anything this primitive renders with. Swapping the material, geometry or an assembler
+     * goes through the pipeline wrapper's mark*ShaderDirty(), so its stamp already covers those setters.
+     */
+    getChangedAt(): number {
+        return Math.max(
+            this.material.getChangedAt(),
+            this.geometry.getChangedAt(),
+            this.pipelineWrapper.getChangedAt(),
+        );
+    }
+
     setVertexAssembler(a: VertexAssemblerBase): void {
         this.vertexAssembler = a;
         this.pipelineWrapper.markVertexShaderDirty()

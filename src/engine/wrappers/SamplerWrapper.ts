@@ -2,6 +2,7 @@ import {v4 as uuidv4} from "uuid";
 import type {Sampler} from "../importers/utils/IR.ts";
 import type {Hasher} from "../hashing/Hasher.ts";
 import {HashHandler} from "../hashing/HashHandler.ts";
+import {ChangeStamp} from "../hashing/ChangeStamp.ts";
 
 export class SamplerWrapper {
     private minFilter: Sampler["minFilter"];
@@ -12,6 +13,7 @@ export class SamplerWrapper {
     readonly uuid: string;
 
     private hashHandler: HashHandler;
+    private readonly changeStamp = new ChangeStamp();
 
     constructor(
         minFilter: Sampler["minFilter"] = "linear",
@@ -38,6 +40,7 @@ export class SamplerWrapper {
     setMinFilter(minFilter: Sampler["minFilter"]): void {
         this.minFilter = minFilter;
         this.hashHandler.addVersion();
+        this.changeStamp.mark();
     }
 
     getMagFilter(): Sampler["magFilter"] {
@@ -47,6 +50,7 @@ export class SamplerWrapper {
     setMagFilter(magFilter: Sampler["magFilter"]): void {
         this.magFilter = magFilter;
         this.hashHandler.addVersion();
+        this.changeStamp.mark();
     }
 
     getMipFilter(): Sampler["mipFilter"] {
@@ -56,6 +60,7 @@ export class SamplerWrapper {
     setMipFilter(mipFilter: Sampler["mipFilter"]): void {
         this.mipFilter = mipFilter;
         this.hashHandler.addVersion();
+        this.changeStamp.mark();
     }
 
     getAddressModeU(): Sampler["addressModeU"] {
@@ -65,6 +70,7 @@ export class SamplerWrapper {
     setAddressModeU(addressModeU: Sampler["addressModeU"]): void {
         this.addressModeU = addressModeU;
         this.hashHandler.addVersion();
+        this.changeStamp.mark();
     }
 
     getAddressModeV(): Sampler["addressModeV"] {
@@ -74,6 +80,11 @@ export class SamplerWrapper {
     setAddressModeV(addressModeV: Sampler["addressModeV"]): void {
         this.addressModeV = addressModeV;
         this.hashHandler.addVersion();
+        this.changeStamp.mark();
+    }
+
+    getChangedAt(): number {
+        return this.changeStamp.get();
     }
 
     convertToHash(hasher: Hasher): string {

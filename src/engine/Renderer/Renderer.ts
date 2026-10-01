@@ -6,6 +6,8 @@ import {v4 as uuidv4} from "uuid";
 import {CentralManager} from "../managers/CentralManager.ts";
 import {RenderTarget} from "./RenderTarget.ts";
 import {RenderItemBuilder} from "./RenderItemBuilder.ts";
+import {RenderCache} from "./RenderCache.ts";
+import {getEpoch} from "../hashing/epoch.ts";
 
 
 export class Renderer {
@@ -23,6 +25,7 @@ export class Renderer {
 
     private hasher!: Hasher;
     private readonly producer = new CentralProducer();
+    private readonly renderCache = new RenderCache();
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -111,6 +114,7 @@ export class Renderer {
                 hasher: this.hasher,
                 frame: {colorFormat: this.format, depthFormat: this.depthRenderTarget.format},
                 camera,
+                cache: this.renderCache,
             }).forEach((item) => {
                 pass.setPipeline(item.pipeline);
                 item.bindGroups.forEach(bg => pass.setBindGroup(bg.slot, bg.bindGroup));
@@ -124,6 +128,9 @@ export class Renderer {
                 }
             });
         });
+
+        // Recorded after the traverse: building items may itself stamp wrappers (shader rebuild marks).
+        this.renderCache.lastFrameEpoch = getEpoch();
 
         pass.end();
         this.device.queue.submit([encoder.finish()]);
