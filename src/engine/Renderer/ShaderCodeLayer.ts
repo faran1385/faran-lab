@@ -15,18 +15,18 @@ export class ShaderCodeLayer {
         const fragmentWrapper = pipeline.getFragmentShaderWrapper();
         const generated: GeneratedStages = {vertex: false, fragment: false};
 
-        if (vertexWrapper.codeGenVersionFlag.needsUpdate()) {
+        if (vertexWrapper.hashProvider.needsUpdateCodeGen()) {
             const entryPoint = vertexWrapper.getEntryPoint();
             const code = p.getVertexAssembler().assemble(producer.produceVertexShader({
                 geometry: p.getGeometry(),
                 material: p.getMaterial(),
             }), entryPoint);
             vertexWrapper.setShader(code, entryPoint);
-            vertexWrapper.codeGenVersionFlag.sync();
+            vertexWrapper.hashProvider.syncCodeGen();
             generated.vertex = true;
         }
 
-        if (fragmentWrapper.codeGenVersionFlag.needsUpdate()) {
+        if (fragmentWrapper.hashProvider.needsUpdateCodeGen()) {
             const entryPoint = fragmentWrapper.getEntryPoint();
             const code = p.getFragmentAssembler().assemble(producer.produceFragmentShader({
                 geometry: p.getGeometry(),
@@ -34,7 +34,7 @@ export class ShaderCodeLayer {
                 material: p.getMaterial()
             }), entryPoint);
             fragmentWrapper.setShader(code, entryPoint);
-            fragmentWrapper.codeGenVersionFlag.sync();
+            fragmentWrapper.hashProvider.syncCodeGen();
             generated.fragment = true;
         }
 

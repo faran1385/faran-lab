@@ -1,7 +1,7 @@
 import type {NodeWrapper} from "../wrappers/NodeWrapper.ts";
 import type {PrimitiveWrapper} from "../wrappers/PrimitiveWrapper.ts";
-import type {HashData} from "../hashing/HashData.ts";
-import {getEpoch} from "../hashing/epoch.ts";
+import type {HashData} from "../hashing/utils/HashData.ts";
+import {getEpoch} from "../hashing/utils/epoch.ts";
 import type {RenderItem} from "./RenderItem.ts";
 import type {RenderContext} from "./RenderContext.ts";
 import {UpdateLayer} from "./UpdateLayer.ts";

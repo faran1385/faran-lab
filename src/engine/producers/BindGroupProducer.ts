@@ -1,6 +1,6 @@
 import {FACTORS_BINDING, type MaterialBindingPlan} from "./BindGroupLayoutProducer.ts";
 import type {MaterialWrapper} from "../wrappers/MaterialWrapper.ts";
-import type {MaterialHashes} from "../hashing/HashData.ts";
+import type {MaterialHashes} from "../hashing/utils/HashData.ts";
 import {type BindGroupLayoutManager, GLOBAL_LAYOUT_KEY, NODE_LAYOUT_KEY} from "../managers/BindGroupLayoutManager.ts";
 import type {BufferManager} from "../managers/BufferManager.ts";
 import type {TextureManager} from "../managers/TextureManager.ts";

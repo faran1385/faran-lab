@@ -1,6 +1,6 @@
 import type {PrimitiveWrapper} from "./PrimitiveWrapper.ts";
 import { v4 as uuidv4 } from "uuid";
-import {ChangeStamp} from "../hashing/ChangeStamp.ts";
+import {ChangeStamp} from "../hashing/utils/ChangeStamp.ts";
 
 export class MeshWrapper {
     readonly uuid: string;

@@ -1,7 +1,7 @@
 import type {PrimitiveWrapper} from "../wrappers/PrimitiveWrapper.ts";
 import type {MaterialWrapper} from "../wrappers/MaterialWrapper.ts";
 import type {GeometryWrapper} from "../wrappers/GeometryWrapper.ts";
-import type {HashData, GeometryHashes, MaterialHashes, PipelineHashes} from "../hashing/HashData.ts";
+import type {HashData, GeometryHashes, MaterialHashes, PipelineHashes} from "../hashing/utils/HashData.ts";
 import type {GeneratedStages} from "./ShaderCodeLayer.ts";
 import type {RenderContext} from "./RenderContext.ts";
 

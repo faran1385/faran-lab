@@ -1,11 +1,11 @@
 import type {MeshWrapper} from "./MeshWrapper.ts";
-import {VersionFlag} from "../hashing/VersionFlag.ts";
+import {VersionFlag} from "../hashing/utils/VersionFlag.ts";
 import {mat4} from "../../packages/math/matrix/mat4.ts";
 import type {Node} from "../importers/utils/IR.ts";
 import {v4 as uuidv4} from "uuid";
 import {vec3} from "../../packages/math/vector/vec3.ts";
 import {quat} from "../../packages/math/quat/quat.ts";
-import {ChangeStamp} from "../hashing/ChangeStamp.ts";
+import {ChangeStamp} from "../hashing/utils/ChangeStamp.ts";
 
 export class NodeWrapper {
     readonly uuid: string;

@@ -33,9 +33,9 @@ export class PrimitiveWrapper {
      */
     getChangedAt(): number {
         return Math.max(
-            this.material.getChangedAt(),
-            this.geometry.getChangedAt(),
-            this.pipelineWrapper.getChangedAt(),
+            this.material.hashProvider.getChangedAt(),
+            this.geometry.hashProvider.getChangedAt(),
+            this.pipelineWrapper.hashProvider.getChangedAt(),
         );
     }
 

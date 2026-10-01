@@ -1,6 +1,6 @@
 import type {Scene} from "../Scene/Scene.ts";
-import {Hasher} from "../hashing/Hasher.ts";
-import {HashResolver} from "../hashing/HashResolver.ts";
+import {Hasher} from "../hashing/utils/Hasher.ts";
+import {HashResolver} from "../hashing/utils/HashResolver.ts";
 import {CentralProducer} from "../producers/CentralProducer.ts";
 import type {Camera} from "../Camera/Camera.ts";
 import {v4 as uuidv4} from "uuid";
@@ -8,7 +8,7 @@ import {CentralManager} from "../managers/CentralManager.ts";
 import {RenderTarget} from "./RenderTarget.ts";
 import {RenderItemBuilder} from "./RenderItemBuilder.ts";
 import {RenderCache} from "./RenderCache.ts";
-import {getEpoch} from "../hashing/epoch.ts";
+import {getEpoch} from "../hashing/utils/epoch.ts";
 
 
 export class Renderer {

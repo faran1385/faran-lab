@@ -1,6 +1,6 @@
 import type {NodeWrapper} from "../wrappers/NodeWrapper.ts";
 import type {PrimitiveWrapper} from "../wrappers/PrimitiveWrapper.ts";
-import type {GeometryHashes, HashData} from "../hashing/HashData.ts";
+import type {GeometryHashes, HashData} from "../hashing/utils/HashData.ts";
 import type {DrawInfo, RenderItem, VertexBufferBinding} from "./RenderItem.ts";
 import type {RenderContext} from "./RenderContext.ts";
 

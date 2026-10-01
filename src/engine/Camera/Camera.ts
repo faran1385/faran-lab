@@ -1,6 +1,6 @@
 import {vec3} from "../../packages/math/vector/vec3.ts";
 import {mat4} from "../../packages/math/matrix/mat4.ts";
-import {VersionFlag} from "../hashing/VersionFlag.ts";
+import {VersionFlag} from "../hashing/utils/VersionFlag.ts";
 import {v4 as uuidv4} from "uuid";
 
 export abstract class Camera {

@@ -1,7 +1,7 @@
 import type {Camera} from "../Camera/Camera.ts";
 import type {CentralManager} from "../managers/CentralManager.ts";
 import type {CentralProducer} from "../producers/CentralProducer.ts";
-import type {HashResolver} from "../hashing/HashResolver.ts";
+import type {HashResolver} from "../hashing/utils/HashResolver.ts";
 import type {RenderCache} from "./RenderCache.ts";
 
 export interface FrameInfo {

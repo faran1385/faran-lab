@@ -1,10 +1,6 @@
 import type {TextureWrapper} from "./TextureWrapper.ts";
 import {v4 as uuidv4} from "uuid";
-import {MaterialComponentHashHandler} from "../hashing/MaterialComponentHashHandler.ts";
-import type {Hasher} from "../hashing/Hasher.ts";
-import {HashHandler} from "../hashing/HashHandler.ts";
-import {AggregateHashHandler} from "../hashing/AggregateHashHandler.ts";
-import {ChangeStamp} from "../hashing/ChangeStamp.ts";
+import {MaterialComponentHashProvider} from "../hashing/MaterialComponentHashProvider.ts";
 
 export type MaterialComponentTextureSlot = {
     wrapper: TextureWrapper,
@@ -17,35 +13,30 @@ export class MaterialComponentWrapper {
 
     private factors: number[];
     private texture?: MaterialComponentTextureSlot;
-    private hashHandler: MaterialComponentHashHandler;
-    private readonly changeStamp = new ChangeStamp();
+    readonly hashProvider: MaterialComponentHashProvider;
 
     constructor(name: string, factors: number[]) {
         this.uuid = uuidv4();
         this.name = name;
         this.factors = factors;
 
-        this.hashHandler = new MaterialComponentHashHandler(
-            new HashHandler(() => (this.texture ? "1" : "0")),
-            new HashHandler(() => (this.texture ? this.texture.texCoord : "0")),
-            new AggregateHashHandler((hasher) =>
-                this.texture ? this.texture.wrapper.convertToHash(hasher) : "notex"
-            ),
-        )
+        this.hashProvider = new MaterialComponentHashProvider({
+            getTexture: this.getTexture.bind(this),
+        })
     }
 
     setTexture(texture: MaterialComponentTextureSlot): void {
         this.texture = texture;
-        this.hashHandler.shapeHash.addVersion();
-        this.hashHandler.shaderKeyHash.addVersion();
-        this.changeStamp.mark();
+        this.hashProvider.markShapeHash();
+        this.hashProvider.markShaderHash();
+        this.hashProvider.markChangeStamp()
     }
 
     removeTexture(): void {
         this.texture = undefined;
-        this.hashHandler.shapeHash.addVersion();
-        this.hashHandler.shaderKeyHash.addVersion();
-        this.changeStamp.mark();
+        this.hashProvider.markShapeHash();
+        this.hashProvider.markShaderHash();
+        this.hashProvider.markChangeStamp()
     }
 
     getTexture() {
@@ -58,33 +49,9 @@ export class MaterialComponentWrapper {
 
     setFactors(factors: number[]): void {
         this.factors = factors;
-        this.hashHandler.factorVersionFlag.addVersion()
-        this.changeStamp.mark();
+        this.hashProvider.markFactorUpdate();
+        this.hashProvider.markChangeStamp()
     }
 
-    /** Latest change stamp of this component or of its texture. */
-    getChangedAt(): number {
-        const own = this.changeStamp.get();
-        return this.texture ? Math.max(own, this.texture.wrapper.getChangedAt()) : own;
-    }
 
-    convertToShapeHash(hasher: Hasher): string {
-        return this.hashHandler.shapeHash.convertToHash(hasher);
-    }
-
-    convertToShaderKeyHash(hasher: Hasher): string {
-        return this.hashHandler.shaderKeyHash.convertToHash(hasher);
-    }
-
-    convertToResourceHash(hasher: Hasher): string {
-        return this.hashHandler.resourceHash.convertToHash(hasher);
-    }
-
-    needsFactorUpdate() {
-        return this.hashHandler.factorVersionFlag.needsUpdate()
-    }
-
-    syncFactorUpdate() {
-        this.hashHandler.factorVersionFlag.sync()
-    }
 }

@@ -1,7 +1,7 @@
 import type {PipelineWrapper} from "../wrappers/PipelineWrapper.ts";
 import type {MaterialWrapper} from "../wrappers/MaterialWrapper.ts";
 import type {GeometryWrapper} from "../wrappers/GeometryWrapper.ts";
-import type {HashData} from "../hashing/HashData.ts";
+import type {HashData} from "../hashing/utils/HashData.ts";
 import type {ShaderModuleManager} from "../managers/ShaderModuleManager.ts";
 import type {PipelineLayoutManager} from "../managers/PipelineLayoutManager.ts";
 import type {GeometryAttributePlan} from "./utils.ts";
@@ -23,7 +23,7 @@ export interface PipelineProduceArgs {
 
 export class PipelineProducer {
     static produce(
-        { pipeline, material, hashes, frame, shaderModules, pipelineLayouts }: PipelineProduceArgs,
+        {pipeline, material, hashes, frame, shaderModules, pipelineLayouts}: PipelineProduceArgs,
         getAttributePlan: () => GeometryAttributePlan,
     ): GPURenderPipelineDescriptor {
         const vs = pipeline.getVertexShaderWrapper();
@@ -34,7 +34,7 @@ export class PipelineProducer {
         const buffers: GPUVertexBufferLayout[] = plan.slots.map((s) => ({
             arrayStride: s.arrayStride,
             stepMode: "vertex",
-            attributes: [{ shaderLocation: s.shaderLocation, offset: 0, format: s.format }],
+            attributes: [{shaderLocation: s.shaderLocation, offset: 0, format: s.format}],
         }));
 
         return {
@@ -52,15 +52,15 @@ export class PipelineProducer {
                     format: frame.colorFormat,
                     blend: isBlend
                         ? {
-                            color: { srcFactor: "src-alpha", dstFactor: "one-minus-src-alpha", operation: "add" },
-                            alpha: { srcFactor: "one", dstFactor: "one-minus-src-alpha", operation: "add" },
+                            color: {srcFactor: "src-alpha", dstFactor: "one-minus-src-alpha", operation: "add"},
+                            alpha: {srcFactor: "one", dstFactor: "one-minus-src-alpha", operation: "add"},
                         }
                         : undefined,
                 }],
             },
             primitive: {
                 topology: "triangle-list",
-                cullMode: PipelineProducer.cullMode(material, pipeline.getFacePass()),
+                cullMode: PipelineProducer.cullMode(material, pipeline.hashProvider.getFacePass()),
             },
             depthStencil: {
                 format: frame.depthFormat,

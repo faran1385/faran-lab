@@ -1,8 +1,8 @@
 import type {Hasher} from "./Hasher.ts";
-import type {MaterialWrapper} from "../wrappers/MaterialWrapper.ts";
-import type {GeometryWrapper} from "../wrappers/GeometryWrapper.ts";
-import type {PipelineWrapper} from "../wrappers/PipelineWrapper.ts";
-import type {MaterialBindingPlan} from "../producers/BindGroupLayoutProducer.ts";
+import type {MaterialWrapper} from "../../wrappers/MaterialWrapper.ts";
+import type {GeometryWrapper} from "../../wrappers/GeometryWrapper.ts";
+import type {PipelineWrapper} from "../../wrappers/PipelineWrapper.ts";
+import type {MaterialBindingPlan} from "../../producers/BindGroupLayoutProducer.ts";
 import type {GeometryHashes, MaterialHashes, MaterialTextureHashes, PipelineHashes, Resolved} from "./HashData.ts";
 
 interface CacheEntry<T> {
@@ -31,9 +31,10 @@ export class HashResolver {
         this.hasher = hasher;
     }
 
-    /** @param getBindingPlan the producer's per-frame binding plan cache, so the layout hash never plans bindings itself */
+    /** @param material
+     @param getBindingPlan the producer's per-frame binding plan cache, so the layout hash never plans bindings itself */
     resolveMaterial(material: MaterialWrapper, getBindingPlan: (material: MaterialWrapper) => MaterialBindingPlan): Resolved<MaterialHashes> {
-        const builtAt = material.getChangedAt();
+        const builtAt = material.hashProvider.getChangedAt();
         const cached = this.materials.get(material);
         if (cached && cached.builtAt === builtAt) return {hashes: cached.hashes, computed: false};
 
@@ -43,17 +44,17 @@ export class HashResolver {
             const slot = component.getTexture();
             if (!slot) continue;
             textures.set(component.name, {
-                image: slot.wrapper.getImage().convertToHash(h),
-                sampler: slot.wrapper.getSampler().convertToHash(h),
+                image: slot.wrapper.getImage().hashProvider.convertToHash(h),
+                sampler: slot.wrapper.getSampler().hashProvider.convertToHash(h),
             });
         }
 
         const hashes: MaterialHashes = {
-            factors: material.convertToFactorsHash(h),
-            layout: material.convertToBindgroupLayoutHash(h, getBindingPlan(material).signature),
-            bindgroup: material.convertToBindgroupHash(h),
-            shader: material.convertToShaderHash(h),
-            pipelineSettings: material.convertToPipelineSettingsHash(h),
+            factors: material.hashProvider.convertToFactorsHash(h),
+            layout: material.hashProvider.convertToBindgroupLayoutHash(h, getBindingPlan(material).signature),
+            bindgroup: material.hashProvider.convertToBindgroupHash(h),
+            shader: material.hashProvider.convertToShaderHash(h),
+            pipelineSettings: material.hashProvider.convertToPipelineSettingsHash(h),
             textures,
         };
         this.materials.set(material, {builtAt, hashes});
@@ -61,20 +62,20 @@ export class HashResolver {
     }
 
     resolveGeometry(geometry: GeometryWrapper): Resolved<GeometryHashes> {
-        const builtAt = geometry.getChangedAt();
+        const builtAt = geometry.hashProvider.getChangedAt();
         const cached = this.geometries.get(geometry);
         if (cached && cached.builtAt === builtAt) return {hashes: cached.hashes, computed: false};
 
         const h = this.hasher;
         const attributeBuffers = new Map<string, string>();
         for (const attribute of geometry.getAttributes().values()) {
-            attributeBuffers.set(attribute.name, attribute.convertToHash(h));
+            attributeBuffers.set(attribute.name, attribute.hashProvider.convertToHash(h));
         }
 
         const hashes: GeometryHashes = {
-            attributesShape: geometry.convertToAttributesShapeHash(h),
+            attributesShape: geometry.hashProvider.convertToAttributesShapeHash(h),
             attributeBuffers,
-            indices: geometry.getIndices()?.convertToHash(h),
+            indices: geometry.getIndices()?.hashProvider.convertToHash(h),
         };
         this.geometries.set(geometry, {builtAt, hashes});
         return {hashes, computed: true};
@@ -86,11 +87,11 @@ export class HashResolver {
      */
     resolvePipeline(pipeline: PipelineWrapper, material: MaterialHashes, geometry: GeometryHashes): Resolved<PipelineHashes> {
         const h = this.hasher;
-        const vertexShader = pipeline.getVertexShaderWrapper().convertToHash(h);
-        const fragmentShader = pipeline.getFragmentShaderWrapper().convertToHash(h);
+        const vertexShader = pipeline.getVertexShaderWrapper().hashProvider.convertToHash(h);
+        const fragmentShader = pipeline.getFragmentShaderWrapper().hashProvider.convertToHash(h);
 
-        const changed = pipeline.setInputs(vertexShader, fragmentShader, material.layout, geometry.attributesShape, material.pipelineSettings, "front");
-        const hash = changed ? pipeline.convertToHash(h) : pipeline.getCachedHash();
+        const changed = pipeline.hashProvider.setInputs(vertexShader, fragmentShader, material.layout, geometry.attributesShape, material.pipelineSettings, "front");
+        const hash = changed ? pipeline.hashProvider.convertToHash(h) : pipeline.hashProvider.getCachedHash();
 
         return {hashes: {vertexShader, fragmentShader, pipeline: hash}, computed: changed};
     }

@@ -1,27 +1,21 @@
 import {v4 as uuidv4} from 'uuid';
-import type {Hasher} from "../hashing/Hasher.ts";
-import {HashHandler} from "../hashing/HashHandler.ts";
-import {ChangeStamp} from "../hashing/ChangeStamp.ts";
+import {BufferHashProvider} from "../hashing/BufferHashProvider.ts";
 
 export class BufferWrapper<TUsage extends GPUBufferUsageFlags = GPUBufferUsageFlags> {
     readonly uuid: string;
 
     protected usage: TUsage;
     protected data: ArrayBuffer;
-    protected hashHandler!: HashHandler;
-    private readonly changeStamp = new ChangeStamp();
+    readonly hashProvider: BufferHashProvider
 
     constructor(data: ArrayBuffer, usage: TUsage) {
         this.uuid = uuidv4();
         this.data = data;
         this.usage = usage;
-        this.hashHandler = new HashHandler(() => `${this.uuid}|${this.hashHandler.getVersion()}`);
+
+        this.hashProvider=new BufferHashProvider(this.uuid)
     }
 
-    setBuildKey(buildKey: (...args: any[]) => string): void {
-        this.hashHandler.setBuildKey(buildKey);
-        this.changeStamp.mark();
-    }
 
     getUsage(): TUsage {
         return this.usage;
@@ -33,19 +27,8 @@ export class BufferWrapper<TUsage extends GPUBufferUsageFlags = GPUBufferUsageFl
 
     setData(data: ArrayBuffer): void {
         this.data = data;
-        this.hashHandler.addVersion();
-        this.changeStamp.mark();
+        this.hashProvider.markHashHandler();
+        this.hashProvider.markChangeStamp()
     }
 
-    getChangedAt(): number {
-        return this.changeStamp.get();
-    }
-
-    getVersion(): number {
-        return this.hashHandler.getVersion();
-    }
-
-    convertToHash(hasher: Hasher): string {
-        return this.hashHandler.convertToHash(hasher);
-    }
 }

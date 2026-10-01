@@ -1,5 +1,5 @@
 import {BindGroupLayoutManager, GLOBAL_LAYOUT_KEY, NODE_LAYOUT_KEY} from "../managers/BindGroupLayoutManager.ts";
-import type {MaterialHashes} from "../hashing/HashData.ts";
+import type {MaterialHashes} from "../hashing/utils/HashData.ts";
 import type {MaterialWrapper} from "../wrappers/MaterialWrapper.ts";
 
 export interface PipelineLayoutProduceArgs {

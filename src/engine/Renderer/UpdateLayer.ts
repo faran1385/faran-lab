@@ -1,6 +1,6 @@
 import type {PrimitiveWrapper} from "../wrappers/PrimitiveWrapper.ts";
 import type {MaterialWrapper} from "../wrappers/MaterialWrapper.ts";
-import type {GeometryHashes, MaterialHashes} from "../hashing/HashData.ts";
+import type {GeometryHashes, MaterialHashes} from "../hashing/utils/HashData.ts";
 import type {RenderContext} from "./RenderContext.ts";
 
 /**
@@ -21,9 +21,9 @@ export class UpdateLayer {
     static syncShaderInputs(primitive: PrimitiveWrapper, material: MaterialHashes, geometry: GeometryHashes): boolean {
         const pipeline = primitive.getPipeline();
         const key = `${material.shader}|${material.layout}|${geometry.attributesShape}`;
-        if (pipeline.getShaderInputsKey() === key) return false;
+        if (pipeline.hashProvider.getShaderInputsKey() === key) return false;
 
-        pipeline.setShaderInputsKey(key);
+        pipeline.hashProvider.setShaderInputsKey(key);
         pipeline.markVertexShaderDirty();
         pipeline.markFragmentShaderDirty();
         return true;
@@ -37,11 +37,11 @@ export class UpdateLayer {
         const {managers, producer} = ctx;
 
         for (const component of material.getAllComponents()) {
-            if (!component.needsFactorUpdate()) continue;
+            if (!component.hashProvider.needsFactorUpdate()) continue;
 
             const item = producer.getFactorPlan(material).get(component.name)!;
             managers.bufferManager.upload(hashes.factors, new Float32Array([item.factor].flat()), item.offset);
-            component.syncFactorUpdate();
+            component.hashProvider.syncFactorUpdate();
         }
     }
 }

@@ -1,8 +1,6 @@
 import {v4 as uuidv4} from "uuid";
 import type {Sampler} from "../importers/utils/IR.ts";
-import type {Hasher} from "../hashing/Hasher.ts";
-import {HashHandler} from "../hashing/HashHandler.ts";
-import {ChangeStamp} from "../hashing/ChangeStamp.ts";
+import {SamplerHashProvider} from "../hashing/SamplerHashProvider.ts";
 
 export class SamplerWrapper {
     private minFilter: Sampler["minFilter"];
@@ -12,8 +10,7 @@ export class SamplerWrapper {
     private addressModeV: Sampler["addressModeV"];
     readonly uuid: string;
 
-    private hashHandler: HashHandler;
-    private readonly changeStamp = new ChangeStamp();
+    readonly hashProvider: SamplerHashProvider;
 
     constructor(
         minFilter: Sampler["minFilter"] = "linear",
@@ -30,7 +27,13 @@ export class SamplerWrapper {
 
         this.uuid = uuidv4();
 
-        this.hashHandler = new HashHandler(() => `${this.minFilter}|${this.magFilter}|${this.mipFilter}|${this.addressModeU}|${this.addressModeV}`);
+        this.hashProvider = new SamplerHashProvider({
+            getAddressModeV: this.getAddressModeV.bind(this),
+            getMipFilter: this.getMipFilter.bind(this),
+            getAddressModeU: this.getAddressModeU.bind(this),
+            getMagFilter: this.getMagFilter.bind(this),
+            getMinFilter: this.getMinFilter.bind(this),
+        })
     }
 
     getMinFilter(): Sampler["minFilter"] {
@@ -39,8 +42,8 @@ export class SamplerWrapper {
 
     setMinFilter(minFilter: Sampler["minFilter"]): void {
         this.minFilter = minFilter;
-        this.hashHandler.addVersion();
-        this.changeStamp.mark();
+        this.hashProvider.markHashHandler()
+        this.hashProvider.markChangeStamp()
     }
 
     getMagFilter(): Sampler["magFilter"] {
@@ -49,8 +52,8 @@ export class SamplerWrapper {
 
     setMagFilter(magFilter: Sampler["magFilter"]): void {
         this.magFilter = magFilter;
-        this.hashHandler.addVersion();
-        this.changeStamp.mark();
+        this.hashProvider.markHashHandler()
+        this.hashProvider.markChangeStamp()
     }
 
     getMipFilter(): Sampler["mipFilter"] {
@@ -59,8 +62,8 @@ export class SamplerWrapper {
 
     setMipFilter(mipFilter: Sampler["mipFilter"]): void {
         this.mipFilter = mipFilter;
-        this.hashHandler.addVersion();
-        this.changeStamp.mark();
+        this.hashProvider.markHashHandler()
+        this.hashProvider.markChangeStamp()
     }
 
     getAddressModeU(): Sampler["addressModeU"] {
@@ -69,8 +72,8 @@ export class SamplerWrapper {
 
     setAddressModeU(addressModeU: Sampler["addressModeU"]): void {
         this.addressModeU = addressModeU;
-        this.hashHandler.addVersion();
-        this.changeStamp.mark();
+        this.hashProvider.markHashHandler()
+        this.hashProvider.markChangeStamp()
     }
 
     getAddressModeV(): Sampler["addressModeV"] {
@@ -79,15 +82,8 @@ export class SamplerWrapper {
 
     setAddressModeV(addressModeV: Sampler["addressModeV"]): void {
         this.addressModeV = addressModeV;
-        this.hashHandler.addVersion();
-        this.changeStamp.mark();
+        this.hashProvider.markHashHandler()
+        this.hashProvider.markChangeStamp()
     }
 
-    getChangedAt(): number {
-        return this.changeStamp.get();
-    }
-
-    convertToHash(hasher: Hasher): string {
-        return this.hashHandler.convertToHash(hasher);
-    }
 }
