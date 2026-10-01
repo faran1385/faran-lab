@@ -1,7 +1,7 @@
 import type {PipelineWrapper} from "../wrappers/PipelineWrapper.ts";
 import type {MaterialWrapper} from "../wrappers/MaterialWrapper.ts";
 import type {GeometryWrapper} from "../wrappers/GeometryWrapper.ts";
-import type {Hasher} from "../hashing/Hasher.ts";
+import type {HashData} from "../hashing/HashData.ts";
 import type {ShaderModuleManager} from "../managers/ShaderModuleManager.ts";
 import type {PipelineLayoutManager} from "../managers/PipelineLayoutManager.ts";
 import type {GeometryAttributePlan} from "./utils.ts";
@@ -15,7 +15,7 @@ export interface PipelineProduceArgs {
     pipeline: PipelineWrapper;
     material: MaterialWrapper;
     geometry: GeometryWrapper;
-    hasher: Hasher;
+    hashes: HashData;
     frame: FrameTargetInfo;
     shaderModules: ShaderModuleManager;
     pipelineLayouts: PipelineLayoutManager;
@@ -23,7 +23,7 @@ export interface PipelineProduceArgs {
 
 export class PipelineProducer {
     static produce(
-        { pipeline, material, hasher, frame, shaderModules, pipelineLayouts }: PipelineProduceArgs,
+        { pipeline, material, hashes, frame, shaderModules, pipelineLayouts }: PipelineProduceArgs,
         getAttributePlan: () => GeometryAttributePlan,
     ): GPURenderPipelineDescriptor {
         const vs = pipeline.getVertexShaderWrapper();
@@ -39,14 +39,14 @@ export class PipelineProducer {
 
         return {
             label: pipeline.uuid,
-            layout: pipelineLayouts.getRaw(material.convertToBindgroupLayoutHash(hasher)),
+            layout: pipelineLayouts.getRaw(hashes.material.layout),
             vertex: {
-                module: shaderModules.getRaw(vs.convertToHash(hasher)),
+                module: shaderModules.getRaw(hashes.pipeline.vertexShader),
                 entryPoint: vs.getEntryPoint(),
                 buffers,
             },
             fragment: {
-                module: shaderModules.getRaw(fs.convertToHash(hasher)),
+                module: shaderModules.getRaw(hashes.pipeline.fragmentShader),
                 entryPoint: fs.getEntryPoint(),
                 targets: [{
                     format: frame.colorFormat,

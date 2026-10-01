@@ -1,53 +1,29 @@
-import type {Camera} from "../Camera/Camera.ts";
-import type {CentralManager} from "../managers/CentralManager.ts";
-import type {Hasher} from "../hashing/Hasher.ts";
-import type {CentralProducer} from "../producers/CentralProducer.ts";
-import {NodeWrapper} from "../wrappers/NodeWrapper.ts";
-import {PrimitiveWrapper} from "../wrappers/PrimitiveWrapper.ts";
-import type {RenderCache} from "./RenderCache.ts";
+import type {NodeWrapper} from "../wrappers/NodeWrapper.ts";
+import type {PrimitiveWrapper} from "../wrappers/PrimitiveWrapper.ts";
+import type {HashData} from "../hashing/HashData.ts";
 import {getEpoch} from "../hashing/epoch.ts";
+import type {RenderItem} from "./RenderItem.ts";
+import type {RenderContext} from "./RenderContext.ts";
+import {UpdateLayer} from "./UpdateLayer.ts";
+import {ShaderCodeLayer} from "./ShaderCodeLayer.ts";
+import {ResourceLayer} from "./ResourceLayer.ts";
+import {RenderItemAssembler} from "./RenderItemAssembler.ts";
 
-export interface FrameInfo {
-    colorFormat: GPUTextureFormat;
-    depthFormat: GPUTextureFormat;
-}
+export type {RenderItem, DrawInfo, VertexBufferBinding, BindGroupBinding} from "./RenderItem.ts";
+export type {RenderContext, FrameInfo} from "./RenderContext.ts";
 
-export interface RenderItemBuilderContext {
-    managers: CentralManager;
-    producer: CentralProducer;
-    hasher: Hasher;
-    frame: FrameInfo;
-    camera: Camera;
-    cache: RenderCache;
-}
-
-// RenderItem.ts
-export interface DrawInfo {
-    indexed: boolean;
-    count: number
-    indexBuffer?: GPUBuffer;
-    indexFormat?: GPUIndexFormat;
-}
-
-export interface VertexBufferBinding {
-    slot: number;
-    buffer: GPUBuffer;
-}
-
-export interface BindGroupBinding {
-    slot: number;
-    bindGroup: GPUBindGroup;
-}
-
-export interface RenderItem {
-    pipeline: GPURenderPipeline;
-    bindGroups: BindGroupBinding[];
-    vertexBuffers: VertexBufferBinding[];
-    draw: DrawInfo;
-}
-
+/**
+ * Orchestrates the render layers for one node. It owns no logic of its own besides deciding which primitives need
+ * rebuilding; each step is a layer with a single responsibility:
+ *
+ *   HashResolver       wrappers -> hashes            (hash layer, cached by change stamp)
+ *   UpdateLayer        hashes/flags -> what to redo  (shader inputs, factor uploads)
+ *   ShaderCodeLayer    run the assemblers
+ *   ResourceLayer      ensure GPU resources          (only for hashes that were computed)
+ *   RenderItemAssembler hashes -> RenderItem         (pure lookup)
+ */
 export class RenderItemBuilder {
-    static build(node: NodeWrapper, ctx: RenderItemBuilderContext): RenderItem[] {
+    static build(node: NodeWrapper, ctx: RenderContext): RenderItem[] {
         const mesh = node.getMesh();
         if (!mesh) return [];
 
@@ -92,7 +68,7 @@ export class RenderItemBuilder {
 
     // ---- node-level (once per node, shared by all its primitives) ----
 
-    private static ensureNodeResources(node: NodeWrapper, ctx: RenderItemBuilderContext): void {
+    private static ensureNodeResources(node: NodeWrapper, ctx: RenderContext): void {
         const {managers, producer} = ctx;
         managers.bufferManager.ensure(node.uuid, () => producer.produceBufferFromNodeMatrix(node));
         managers.bindgroupManager.ensure(node.uuid, () => producer.produceBindgroupFromNode({
@@ -104,172 +80,32 @@ export class RenderItemBuilder {
 
     // ---- primitive-level ----
 
-    private static buildPrimitive(node: NodeWrapper, p: PrimitiveWrapper, ctx: RenderItemBuilderContext): RenderItem {
-        RenderItemBuilder.ensureShaderRebuild(p, ctx);
-        RenderItemBuilder.ensureShaderCode(p, ctx);
-        RenderItemBuilder.ensureGeometryBuffers(p, ctx);
-        RenderItemBuilder.ensureMaterialResources(p, ctx);
-        RenderItemBuilder.ensurePipelineInputs(p, ctx);
-        RenderItemBuilder.ensurePipeline(p, ctx);
-
-        const {managers, hasher, camera} = ctx;
-
-        return {
-            pipeline: managers.pipelineManager.getRaw(p.getPipeline().convertToHash(hasher)),
-            bindGroups: [
-                {slot: 0, bindGroup: managers.bindgroupManager.getRaw(camera.uuid)},
-                {slot: 1, bindGroup: managers.bindgroupManager.getRaw(p.getMaterial().convertToBindgroupHash(hasher))},
-                {slot: 2, bindGroup: managers.bindgroupManager.getRaw(node.uuid)},
-            ],
-            vertexBuffers: RenderItemBuilder.buildVertexBuffers(p, ctx),
-            draw: RenderItemBuilder.resolveDrawInfo(p, ctx),
-        };
-    }
-
-    private static ensureShaderRebuild(p: PrimitiveWrapper, ctx: RenderItemBuilderContext): void {
-        const {hasher} = ctx;
-        if (p.getMaterial().needsShaderRebuild(hasher) || p.getGeometry().needsShaderRebuild(hasher)) {
-            p.getPipeline().markVertexShaderDirty();
-            p.getPipeline().markFragmentShaderDirty();
-            p.getMaterial().syncShaderRebuild();
-            p.getGeometry().syncAttributesHash();
-        }
-    }
-
-    private static ensureShaderCode(p: PrimitiveWrapper, ctx: RenderItemBuilderContext): void {
-        const {producer, managers, hasher} = ctx;
-        const vertexWrapper = p.getPipeline().getVertexShaderWrapper();
-        const fragmentWrapper = p.getPipeline().getFragmentShaderWrapper();
-
-        if (vertexWrapper.codeGenVersionFlag.needsUpdate()) {
-            const entryPoint = vertexWrapper.getEntryPoint();
-            const code = p.getVertexAssembler().assemble(producer.produceVertexShader({
-                geometry: p.getGeometry(),
-                material: p.getMaterial(),
-            }), entryPoint);
-            vertexWrapper.setShader(code, entryPoint);
-            vertexWrapper.codeGenVersionFlag.sync();
-        }
-
-        if (fragmentWrapper.codeGenVersionFlag.needsUpdate()) {
-            const entryPoint = fragmentWrapper.getEntryPoint();
-            const code = p.getFragmentAssembler().assemble(producer.produceFragmentShader({
-                geometry: p.getGeometry(),
-                vertexShader: vertexWrapper,
-                material: p.getMaterial()
-            }), entryPoint);
-            fragmentWrapper.setShader(code, entryPoint);
-            fragmentWrapper.codeGenVersionFlag.sync();
-        }
-
-        managers.shaderModuleManager.ensure(vertexWrapper.convertToHash(hasher), () => producer.produceShaderModule(vertexWrapper));
-        managers.shaderModuleManager.ensure(fragmentWrapper.convertToHash(hasher), () => producer.produceShaderModule(fragmentWrapper));
-    }
-
-    private static ensureGeometryBuffers(p: PrimitiveWrapper, ctx: RenderItemBuilderContext): void {
-        const {managers, producer, hasher} = ctx;
-
-        p.getGeometry().getAttributes().forEach(attribute => {
-            managers.bufferManager.ensure(attribute.convertToHash(hasher), () => producer.produceBuffer(attribute));
-        });
-
-        const indices = p.getGeometry().getIndices();
-        if (indices) {
-            managers.bufferManager.ensure(indices.convertToHash(hasher), () => producer.produceBuffer(indices));
-        }
-    }
-
-    private static ensureMaterialResources(p: PrimitiveWrapper, ctx: RenderItemBuilderContext): void {
-        const {managers, producer, hasher} = ctx;
+    private static buildPrimitive(node: NodeWrapper, p: PrimitiveWrapper, ctx: RenderContext): RenderItem {
         const material = p.getMaterial();
-
-        managers.bufferManager.ensure(material.convertToFactorsHash(hasher), () => producer.produceBufferFromMatFactors(material));
-
-        material.getAllComponents().forEach(component => {
-            if (component.getTexture()) {
-                const sampler = component.getTexture()!.wrapper.getSampler();
-                const image = component.getTexture()!.wrapper.getImage();
-                managers.samplerManager.ensure(sampler.convertToHash(hasher), () => producer.produceSampler(sampler));
-                managers.textureManager.ensure(image.convertToHash(hasher), () => producer.produceTexture(image));
-            }
-
-            if (component.needsFactorUpdate()) {
-                const plan = producer.getFactorPlan(material);
-                const item = plan.get(component.name)!;
-                managers.bufferManager.upload(
-                    material.convertToFactorsHash(hasher),
-                    new Float32Array([item.factor].flat()),
-                    item.offset
-                );
-                component.syncFactorUpdate();
-            }
-        });
-
-        managers.bindgroupLayoutManager.ensure(material.convertToBindgroupLayoutHash(hasher), () => producer.produceBindGroupLayout(material));
-        managers.bindgroupManager.ensure(material.convertToBindgroupHash(hasher), () => producer.produceBindGroup({
-            material, samplers: managers.samplerManager, hasher, buffers: managers.bufferManager,
-            layouts: managers.bindgroupLayoutManager, textures: managers.textureManager,
-        }));
-        managers.pipelineLayoutManager.ensure(material.convertToBindgroupLayoutHash(hasher), () => producer.producePipelineLayout({
-            material, hasher, layouts: managers.bindgroupLayoutManager
-        }));
-    }
-
-    private static ensurePipelineInputs(p: PrimitiveWrapper, ctx: RenderItemBuilderContext): void {
-        const {hasher} = ctx;
-        p.getPipeline().setInputs(
-            p.getPipeline().getVertexShaderWrapper().convertToHash(hasher),
-            p.getPipeline().getFragmentShaderWrapper().convertToHash(hasher),
-            p.getMaterial().convertToBindgroupLayoutHash(hasher),
-            p.getGeometry().convertToAttributesShapeHash(hasher),
-            p.getMaterial().convertToPipelineSettingsHash(hasher),
-            "front" 
-        );
-    }
-
-    private static ensurePipeline(p: PrimitiveWrapper, ctx: RenderItemBuilderContext): void {
-        const {managers, producer, hasher, frame} = ctx;
-        managers.pipelineManager.ensure(p.getPipeline().convertToHash(hasher), () => producer.producePipeline({
-            frame: {colorFormat: frame.colorFormat, depthFormat: frame.depthFormat},
-            hasher,
-            geometry: p.getGeometry(),
-            material: p.getMaterial(),
-            pipelineLayouts: managers.pipelineLayoutManager,
-            pipeline: p.getPipeline(),
-            shaderModules: managers.shaderModuleManager
-        }));
-    }
-
-    private static buildVertexBuffers(p: PrimitiveWrapper, ctx: RenderItemBuilderContext) {
-        const {producer, managers, hasher} = ctx;
-        const attrPlan = producer.getAttributePlan(p.getGeometry());
-        return attrPlan.slots.map((slot) => {
-            const attr = p.getGeometry().getAttributes().get(slot.name)!;
-            return {slot: slot.slot, buffer: managers.bufferManager.getRaw(attr.convertToHash(hasher))};
-        });
-    }
-
-    private static resolveDrawInfo(p: PrimitiveWrapper, ctx: RenderItemBuilderContext) {
-        const {producer, managers, hasher} = ctx;
         const geometry = p.getGeometry();
-        const indices = geometry.getIndices();
-        const attrPlan = producer.getAttributePlan(geometry);
-        const positionSlot = attrPlan.slots.find(s => s.name === "position")!;
+        const {hashes, producer} = ctx;
 
-        if (indices) {
-            const bytesPerIndex = indices.format === "uint32" ? 4 : 2;
-            return {
-                indexed: true,
-                count: indices.getData().byteLength / bytesPerIndex,
-                indexBuffer: managers.bufferManager.getRaw(indices.convertToHash(hasher)),
-                indexFormat: indices.format as GPUIndexFormat,
-            };
+        // hash layer: shared material / geometry hashes are computed by the first primitive that asks
+        const materialHashes = hashes.resolveMaterial(material, (m) => producer.getBindingPlan(m));
+        const geometryHashes = hashes.resolveGeometry(geometry);
+
+        // update layer, then shader code (this primitive's own code, from its own last-seen key)
+        UpdateLayer.syncShaderInputs(p, materialHashes.hashes, geometryHashes.hashes);
+        const generated = ShaderCodeLayer.generate(p, ctx);
+
+        // hash layer again: the pipeline hash needs the shader hashes
+        const pipelineHashes = hashes.resolvePipeline(p.getPipeline(), materialHashes.hashes, geometryHashes.hashes);
+        const data: HashData = {material: materialHashes.hashes, geometry: geometryHashes.hashes, pipeline: pipelineHashes.hashes};
+
+        // resource layer: only for what was actually computed
+        if (geometryHashes.computed) ResourceLayer.geometry(geometry, data.geometry, ctx);
+        if (materialHashes.computed) {
+            ResourceLayer.material(material, data.material, ctx);
+            UpdateLayer.uploadFactors(material, data.material, ctx);
         }
+        if (generated.vertex || generated.fragment) ResourceLayer.shaders(p, data.pipeline, generated, ctx);
+        if (pipelineHashes.computed) ResourceLayer.pipeline(p, data, ctx);
 
-        const position = geometry.getAttributes().get("position")!;
-        return {
-            indexed: false,
-            count: position.getData().byteLength / positionSlot.arrayStride,
-        };
+        return RenderItemAssembler.assemble(node, p, data, ctx);
     }
 }

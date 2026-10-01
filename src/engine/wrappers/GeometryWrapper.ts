@@ -75,12 +75,4 @@ export class GeometryWrapper {
     convertToAttributesShapeHash(hasher: Hasher): string {
         return this.hashHandler.convertToAttributesShapeHash(hasher);
     }
-
-    syncAttributesHash() {
-        return this.hashHandler.syncAttributesHash()
-    }
-
-    needsShaderRebuild(hasher: Hasher) {
-        return this.hashHandler.needsShaderRebuild(hasher)
-    }
 }

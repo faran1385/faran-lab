@@ -1,16 +1,16 @@
 import type {AttributeWrapper} from "../wrappers/AttributeWrapper.ts";
 import type {GeometryWrapper} from "../wrappers/GeometryWrapper.ts";
 import type {Hasher} from "./Hasher.ts";
-import {TriggerableAggregateHashHandler} from "./TriggerableAggregateHashHandler.ts";
+import {AggregateHashHandler} from "./AggregateHashHandler.ts";
 import {HashHandler} from "./HashHandler.ts";
 
 export class GeometryHashHandler {
-    private attributesHash: TriggerableAggregateHashHandler;
+    private attributesHash: AggregateHashHandler;
     private attributesShapeHash: HashHandler;
     private sortedAttributes: AttributeWrapper[] = [];
 
     constructor() {
-        this.attributesHash = new TriggerableAggregateHashHandler((hasher) =>
+        this.attributesHash = new AggregateHashHandler((hasher) =>
             this.sortedAttributes
                 .map((wrapper) => `${wrapper.name}:${wrapper.convertToHash(hasher)}`)
                 .join("|")
@@ -26,6 +26,9 @@ export class GeometryHashHandler {
     sortAttributes(attributes: GeometryWrapper["attributes"]): void {
         this.sortedAttributes = Array.from(attributes.values())
             .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+        // The shape hash is version-gated, and the set of attributes is exactly what it describes. Without this bump
+        // adding or removing an attribute left the cached shape hash (and so the pipeline's vertex layout) stale.
+        this.attributesShapeHash.addVersion();
     }
 
     convertToAttributesHash(hasher: Hasher): string {
@@ -34,13 +37,5 @@ export class GeometryHashHandler {
 
     convertToAttributesShapeHash(hasher: Hasher): string {
         return this.attributesShapeHash.convertToHash(hasher);
-    }
-
-    syncAttributesHash() {
-        return this.attributesHash.sync()
-    }
-
-    needsShaderRebuild(hasher: Hasher) {
-        return this.attributesHash.needsUpdate(hasher)
     }
 }

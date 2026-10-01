@@ -119,7 +119,7 @@ export class CentralProducer {
         this.materialFactorPlans.clear()
     }
 
-    private getBindingPlan(material: MaterialWrapper): MaterialBindingPlan {
+    getBindingPlan(material: MaterialWrapper): MaterialBindingPlan {
         let plan = this.materialBindingPlans.get(material.uuid);
         if (!plan) {
             plan = planMaterialBindings(material.getSortedComponents());

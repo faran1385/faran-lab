@@ -1,5 +1,6 @@
 import type {Scene} from "../Scene/Scene.ts";
 import {Hasher} from "../hashing/Hasher.ts";
+import {HashResolver} from "../hashing/HashResolver.ts";
 import {CentralProducer} from "../producers/CentralProducer.ts";
 import type {Camera} from "../Camera/Camera.ts";
 import {v4 as uuidv4} from "uuid";
@@ -24,6 +25,7 @@ export class Renderer {
     depthRenderTarget!: RenderTarget;
 
     private hasher!: Hasher;
+    private hashResolver!: HashResolver;
     private readonly producer = new CentralProducer();
     private readonly renderCache = new RenderCache();
 
@@ -47,6 +49,7 @@ export class Renderer {
         })
 
         this.hasher = await Hasher.create();
+        this.hashResolver = new HashResolver(this.hasher);
     }
 
     setSize(width: number, height: number): void {
@@ -111,7 +114,7 @@ export class Renderer {
             RenderItemBuilder.build(node, {
                 managers: this.managers,
                 producer: this.producer,
-                hasher: this.hasher,
+                hashes: this.hashResolver,
                 frame: {colorFormat: this.format, depthFormat: this.depthRenderTarget.format},
                 camera,
                 cache: this.renderCache,

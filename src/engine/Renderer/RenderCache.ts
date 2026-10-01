@@ -1,6 +1,6 @@
 import type {NodeWrapper} from "../wrappers/NodeWrapper.ts";
 import type {PrimitiveWrapper} from "../wrappers/PrimitiveWrapper.ts";
-import type {RenderItem} from "./RenderItemBuilder.ts";
+import type {RenderItem} from "./RenderItem.ts";
 
 /**
  * Render items last built for one node.

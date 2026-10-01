@@ -19,6 +19,10 @@ export class PipelineWrapper {
     private currentPipelineSettingsHash = "";
     private currentFacePass: "single" | "back" | "front" = "single";
 
+    private cachedHash = "";
+    /** What this primitive's shader code was last generated from (see UpdateLayer.syncShaderInputs). */
+    private shaderInputsKey = "";
+
     private hashHandler: AggregateHashHandler;
     private readonly changeStamp = new ChangeStamp();
 
@@ -46,13 +50,29 @@ export class PipelineWrapper {
         attributesHash: string,
         pipelineSettingsHash: string,
         facePass:FacePass
-    ): void {
+    ): boolean {
+        const changed = this.currentVertexHash !== vertexHash
+            || this.currentFragmentHash !== fragmentHash
+            || this.currentBindgroupLayoutHash !== bindgroupLayoutHash
+            || this.currentAttributesHash !== attributesHash
+            || this.currentPipelineSettingsHash !== pipelineSettingsHash
+            || this.currentFacePass !== facePass;
+
         this.currentVertexHash = vertexHash;
         this.currentFragmentHash = fragmentHash;
         this.currentBindgroupLayoutHash = bindgroupLayoutHash;
         this.currentAttributesHash = attributesHash;
         this.currentPipelineSettingsHash = pipelineSettingsHash;
         this.currentFacePass = facePass;
+        return changed;
+    }
+
+    getShaderInputsKey(): string {
+        return this.shaderInputsKey;
+    }
+
+    setShaderInputsKey(key: string): void {
+        this.shaderInputsKey = key;
     }
 
     markVertexShaderDirty(){
@@ -70,7 +90,13 @@ export class PipelineWrapper {
     }
 
     convertToHash(hasher: Hasher): string {
-        return this.hashHandler.convertToHash(hasher);
+        this.cachedHash = this.hashHandler.convertToHash(hasher);
+        return this.cachedHash;
+    }
+
+    /** The hash from the last convertToHash() call, without recomputing. */
+    getCachedHash(): string {
+        return this.cachedHash;
     }
 
     getVertexShaderWrapper(): ShaderModuleWrapper  {

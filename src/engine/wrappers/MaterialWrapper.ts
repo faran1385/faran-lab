@@ -5,8 +5,6 @@ import {HashHandler} from "../hashing/HashHandler.ts";
 import {AggregateHashHandler} from "../hashing/AggregateHashHandler.ts";
 import type {Hasher} from "../hashing/Hasher.ts";
 import {MaterialHashHandler} from "../hashing/MaterialHashHandler.ts";
-import {TriggerableAggregateHashHandler} from "../hashing/TriggerableAggregateHashHandler.ts";
-import {planMaterialBindings} from "../producers/utils.ts";
 import {ChangeStamp} from "../hashing/ChangeStamp.ts";
 import {getEpoch} from "../hashing/epoch.ts";
 
@@ -48,16 +46,10 @@ export class MaterialWrapper {
                 })
                 return `${this.uuid}${i}`
             }),
-            new TriggerableAggregateHashHandler((hasher) =>
+            new AggregateHashHandler((hasher) =>
                 `${this.alphaMode}|` + this.sortedComponents
                     .map((c) => `${c.name}:${c.convertToShaderKeyHash(hasher)}`)
                     .join("|")
-            ),
-            new AggregateHashHandler((hasher) =>
-                this.sortedComponents
-                    .map((c) => `${c.name}:${c.convertToShapeHash(hasher)}`)
-                    .join("|")
-                + "#" + planMaterialBindings(this.sortedComponents).signature
             ),
             new AggregateHashHandler((hasher) =>
                 `${this.hashHandler.factorsHash.convertToHash(hasher)}` + this.sortedComponents
@@ -149,8 +141,15 @@ export class MaterialWrapper {
         return this.hashHandler.shaderHash.convertToHash(hasher);
     }
 
-    convertToBindgroupLayoutHash(hasher: Hasher): string {
-        return this.hashHandler.bindgroupLayoutHash.convertToHash(hasher);
+    /**
+     * @param bindingSignature the signature of the material's binding plan. It is passed in (from the producer's
+     * per-frame plan cache) so hashing never plans bindings itself.
+     */
+    convertToBindgroupLayoutHash(hasher: Hasher, bindingSignature: string): string {
+        const shapes = this.sortedComponents
+            .map((c) => `${c.name}:${c.convertToShapeHash(hasher)}`)
+            .join("|");
+        return hasher.hashString(`${shapes}#${bindingSignature}`);
     }
 
     convertToBindgroupHash(hasher: Hasher): string {
@@ -161,11 +160,4 @@ export class MaterialWrapper {
         return this.hashHandler.factorsHash.convertToHash(hasher);
     }
 
-    needsShaderRebuild(hasher: Hasher) {
-        return this.hashHandler.shaderHash.needsUpdate(hasher)
-    }
-
-    syncShaderRebuild() {
-        this.hashHandler.shaderHash.sync()
-    }
 }
