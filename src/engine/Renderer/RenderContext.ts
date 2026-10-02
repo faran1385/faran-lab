@@ -1,4 +1,3 @@
-import type {Camera} from "../Camera/Camera.ts";
 import type {CentralManager} from "../managers/CentralManager.ts";
 import type {CentralProducer} from "../producers/CentralProducer.ts";
 import type {HashResolver} from "../hashing/utils/HashResolver.ts";
@@ -15,6 +14,6 @@ export interface RenderContext {
     producer: CentralProducer;
     hashes: HashResolver;
     frame: FrameInfo;
-    camera: Camera;
-    cache: RenderCache;
+    cache: RenderCache,
+    rendererUUID: string
 }

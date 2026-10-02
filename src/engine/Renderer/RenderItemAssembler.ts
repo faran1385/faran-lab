@@ -7,12 +7,12 @@ import type {RenderContext} from "./RenderContext.ts";
 /** The item layer: pure lookup. Reads resolved hashes and the managers' resources, creates and computes nothing. */
 export class RenderItemAssembler {
     static assemble(node: NodeWrapper, p: PrimitiveWrapper, data: HashData, ctx: RenderContext): RenderItem {
-        const {managers, camera} = ctx;
+        const {managers, rendererUUID} = ctx;
 
         return {
             pipeline: managers.pipelineManager.getRaw(data.pipeline.pipeline),
             bindGroups: [
-                {slot: 0, bindGroup: managers.bindgroupManager.getRaw(camera.uuid)},
+                {slot: 0, bindGroup: managers.bindgroupManager.getRaw(rendererUUID)},
                 {slot: 1, bindGroup: managers.bindgroupManager.getRaw(data.material.bindgroup)},
                 {slot: 2, bindGroup: managers.bindgroupManager.getRaw(node.uuid)},
             ],
@@ -25,6 +25,7 @@ export class RenderItemAssembler {
         const {producer, managers} = ctx;
         const attrPlan = producer.getAttributePlan(p.getGeometry());
 
+        // *memoryLeak*
         return attrPlan.slots.map((slot) => ({
             slot: slot.slot,
             buffer: managers.bufferManager.getRaw(geometry.attributeBuffers.get(slot.name)!),

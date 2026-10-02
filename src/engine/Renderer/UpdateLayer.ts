@@ -2,6 +2,7 @@ import type {PrimitiveWrapper} from "../wrappers/PrimitiveWrapper.ts";
 import type {MaterialWrapper} from "../wrappers/MaterialWrapper.ts";
 import type {GeometryHashes, MaterialHashes} from "../hashing/utils/HashData.ts";
 import type {RenderContext} from "./RenderContext.ts";
+import type {Camera} from "../Camera/Camera.ts";
 
 /**
  * The update layer: decides what has to be redone, from hashes and flags. It never computes a hash and never
@@ -29,6 +30,26 @@ export class UpdateLayer {
         return true;
     }
 
+
+    static updateCamera(camera: Camera, ctx: RenderContext) {
+
+        const {managers, cache, rendererUUID} = ctx
+
+        const isTheLastFrameCamera = camera.uuid === cache.lastCameraUUID;
+
+        if (camera.isUploadViewDirty() || !isTheLastFrameCamera) {
+            managers.bufferManager.upload(rendererUUID, camera.getViewMatrix().buffer, 0)
+            camera.syncUploadView()
+        }
+        if (camera.isUploadProjectionDirty() || !isTheLastFrameCamera) {
+            managers.bufferManager.upload(rendererUUID, camera.getProjectionMatrix().buffer, 64)
+            camera.syncUploadProjection()
+        }
+
+        if (!isTheLastFrameCamera) cache.lastCameraUUID = camera.uuid
+
+    }
+
     /**
      * Per material, run once right after its hashes were computed (its factor buffer exists by then): write changed
      * factor values into the uniform buffer. The flag is consumed by exactly one caller, the material itself.
@@ -36,10 +57,18 @@ export class UpdateLayer {
     static uploadFactors(material: MaterialWrapper, hashes: MaterialHashes, ctx: RenderContext): void {
         const {managers, producer} = ctx;
 
+        if (material.hashProvider.factorNeedsUpdate()) {
+            const item = producer.getFactorPlan(material).get("alphaCutOff")!;
+            // *memoryLeak*
+            managers.bufferManager.upload(hashes.factors, new Float32Array([item.factor].flat()), item.offset);
+            material.hashProvider.syncFactorUpdate();
+        }
+
         for (const component of material.getAllComponents()) {
             if (!component.hashProvider.needsFactorUpdate()) continue;
 
             const item = producer.getFactorPlan(material).get(component.name)!;
+            // *memoryLeak*
             managers.bufferManager.upload(hashes.factors, new Float32Array([item.factor].flat()), item.offset);
             component.hashProvider.syncFactorUpdate();
         }

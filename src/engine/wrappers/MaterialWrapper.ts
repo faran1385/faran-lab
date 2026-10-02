@@ -31,7 +31,7 @@ export class MaterialWrapper {
         this.hashProvider = new MaterialHashProvider(this.uuid, {
             getDoubleSided: this.getDoubleSided.bind(this),
             getAlphaMode: this.getAlphaMode.bind(this),
-            getSortedComponents: () => this.sortedComponents,
+            getSortedComponents: this.getSortedComponents.bind(this),
         })
     }
 
@@ -62,6 +62,7 @@ export class MaterialWrapper {
     }
 
     getAllComponents(): MaterialComponentWrapper[] {
+        // *memoryLeak*
         return Array.from(this.components.values());
     }
 
@@ -81,6 +82,8 @@ export class MaterialWrapper {
 
     setAlphaCutoff(alphaCutoff: number): void {
         this.alphaCutoff = alphaCutoff;
+        this.hashProvider.markFactorUpdate()
+        this.hashProvider.markChangeStamp()
     }
 
     getDoubleSided(): Material["doubleSided"] {

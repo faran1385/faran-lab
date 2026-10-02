@@ -52,10 +52,6 @@ mesh1.setPrimitive(p1)
 node1.setMesh(mesh1)
 scene.addNode(node1)
 
-window.addEventListener("click", () => {
-    mat1.getComponent("baseColor")?.setFactors([0, 0, 1])
-})
-
 
 function frame(): void {
 

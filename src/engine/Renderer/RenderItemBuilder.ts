@@ -27,21 +27,23 @@ export class RenderItemBuilder {
         const mesh = node.getMesh();
         if (!mesh) return [];
 
-        RenderItemBuilder.ensureNodeResources(node, ctx);
 
-        const {cache, camera} = ctx;
+        const {cache} = ctx;
         const entry = cache.get(node);
 
         // Quiet frame: no setter anywhere has run since the last frame, so nothing can have changed. No hashing,
         // no ensure(), no allocation: hand back the items built before.
-        if (entry && entry.cameraUuid === camera.uuid && cache.lastFrameEpoch === getEpoch()) {
+        if (entry && cache.lastFrameEpoch === getEpoch()) {
             return entry.items;
         }
 
+        // *memoryLeak*
         const primitives = mesh.getAllPrimitives();
 
-        // First time we see this node, another camera, or its mesh / primitive list changed: build everything.
-        if (!entry || entry.cameraUuid !== camera.uuid || node.getStructureChangedAt() > entry.structureBuiltAt) {
+        // First time we see this node, its mesh / primitive list changed: build everything.
+        if (!entry || node.getStructureChangedAt() > entry.structureBuiltAt) {
+            ResourceLayer.node(node, ctx)
+            // *memoryLeak*
             const items = primitives.map((p) => RenderItemBuilder.buildPrimitive(node, p, ctx));
             const builtAt = getEpoch(); // after building: building itself may stamp (shader rebuild marks)
             cache.set(node, {
@@ -49,7 +51,6 @@ export class RenderItemBuilder {
                 primitives,
                 builtAt: primitives.map(() => builtAt),
                 structureBuiltAt: builtAt,
-                cameraUuid: camera.uuid,
             });
             return items;
         }
@@ -64,18 +65,6 @@ export class RenderItemBuilder {
             }
         }
         return entry.items;
-    }
-
-    // ---- node-level (once per node, shared by all its primitives) ----
-
-    private static ensureNodeResources(node: NodeWrapper, ctx: RenderContext): void {
-        const {managers, producer} = ctx;
-        managers.bufferManager.ensure(node.uuid, () => producer.produceBufferFromNodeMatrix(node));
-        managers.bindgroupManager.ensure(node.uuid, () => producer.produceBindgroupFromNode({
-            layouts: managers.bindgroupLayoutManager,
-            buffers: managers.bufferManager,
-            node
-        }));
     }
 
     // ---- primitive-level ----
@@ -95,7 +84,11 @@ export class RenderItemBuilder {
 
         // hash layer again: the pipeline hash needs the shader hashes
         const pipelineHashes = hashes.resolvePipeline(p.getPipeline(), materialHashes.hashes, geometryHashes.hashes);
-        const data: HashData = {material: materialHashes.hashes, geometry: geometryHashes.hashes, pipeline: pipelineHashes.hashes};
+        const data: HashData = {
+            material: materialHashes.hashes,
+            geometry: geometryHashes.hashes,
+            pipeline: pipelineHashes.hashes
+        };
 
         // resource layer: only for what was actually computed
         if (geometryHashes.computed) ResourceLayer.geometry(geometry, data.geometry, ctx);

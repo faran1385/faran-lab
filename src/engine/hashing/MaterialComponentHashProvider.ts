@@ -15,7 +15,7 @@ export class MaterialComponentHashProvider {
     private shapeHash: HashHandler;
     private shaderKeyHash: HashHandler;
     private resourceHash: AggregateHashHandler;
-    private factorVersionFlag = new VersionFlag();
+    private factorNeedUpdateFlag = new VersionFlag();
 
     constructor(T: InputFunctions) {
         this.wrapperGetFunctions = T;
@@ -42,7 +42,7 @@ export class MaterialComponentHashProvider {
     }
 
     markFactorUpdate(){
-        this.factorVersionFlag.addVersion()
+        this.factorNeedUpdateFlag.addVersion()
     }
 
     convertToShapeHash(hasher: Hasher): string {
@@ -58,11 +58,11 @@ export class MaterialComponentHashProvider {
     }
 
     needsFactorUpdate() {
-        return this.factorVersionFlag.needsUpdate()
+        return this.factorNeedUpdateFlag.needsUpdate()
     }
 
     syncFactorUpdate() {
-        this.factorVersionFlag.sync()
+        this.factorNeedUpdateFlag.sync()
     }
 
     markChangeStamp() {

@@ -10,7 +10,7 @@ import {ChangeStamp} from "../hashing/utils/ChangeStamp.ts";
 export class NodeWrapper {
     readonly uuid: string;
     private name?: string;
-    mesh?: MeshWrapper;
+    private mesh?: MeshWrapper;
     private children = new Map<string, NodeWrapper>();
     private parent?: NodeWrapper;
 
@@ -138,7 +138,7 @@ export class NodeWrapper {
         mat4.mul(this.worldMatrix, parentMatrix, this.localMatrix);
 
         this.transformFlag.sync();
-        uploadToGPUBuffer(this.uuid, this.worldMatrix, 0);
+        if (this.mesh && this.mesh.getAllPrimitives().length > 0) uploadToGPUBuffer(this.uuid, this.worldMatrix, 0);
 
         this.children.forEach((child: NodeWrapper) => {
             child.buildWorldMatrix(this.worldMatrix, uploadToGPUBuffer);

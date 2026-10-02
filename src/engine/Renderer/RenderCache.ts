@@ -15,7 +15,6 @@ export interface NodeRenderEntry {
     builtAt: number[];
     /** Epoch at which the list of primitives itself was last read (mesh swap / primitive added). */
     structureBuiltAt: number;
-    cameraUuid: string;
 }
 
 /**
@@ -31,6 +30,7 @@ export class RenderCache {
      * a render item has changed anywhere, and every cached item can be reused without looking at any wrapper.
      */
     lastFrameEpoch = -1;
+    lastCameraUUID = ""
 
     get(node: NodeWrapper): NodeRenderEntry | undefined {
         return this.entries.get(node);

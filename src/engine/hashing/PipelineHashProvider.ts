@@ -21,6 +21,7 @@ export class PipelineHashProvider {
 
     constructor() {
 
+        // *memoryLeak*
         this.hashHandler = new AggregateHashHandler(() =>
             [
                 this.currentVertexHash,

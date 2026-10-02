@@ -18,7 +18,7 @@ export abstract class ResourceManager<TDescriptor, TTracker extends Tracker<unkn
         return this.get(hash).raw;
     }
 
-    getCacheLength(){
+    getCacheLength() {
         return this.cache.size;
     }
 

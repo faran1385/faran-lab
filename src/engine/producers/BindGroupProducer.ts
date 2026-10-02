@@ -6,7 +6,6 @@ import type {BufferManager} from "../managers/BufferManager.ts";
 import type {TextureManager} from "../managers/TextureManager.ts";
 import type {SamplerManager} from "../managers/SamplerManager.ts";
 import type {NodeWrapper} from "../wrappers/NodeWrapper.ts";
-import type {Camera} from "../Camera/Camera.ts";
 
 export interface BindGroupProduceArgs {
     material: MaterialWrapper;
@@ -32,6 +31,7 @@ export class BindGroupProducer {
             {binding: FACTORS_BINDING, resource: {buffer: buffers.getRaw(hashes.factors)},},
         ];
 
+        // *memoryLeak*
         const written = new Set<number>();
 
         for (const c of sorted) {
@@ -83,18 +83,18 @@ export class NodeBindGroupProducer {
 export interface SceneBindgroupProduceArgs {
     layouts: BindGroupLayoutManager,
     buffers: BufferManager,
-    camera: Camera
+    rendererUUID: string
 }
 
 export class SceneBindGroupProducer {
     static produce(
-        {layouts, buffers, camera}: SceneBindgroupProduceArgs,
+        {layouts, buffers, rendererUUID}: SceneBindgroupProduceArgs,
     ): GPUBindGroupDescriptor {
         const layout = layouts.getRaw(GLOBAL_LAYOUT_KEY);
 
 
         const entries: GPUBindGroupEntry[] = [
-            {binding: 0, resource: {buffer: buffers.getRaw(camera.uuid)},},
+            {binding: 0, resource: {buffer: buffers.getRaw(rendererUUID)},},
         ];
 
         return {label: "", layout, entries};

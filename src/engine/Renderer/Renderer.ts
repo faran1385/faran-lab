@@ -9,6 +9,7 @@ import {RenderTarget} from "./RenderTarget.ts";
 import {RenderItemBuilder} from "./RenderItemBuilder.ts";
 import {RenderCache} from "./RenderCache.ts";
 import {getEpoch} from "../hashing/utils/epoch.ts";
+import {UpdateLayer} from "./UpdateLayer.ts";
 
 
 export class Renderer {
@@ -48,6 +49,21 @@ export class Renderer {
             format: "depth32float",
         })
 
+        // renderer camera
+        this.managers.bufferManager.ensure(this.uuid, () => ({
+            size: 128,
+            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+            label: `${this.uuid} renderer camera buffer`,
+            data: new Float32Array(32).buffer
+        }))
+
+        // scene bindgroup initialization since the only binding is camera witch is static
+        this.managers.bindgroupManager.ensure(this.uuid, () => this.producer.produceSceneBindgroup({
+            layouts: this.managers.bindgroupLayoutManager,
+            rendererUUID: this.uuid,
+            buffers: this.managers.bufferManager
+        }))
+
         this.hasher = await Hasher.create();
         this.hashResolver = new HashResolver(this.hasher);
     }
@@ -58,6 +74,7 @@ export class Renderer {
         this.colorRenderTarget?.setSize(width, height);
         this.depthRenderTarget.setSize(width, height);
     }
+
 
     render(scene: Scene, camera: Camera): void {
 
@@ -82,41 +99,22 @@ export class Renderer {
         });
 
         // global
-        this.managers.bufferManager.ensure(camera.uuid, () => this.producer.produceCameraBuffer(camera))
-        if (camera.isUploadViewDirty()) {
-            this.managers.bufferManager.upload(camera.uuid, camera.getViewMatrix().buffer, 0)
-            camera.syncUploadView()
-        }
-        if (camera.isUploadProjectionDirty()) {
-            this.managers.bufferManager.upload(camera.uuid, camera.getProjectionMatrix().buffer, 64)
-            camera.syncUploadProjection()
-        }
-        // hash should change as we add items
-        this.managers.bindgroupManager.ensure(camera.uuid, () => this.producer.produceSceneBindgroup({
-            layouts: this.managers.bindgroupLayoutManager,
-            camera,
-            buffers: this.managers.bufferManager
-        }))
-
-
-        scene.traverse((node) => {
-            this.managers.bufferManager.ensure(node.uuid, () => this.producer.produceBufferFromNodeMatrix(node));
-            this.managers.bindgroupManager.ensure(node.uuid, () => this.producer.produceBindgroupFromNode({
-                layouts: this.managers.bindgroupLayoutManager,
-                buffers: this.managers.bufferManager,
-                node
-            }));
+        UpdateLayer.updateCamera(camera, {
+            rendererUUID: this.uuid,
+            managers: this.managers,
+            producer: this.producer,
+            hashes: this.hashResolver,
+            frame: {colorFormat: this.format, depthFormat: this.depthRenderTarget.format},
+            cache: this.renderCache,
         })
-
-        scene.updateWorldMatrices(this.managers.bufferManager.upload.bind(this.managers.bufferManager));
 
         scene.traverse((node) => {
             RenderItemBuilder.build(node, {
                 managers: this.managers,
+                rendererUUID: this.uuid,
                 producer: this.producer,
                 hashes: this.hashResolver,
                 frame: {colorFormat: this.format, depthFormat: this.depthRenderTarget.format},
-                camera,
                 cache: this.renderCache,
             }).forEach((item) => {
                 pass.setPipeline(item.pipeline);
@@ -131,6 +129,9 @@ export class Renderer {
                 }
             });
         });
+
+        // *memoryLeak*
+        scene.updateWorldMatrices(this.managers.bufferManager.upload.bind(this.managers.bufferManager));
 
         // Recorded after the traverse: building items may itself stamp wrappers (shader rebuild marks).
         this.renderCache.lastFrameEpoch = getEpoch();

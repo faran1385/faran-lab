@@ -5,6 +5,7 @@ import {MaterialComponentWrapper} from "../wrappers/MaterialComponentWrapper.ts"
 import type {Material} from "../importers/utils/IR.ts";
 import {getEpoch} from "./utils/epoch.ts";
 import type {Hasher} from "./utils/Hasher.ts";
+import {VersionFlag} from "./utils/VersionFlag.ts";
 
 type InputFunctions = {
     getSortedComponents: () => MaterialComponentWrapper[],
@@ -17,6 +18,7 @@ export class MaterialHashProvider {
     private shaderHash: AggregateHashHandler;
     private bindgroupHash: AggregateHashHandler;
     private factorsHash: AggregateHashHandler;
+    private factorNeedUpdateFlag = new VersionFlag()
     private readonly changeStamp = new ChangeStamp();
     private memoEpoch = -1;
     private memoChangedAt = 0;
@@ -29,19 +31,21 @@ export class MaterialHashProvider {
         this.wrapperFunctions = {
             getSortedComponents: T.getSortedComponents
         }
-        this.pipelineSettingsHash = new HashHandler(() => `${T.getAlphaMode()}|${T.getDoubleSided()}`),
-            this.factorsHash = new AggregateHashHandler(() => {
-                let i = 1;
-                T.getSortedComponents().forEach((c) => {
-                    i += c.getFactors().length;
-                })
-                return `${uuid}${i}`
+        this.pipelineSettingsHash = new HashHandler(() => `${T.getAlphaMode()}|${T.getDoubleSided()}`)
+        this.factorsHash = new AggregateHashHandler(() => {
+            let i = 1;
+            T.getSortedComponents().forEach((c) => {
+                i += c.getFactors().length;
             })
+            return `${uuid}${i}`
+        })
+        // *memoryLeak*
         this.shaderHash = new AggregateHashHandler((hasher) =>
             `${T.getAlphaMode()}|` + T.getSortedComponents()
                 .map((c) => `${c.name}:${c.hashProvider.convertToShaderKeyHash(hasher)}`)
                 .join("|")
         )
+        // *memoryLeak*
         this.bindgroupHash = new AggregateHashHandler((hasher) =>
             `${this.factorsHash.convertToHash(hasher)}` + T.getSortedComponents()
                 .map((c) => `${c.name}:${c.hashProvider.convertToResourceHash(hasher)}`)
@@ -75,7 +79,8 @@ export class MaterialHashProvider {
     }
 
     convertToBindgroupLayoutHash(hasher: Hasher, bindingSignature: string): string {
-        const shapes =this.wrapperFunctions.getSortedComponents().map((c) => `${c.name}:${c.hashProvider.convertToShapeHash(hasher)}`)
+        // *memoryLeak*
+        const shapes = this.wrapperFunctions.getSortedComponents().map((c) => `${c.name}:${c.hashProvider.convertToShapeHash(hasher)}`)
             .join("|");
         return hasher.hashString(`${shapes}#${bindingSignature}`);
     }
@@ -94,6 +99,18 @@ export class MaterialHashProvider {
 
     markPipelineSettingsHash() {
         this.pipelineSettingsHash.addVersion()
+    }
+
+    syncFactorUpdate() {
+        this.factorNeedUpdateFlag.sync();
+    }
+
+    markFactorUpdate() {
+        this.factorNeedUpdateFlag.addVersion()
+    }
+
+    factorNeedsUpdate() {
+        return this.factorNeedUpdateFlag.needsUpdate()
     }
 
 }

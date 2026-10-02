@@ -4,6 +4,7 @@ import type {GeometryWrapper} from "../wrappers/GeometryWrapper.ts";
 import type {HashData, GeometryHashes, MaterialHashes, PipelineHashes} from "../hashing/utils/HashData.ts";
 import type {GeneratedStages} from "./ShaderCodeLayer.ts";
 import type {RenderContext} from "./RenderContext.ts";
+import type {NodeWrapper} from "../wrappers/NodeWrapper.ts";
 
 /**
  * The resource layer: ensures GPU resources exist. Every method here is called only for hashes that were actually
@@ -13,6 +14,7 @@ export class ResourceLayer {
     static geometry(geometry: GeometryWrapper, hashes: GeometryHashes, ctx: RenderContext): void {
         const {managers, producer} = ctx;
 
+        // *memoryLeak*
         for (const attribute of geometry.getAttributes().values()) {
             managers.bufferManager.ensure(hashes.attributeBuffers.get(attribute.name)!, () => producer.produceBuffer(attribute));
         }
@@ -20,6 +22,20 @@ export class ResourceLayer {
         const indices = geometry.getIndices();
         if (indices) {
             managers.bufferManager.ensure(hashes.indices!, () => producer.produceBuffer(indices));
+        }
+    }
+
+    static node(node: NodeWrapper, ctx: RenderContext) {
+        const nodeMesh = node.getMesh();
+        if (nodeMesh && nodeMesh.getAllPrimitives().length > 0) {
+            ctx.managers.bufferManager.ensure(node.uuid, () => ctx.producer.produceBufferFromNodeMatrix(node));
+            ctx.managers.bindgroupManager.ensure(node.uuid, () => ctx.producer.produceBindgroupFromNode({
+                layouts: ctx.managers.bindgroupLayoutManager,
+                buffers: ctx.managers.bufferManager,
+                node
+            }));
+        } else {
+            /// should delete the node buffer and nodeBindgroup
         }
     }
 
@@ -39,8 +55,12 @@ export class ResourceLayer {
 
         managers.bindgroupLayoutManager.ensure(hashes.layout, () => producer.produceBindGroupLayout(material));
         managers.bindgroupManager.ensure(hashes.bindgroup, () => producer.produceBindGroup({
-            material, hashes, buffers: managers.bufferManager,
-            layouts: managers.bindgroupLayoutManager, textures: managers.textureManager, samplers: managers.samplerManager,
+            material,
+            hashes,
+            buffers: managers.bufferManager,
+            layouts: managers.bindgroupLayoutManager,
+            textures: managers.textureManager,
+            samplers: managers.samplerManager,
         }));
         managers.pipelineLayoutManager.ensure(hashes.layout, () => producer.producePipelineLayout({
             material, hashes, layouts: managers.bindgroupLayoutManager
