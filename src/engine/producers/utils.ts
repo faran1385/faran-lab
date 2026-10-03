@@ -297,7 +297,7 @@ export function planMaterialFactors(material: MaterialWrapper): MaterialFactorsP
         cursor += size;
     };
 
-    for (const component of material.getAllComponents()) {
+    for (const component of material.getSortedComponents()) {
         push(component.name, component.getFactors());
     }
 

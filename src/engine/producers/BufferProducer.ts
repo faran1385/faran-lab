@@ -23,7 +23,6 @@ export class BufferProducer {
 
 export class MaterialFactorBufferProducer {
     static produce(factorPlan: MaterialFactorsPlan) {
-        // *memoryLeak*
         return new BufferWrapper(new Float32Array(Array.from(factorPlan).map(([_, item]) => item.factor).flat()).buffer, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST)
     }
 }

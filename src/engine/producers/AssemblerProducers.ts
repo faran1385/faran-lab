@@ -227,7 +227,6 @@ export class FragmentShaderProducer {
         const bindingPlan = getBindingPlan();
         const factorPlan = getFactorsPlan();
 
-        // *memoryLeak*
         return {
             bindings: [...sceneBindings(), ...materialBindings(bindingPlan, factorPlan)],
             componentDataMap: fragmentComponentDataMap(bindingPlan, factorPlan),

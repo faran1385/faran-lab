@@ -16,12 +16,12 @@ import {SamplerWrapper} from "./engine/wrappers/SamplerWrapper.ts";
 
 const canvas = document.getElementById("gpu-canvas") as HTMLCanvasElement;
 let stats = new Stats.default();
-stats.showPanel(1);
+stats.showPanel(2);
 document.body.appendChild(stats.dom);
 
-const loader = new GLBLoader();
-
-const {root} = await loader.load("/test.glb");
+// const loader = new GLBLoader();
+//
+// const {root} = await loader.load("/test.glb");
 
 const camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.setPosition(0, 0, 3)

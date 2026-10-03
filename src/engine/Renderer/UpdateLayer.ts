@@ -10,6 +10,9 @@ import type {GeometryWrapper} from "../wrappers/GeometryWrapper.ts";
  * creates a GPU resource.
  */
 export class UpdateLayer {
+
+    private static preAllocatedArray = new Float32Array(4);
+
     /**
      * Per primitive: must its shaders be regenerated?
      *
@@ -60,16 +63,23 @@ export class UpdateLayer {
 
         if (material.hashProvider.factorNeedsUpdate()) {
             const item = producer.getFactorPlan(material).get("alphaCutOff")!;
-            // *memoryLeak*
-            managers.bufferManager.upload(hashes.factors, new Float32Array([item.factor].flat()), item.offset);
+            this.preAllocatedArray.set([item.factor as number], 0);
+            managers.bufferManager.upload(hashes.factors, this.preAllocatedArray.subarray(0, 1), item.offset);
             material.hashProvider.syncFactorUpdate();
         }
 
-        for (const component of material.getAllComponents()) {
+        for (const component of material.getSortedComponents()) {
             if (!component.hashProvider.needsFactorUpdate()) continue;
             const item = producer.getFactorPlan(material).get(component.name)!;
-            // *memoryLeak*
-            managers.bufferManager.upload(hashes.factors, new Float32Array([item.factor].flat()), item.offset);
+            const length = typeof item.factor === "number" ? 1 : item.factor.length;
+
+            if (length > 1) {
+                this.preAllocatedArray.set(item.factor as number[], 0);
+            } else {
+                this.preAllocatedArray[0] = item.factor as number;
+            }
+
+            managers.bufferManager.upload(hashes.factors, this.preAllocatedArray.subarray(0, length), item.offset);
             component.hashProvider.syncFactorUpdate();
         }
     }
@@ -78,7 +88,7 @@ export class UpdateLayer {
     static uploadTextures(material: MaterialWrapper, ctx: RenderContext): void {
         const {managers, producer, hashes} = ctx;
 
-        for (const component of material.getAllComponents()) {
+        for (const component of material.getSortedComponents()) {
             const texture = component.getTexture()?.wrapper;
             if (!texture || !texture.getImage().hashProvider.needsUpdate()) continue;
             const image = texture.getImage();

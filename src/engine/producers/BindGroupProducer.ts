@@ -31,7 +31,6 @@ export class BindGroupProducer {
             {binding: FACTORS_BINDING, resource: {buffer: buffers.getRaw(hashes.factors)},},
         ];
 
-        // *memoryLeak*
         const written = new Set<number>();
 
         for (const c of sorted) {

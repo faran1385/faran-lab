@@ -25,7 +25,6 @@ export class RenderItemAssembler {
         const {producer, managers} = ctx;
         const attrPlan = producer.getAttributePlan(p.getGeometry());
 
-        // *memoryLeak*
         return attrPlan.slots.map((slot) => ({
             slot: slot.slot,
             buffer: managers.bufferManager.getRaw(geometry.attributeBuffers.get(slot.name)!),
@@ -49,7 +48,7 @@ export class RenderItemAssembler {
             };
         }
 
-        const position = geometry.getAttributes().get("position")!;
+        const position = geometry.getAttribute("position")!;
         return {
             indexed: false,
             count: position.getData().byteLength / positionSlot.arrayStride,

@@ -10,6 +10,7 @@ import {RenderItemBuilder} from "./RenderItemBuilder.ts";
 import {RenderCache} from "./RenderCache.ts";
 import {getEpoch} from "../hashing/utils/epoch.ts";
 import {UpdateLayer} from "./UpdateLayer.ts";
+import type {BufferManager} from "../managers/BufferManager.ts";
 
 
 export class Renderer {
@@ -29,6 +30,7 @@ export class Renderer {
     private hashResolver!: HashResolver;
     private readonly producer = new CentralProducer();
     private readonly renderCache = new RenderCache();
+    private _bufferUploadFunction!: BufferManager["upload"]
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -56,6 +58,8 @@ export class Renderer {
             label: `${this.uuid} renderer camera buffer`,
             data: new Float32Array(32).buffer
         }))
+
+        this._bufferUploadFunction = this.managers.bufferManager.upload.bind(this.managers.bufferManager)
 
         // scene bindgroup initialization since the only binding is camera witch is static
         this.managers.bindgroupManager.ensure(this.uuid, () => this.producer.produceSceneBindgroup({
@@ -98,28 +102,27 @@ export class Renderer {
             }
         });
 
-        // global
-        UpdateLayer.updateCamera(camera, {
+        const ctx = {
             rendererUUID: this.uuid,
             managers: this.managers,
             producer: this.producer,
             hashes: this.hashResolver,
             frame: {colorFormat: this.format, depthFormat: this.depthRenderTarget.format},
             cache: this.renderCache,
-        })
+        }
+
+        // global
+        UpdateLayer.updateCamera(camera, ctx)
 
         scene.traverse((node) => {
-            RenderItemBuilder.build(node, {
-                managers: this.managers,
-                rendererUUID: this.uuid,
-                producer: this.producer,
-                hashes: this.hashResolver,
-                frame: {colorFormat: this.format, depthFormat: this.depthRenderTarget.format},
-                cache: this.renderCache,
-            }).forEach((item) => {
+            for (const item of RenderItemBuilder.build(node, ctx)) {
                 pass.setPipeline(item.pipeline);
-                item.bindGroups.forEach(bg => pass.setBindGroup(bg.slot, bg.bindGroup));
-                item.vertexBuffers.forEach(vb => pass.setVertexBuffer(vb.slot, vb.buffer));
+                for (const bg of item.bindGroups) {
+                    pass.setBindGroup(bg.slot, bg.bindGroup)
+                }
+                for (const vb of item.vertexBuffers) {
+                    pass.setVertexBuffer(vb.slot, vb.buffer)
+                }
 
                 if (item.draw.indexed) {
                     pass.setIndexBuffer(item.draw.indexBuffer!, item.draw.indexFormat!);
@@ -127,11 +130,10 @@ export class Renderer {
                 } else {
                     pass.draw(item.draw.count);
                 }
-            });
+            }
         });
 
-        // *memoryLeak*
-        scene.updateWorldMatrices(this.managers.bufferManager.upload.bind(this.managers.bufferManager));
+        scene.updateWorldMatrices(this._bufferUploadFunction);
 
         // Recorded after the traverse: building items may itself stamp wrappers (shader rebuild marks).
         this.renderCache.lastFrameEpoch = getEpoch();

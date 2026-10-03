@@ -14,7 +14,6 @@ export class ResourceLayer {
     static geometry(geometry: GeometryWrapper, hashes: GeometryHashes, ctx: RenderContext): void {
         const {managers, producer} = ctx;
 
-        // *memoryLeak*
         for (const attribute of geometry.getAttributes().values()) {
             managers.bufferManager.ensure(hashes.attributeBuffers.get(attribute.name)!, () => producer.produceBuffer(attribute));
         }
@@ -27,7 +26,7 @@ export class ResourceLayer {
 
     static node(node: NodeWrapper, ctx: RenderContext) {
         const nodeMesh = node.getMesh();
-        if (nodeMesh && nodeMesh.getAllPrimitives().length > 0) {
+        if (nodeMesh && nodeMesh.getPrimitivesCount() > 0) {
             ctx.managers.bufferManager.ensure(node.uuid, () => ctx.producer.produceBufferFromNodeMatrix(node));
             ctx.managers.bindgroupManager.ensure(node.uuid, () => ctx.producer.produceBindgroupFromNode({
                 layouts: ctx.managers.bindgroupLayoutManager,
@@ -44,7 +43,7 @@ export class ResourceLayer {
 
         managers.bufferManager.ensure(hashes.factors, () => producer.produceBufferFromMatFactors(material));
 
-        for (const component of material.getAllComponents()) {
+        for (const component of material.getSortedComponents()) {
             const slot = component.getTexture();
             if (!slot) continue;
 

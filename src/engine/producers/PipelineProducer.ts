@@ -31,7 +31,6 @@ export class PipelineProducer {
         const plan = getAttributePlan();
         const isBlend = material.getAlphaMode() === "blend";
 
-        // *memoryLeak*
         const buffers: GPUVertexBufferLayout[] = plan.slots.map((s) => ({
             arrayStride: s.arrayStride,
             stepMode: "vertex",

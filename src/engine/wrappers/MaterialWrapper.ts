@@ -61,11 +61,6 @@ export class MaterialWrapper {
         this.hashProvider.markChangeStamp()
     }
 
-    getAllComponents(): MaterialComponentWrapper[] {
-        // *memoryLeak*
-        return Array.from(this.components.values());
-    }
-
     getAlphaMode(): Material["alphaMode"] {
         return this.alphaMode;
     }

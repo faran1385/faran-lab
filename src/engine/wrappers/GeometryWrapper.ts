@@ -49,4 +49,8 @@ export class GeometryWrapper {
         return this.attributes;
     }
 
+    getAttribute(name: string) {
+        return this.attributes.get(name)
+    }
+
 }

@@ -1,16 +1,13 @@
 import {NodeWrapper} from "../wrappers/NodeWrapper.ts";
-import {mat4} from "../../packages/math/matrix/mat4.ts";
 import {v4 as uuidv4} from "uuid";
 
 export class Scene {
     private readonly worldRoot = new NodeWrapper();
     readonly uuid: string;
 
-
     constructor() {
         this.uuid = uuidv4();
     }
-
 
     addNode(node: NodeWrapper): void {
         this.worldRoot.addChild(node);
@@ -37,19 +34,19 @@ export class Scene {
         }
     }
 
+    private walkWorldMatrices(node: NodeWrapper, parentMatrix: Float32Array | null, uploadToGPUBuffer: (hash: string, data: GPUAllowSharedBufferSource, offset: number) => void) {
+        if (node.hashProvider.transformNeedsUpdate()) {
+            node.buildWorldMatrix(parentMatrix, uploadToGPUBuffer);
+            return; // invariant: descendants are already dirty, buildWorldMatrix handles them
+        }
+        for (const child of node.getChildren()) {
+            this.walkWorldMatrices(child, node.getWorldMatrix(), uploadToGPUBuffer);
+        }
+    };
 
     updateWorldMatrices(uploadToGPUBuffer: (hash: string, data: GPUAllowSharedBufferSource, offset: number) => void): void {
-        const walk = (node: NodeWrapper, parentMatrix: Float32Array) => {
-            if (node.isTransformDirty()) {
-                node.buildWorldMatrix(parentMatrix, uploadToGPUBuffer);
-                return; // invariant: descendants are already dirty, buildWorldMatrix handles them
-            }
-            for (const child of node.getChildren()) {
-                walk(child, node.getWorldMatrix());
-            }
-        };
         for (const root of this.worldRoot.getChildren()) {
-            walk(root, mat4.create());
+            this.walkWorldMatrices(root, null, uploadToGPUBuffer);
         }
     }
 }

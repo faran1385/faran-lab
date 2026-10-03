@@ -40,7 +40,6 @@ export class HashResolver {
         if (cached && cached.builtAt === builtAt) return {hashes: cached.hashes, computed: false};
 
         const h = this.hasher;
-        // *memoryLeak*
         const textures = new Map<string, MaterialTextureHashes>();
         for (const component of material.getSortedComponents()) {
             const slot = component.getTexture();
@@ -73,9 +72,7 @@ export class HashResolver {
         if (cached && cached.builtAt === builtAt) return {hashes: cached.hashes, computed: false};
 
         const h = this.hasher;
-        // *memoryLeak*
         const attributeBuffers = new Map<string, string>();
-        // *memoryLeak*
         for (const attribute of geometry.getAttributes().values()) {
             attributeBuffers.set(attribute.name, attribute.hashProvider.convertToHash());
         }

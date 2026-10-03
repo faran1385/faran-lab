@@ -38,11 +38,14 @@ export class RenderItemBuilder {
         }
 
         // First time we see this node, its mesh / primitive list changed: build everything.
-        if (!entry || node.getStructureChangedAt() > entry.structureBuiltAt) {
+        if (!entry || node.hashProvider.getStructureChangedAt() > entry.structureBuiltAt) {
             const primitives = mesh.getAllPrimitives();
             ResourceLayer.node(node, ctx)
-            // *memoryLeak*
-            const items = primitives.map((p) => RenderItemBuilder.buildPrimitive(node, p, ctx));
+            const items: RenderItem[] = []
+            for (const p of primitives) {
+                items.push(RenderItemBuilder.buildPrimitive(node, p, ctx))
+            }
+
             const builtAt = getEpoch(); // after building: building itself may stamp (shader rebuild marks)
             cache.set(node, {
                 items,
@@ -87,7 +90,7 @@ export class RenderItemBuilder {
             geometry: geometryHashes.hashes,
             pipeline: pipelineHashes.hashes
         };
-        console.log(materialHashes.computed)
+
         // resource layer: only for what was actually computed
         if (geometryHashes.computed) {
             ResourceLayer.geometry(geometry, data.geometry, ctx);

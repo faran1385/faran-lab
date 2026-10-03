@@ -24,13 +24,11 @@ export class GeometryHashProvider {
     constructor(T: InputFunctions) {
         this.wrapperGetFunctions = T;
 
-        // *memoryLeak*
         this.attributesHash = new AggregateHashHandler(() =>
             this.sortedAttributes
                 .map((wrapper) => `${wrapper.name}:${wrapper.hashProvider.convertToHash()}`)
                 .join("|")
         );
-        // *memoryLeak*
         this.attributesShapeHash = new HashHandler(() =>
             this.sortedAttributes
                 .map((a) => `${a.name}:${a.format}`)

@@ -1,11 +1,10 @@
 import type {MeshWrapper} from "./MeshWrapper.ts";
-import {VersionFlag} from "../hashing/utils/VersionFlag.ts";
 import {mat4} from "../../packages/math/matrix/mat4.ts";
 import type {Node} from "../importers/utils/IR.ts";
 import {v4 as uuidv4} from "uuid";
 import {vec3} from "../../packages/math/vector/vec3.ts";
 import {quat} from "../../packages/math/quat/quat.ts";
-import {ChangeStamp} from "../hashing/utils/ChangeStamp.ts";
+import {NodeHashProvider} from "../hashing/NodeHashProvider.ts";
 
 export class NodeWrapper {
     readonly uuid: string;
@@ -20,9 +19,9 @@ export class NodeWrapper {
 
     private worldMatrix = mat4.create();
     private localMatrix = mat4.create();
+    readonly hashProvider: NodeHashProvider;
+    private _cachedChildrenArray: NodeWrapper[] = []
 
-    private readonly transformFlag = new VersionFlag();
-    private readonly meshStamp = new ChangeStamp();
 
     constructor(
         translation?: Node["translation"],
@@ -34,7 +33,9 @@ export class NodeWrapper {
         const r = rotation ?? [0, 0, 0, 1] as any;
         const s = scale ?? [1, 1, 1] as any;
 
-
+        this.hashProvider = new NodeHashProvider({
+            getMesh: this.getMesh.bind(this),
+        })
         this.uuid = uuidv4();
         this.name = name;
         this.scale = vec3.fromValues(s[0], s[1], s[2]);
@@ -43,23 +44,24 @@ export class NodeWrapper {
         this.markSubtreeDirty();
     }
 
+    private updateCachedChildren() {
+        this._cachedChildrenArray = Array.from(this.children.values())
+    }
+
     getMesh() {
         return this.mesh;
     }
 
     setMesh(mesh: MeshWrapper) {
         this.mesh = mesh;
-        this.meshStamp.mark();
+        this.hashProvider.markMesh();
     }
 
     /**
      * Stamp of what this node draws: the mesh assignment or the mesh's primitive list. Transforms are deliberately
      * not part of it, they are uploaded through the world-matrix path and never invalidate render items.
      */
-    getStructureChangedAt(): number {
-        const own = this.meshStamp.get();
-        return this.mesh ? Math.max(own, this.mesh.getChangedAt()) : own;
-    }
+
 
     setName(name: string | undefined) {
         this.name = name;
@@ -103,12 +105,14 @@ export class NodeWrapper {
         child.parent = this;
         this.children.set(child.uuid, child);
         child.markSubtreeDirty();
+        this.updateCachedChildren();
     }
 
     removeChild(child: NodeWrapper) {
         if (this.children.delete(child.uuid)) {
             child.parent = undefined;
         }
+        this.updateCachedChildren();
     }
 
     getParent() {
@@ -116,16 +120,12 @@ export class NodeWrapper {
     }
 
     getChildren() {
-        return Array.from(this.children).map((value) => value[1]);
-    }
-
-    isTransformDirty(): boolean {
-        return this.transformFlag.needsUpdate();
+        return this._cachedChildrenArray;
     }
 
     private markSubtreeDirty(): void {
-        if (this.transformFlag.needsUpdate()) return;
-        this.transformFlag.addVersion();
+        if (this.hashProvider.transformNeedsUpdate()) return;
+        this.hashProvider.markTransform();
         this.children.forEach((child) => child.markSubtreeDirty());
     }
 
@@ -133,12 +133,12 @@ export class NodeWrapper {
         return this.worldMatrix;
     }
 
-    buildWorldMatrix(parentMatrix: Float32Array, uploadToGPUBuffer: (hash: string, data: GPUAllowSharedBufferSource, offset: number) => void) {
+    buildWorldMatrix(parentMatrix: Float32Array | null, uploadToGPUBuffer: (hash: string, data: GPUAllowSharedBufferSource, offset: number) => void) {
         mat4.compose(this.localMatrix, this.translation as any, this.rotation as any, this.scale as any);
-        mat4.mul(this.worldMatrix, parentMatrix, this.localMatrix);
+        if (parentMatrix) mat4.mul(this.worldMatrix, parentMatrix, this.localMatrix);
 
-        this.transformFlag.sync();
-        if (this.mesh && this.mesh.getAllPrimitives().length > 0) uploadToGPUBuffer(this.uuid, this.worldMatrix, 0);
+        this.hashProvider.syncTransformUpdate()
+        if (this.mesh && this.mesh.getPrimitivesCount() > 0) uploadToGPUBuffer(this.uuid, this.worldMatrix, 0);
 
         this.children.forEach((child: NodeWrapper) => {
             child.buildWorldMatrix(this.worldMatrix, uploadToGPUBuffer);

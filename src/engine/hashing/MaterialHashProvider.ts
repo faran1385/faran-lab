@@ -39,13 +39,11 @@ export class MaterialHashProvider {
             })
             return `${uuid}${i}`
         })
-        // *memoryLeak*
         this.shaderHash = new AggregateHashHandler((hasher) =>
             `${T.getAlphaMode()}|` + T.getSortedComponents()
                 .map((c) => `${c.name}:${c.hashProvider.convertToShaderKeyHash(hasher)}`)
                 .join("|")
         )
-        // *memoryLeak*
         this.bindgroupHash = new AggregateHashHandler((hasher) =>
             `${this.factorsHash.convertToHash(hasher)}` + T.getSortedComponents()
                 .map((c) => `${c.name}:${c.hashProvider.convertToResourceHash(hasher)}`)
@@ -79,7 +77,6 @@ export class MaterialHashProvider {
     }
 
     convertToBindgroupLayoutHash(hasher: Hasher, bindingSignature: string): string {
-        // *memoryLeak*
         const shapes = this.wrapperFunctions.getSortedComponents().map((c) => `${c.name}:${c.hashProvider.convertToShapeHash(hasher)}`)
             .join("|");
         return hasher.hashString(`${shapes}#${bindingSignature}`);
