@@ -4,6 +4,7 @@ import type {GeometryWrapper} from "../../wrappers/GeometryWrapper.ts";
 import type {PipelineWrapper} from "../../wrappers/PipelineWrapper.ts";
 import type {MaterialBindingPlan} from "../../producers/BindGroupLayoutProducer.ts";
 import type {GeometryHashes, MaterialHashes, MaterialTextureHashes, PipelineHashes, Resolved} from "./HashData.ts";
+import type {ImageWrapper} from "../../wrappers/ImageWrapper.ts";
 
 interface CacheEntry<T> {
     /** The wrapper's getChangedAt() when these hashes were computed. */
@@ -62,6 +63,10 @@ export class HashResolver {
         return {hashes, computed: true};
     }
 
+    resolveImage(image: ImageWrapper) {
+        return image.hashProvider.convertToHash(this.hasher)
+    }
+
     resolveGeometry(geometry: GeometryWrapper): Resolved<GeometryHashes> {
         const builtAt = geometry.hashProvider.getChangedAt();
         const cached = this.geometries.get(geometry);
@@ -72,13 +77,13 @@ export class HashResolver {
         const attributeBuffers = new Map<string, string>();
         // *memoryLeak*
         for (const attribute of geometry.getAttributes().values()) {
-            attributeBuffers.set(attribute.name, attribute.hashProvider.convertToHash(h));
+            attributeBuffers.set(attribute.name, attribute.hashProvider.convertToHash());
         }
 
         const hashes: GeometryHashes = {
             attributesShape: geometry.hashProvider.convertToAttributesShapeHash(h),
             attributeBuffers,
-            indices: geometry.getIndices()?.hashProvider.convertToHash(h),
+            indices: geometry.getIndices()?.hashProvider.convertToHash(),
         };
         this.geometries.set(geometry, {builtAt, hashes});
         return {hashes, computed: true};

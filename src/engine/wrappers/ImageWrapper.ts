@@ -17,7 +17,7 @@ export class ImageWrapper {
         this.height = height;
         this.format = format;
 
-        this.hashProvider = new ImageHashProvider(this.uuid)
+        this.hashProvider = new ImageHashProvider(this.uuid, this.getDimensions.bind(this), this.getFormat.bind(this));
     }
 
     getFormat(): GPUTextureFormat {
@@ -35,13 +35,24 @@ export class ImageWrapper {
         return this.data;
     }
 
-    setImage(data: ArrayBuffer, width: number, height: number, format: GPUTextureFormat): void {
-        this.data = data;
+    setDimensions(width: number, height: number): void {
         this.width = width;
         this.height = height;
+
+        this.hashProvider.markHashHandler()
+        this.hashProvider.markChangeStamp();
+    }
+
+    setFormat(format: GPUTextureFormat): void {
         this.format = format;
         this.hashProvider.markHashHandler()
         this.hashProvider.markChangeStamp();
+    }
+
+    setData(data: ArrayBuffer) {
+        this.data = data;
+        this.hashProvider.markNeedsUpdate()
+        this.hashProvider.markChangeStamp()
     }
 
 }

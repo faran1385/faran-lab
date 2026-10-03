@@ -1,29 +1,37 @@
-import {HashHandler} from "./utils/HashHandler.ts";
-import type {Hasher} from "./utils/Hasher.ts";
+import {VersionFlag} from "./utils/VersionFlag.ts";
 import {ChangeStamp} from "./utils/ChangeStamp.ts";
 
 export class BufferHashProvider {
-    protected hashHandler!: HashHandler;
+    private needsUpdateFlag = new VersionFlag()
+    private wrapperUUID: string
     private readonly changeStamp = new ChangeStamp();
 
     constructor(uuid: string) {
-        this.hashHandler = new HashHandler(() => `${uuid}|${this.hashHandler.getVersion()}`);
-
+        this.wrapperUUID = uuid;
     }
 
-    markHashHandler(){
-        this.hashHandler.addVersion()
-    }
-
-    markChangeStamp(){
-        this.changeStamp.mark();
-    }
-
-    convertToHash(hasher: Hasher): string {
-        return this.hashHandler.convertToHash(hasher);
-    }
 
     getChangedAt(): number {
         return this.changeStamp.get();
+    }
+
+    markChangeStamp() {
+        this.changeStamp.mark();
+    }
+
+    convertToHash() {
+        return this.wrapperUUID
+    }
+
+    markNeedsUpdate() {
+        this.needsUpdateFlag.addVersion()
+    }
+
+    syncNeedsUpdate() {
+        this.needsUpdateFlag.sync();
+    }
+
+    needsUpdate() {
+        return this.needsUpdateFlag.needsUpdate();
     }
 }

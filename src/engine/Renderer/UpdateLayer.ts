@@ -3,6 +3,7 @@ import type {MaterialWrapper} from "../wrappers/MaterialWrapper.ts";
 import type {GeometryHashes, MaterialHashes} from "../hashing/utils/HashData.ts";
 import type {RenderContext} from "./RenderContext.ts";
 import type {Camera} from "../Camera/Camera.ts";
+import type {GeometryWrapper} from "../wrappers/GeometryWrapper.ts";
 
 /**
  * The update layer: decides what has to be redone, from hashes and flags. It never computes a hash and never
@@ -66,11 +67,34 @@ export class UpdateLayer {
 
         for (const component of material.getAllComponents()) {
             if (!component.hashProvider.needsFactorUpdate()) continue;
-
             const item = producer.getFactorPlan(material).get(component.name)!;
             // *memoryLeak*
             managers.bufferManager.upload(hashes.factors, new Float32Array([item.factor].flat()), item.offset);
             component.hashProvider.syncFactorUpdate();
+        }
+    }
+
+
+    static uploadTextures(material: MaterialWrapper, ctx: RenderContext): void {
+        const {managers, producer, hashes} = ctx;
+
+        for (const component of material.getAllComponents()) {
+            const texture = component.getTexture()?.wrapper;
+            if (!texture || !texture.getImage().hashProvider.needsUpdate()) continue;
+            const image = texture.getImage();
+            managers.textureManager.upload(hashes.resolveImage(image), producer.produceTextureUpdate(image));
+            texture.getImage().hashProvider.syncNeedsUpdate()
+        }
+    }
+
+    static updateAttributeBuffers(geometry: GeometryWrapper, hashes: GeometryHashes, ctx: RenderContext): void {
+        const {managers} = ctx;
+
+        for (const attribute of geometry.getAttributes().values()) {
+            if (!attribute.hashProvider.needsUpdate()) continue;
+
+            managers.bufferManager.upload(hashes.attributeBuffers.get(attribute.name)!, attribute.getData())
+            attribute.hashProvider.syncNeedsUpdate()
         }
     }
 }

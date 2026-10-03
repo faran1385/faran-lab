@@ -25,9 +25,9 @@ export class GeometryHashProvider {
         this.wrapperGetFunctions = T;
 
         // *memoryLeak*
-        this.attributesHash = new AggregateHashHandler((hasher) =>
+        this.attributesHash = new AggregateHashHandler(() =>
             this.sortedAttributes
-                .map((wrapper) => `${wrapper.name}:${wrapper.hashProvider.convertToHash(hasher)}`)
+                .map((wrapper) => `${wrapper.name}:${wrapper.hashProvider.convertToHash()}`)
                 .join("|")
         );
         // *memoryLeak*

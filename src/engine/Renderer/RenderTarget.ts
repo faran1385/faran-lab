@@ -1,3 +1,5 @@
+import {v4 as uuidv4} from "uuid";
+
 export interface TextureSettings {
     format: GPUTextureFormat;
 }
@@ -5,11 +7,13 @@ export interface TextureSettings {
 export class RenderTarget {
     width: number;
     height: number;
+    readonly uuid: string
 
     private texture?: GPUTexture;
     private settings: TextureSettings;
 
     constructor(width: number, height: number, settings: TextureSettings) {
+        this.uuid = uuidv4();
         this.width = width;
         this.height = height;
         this.settings = settings;

@@ -37,11 +37,9 @@ export class RenderItemBuilder {
             return entry.items;
         }
 
-        // *memoryLeak*
-        const primitives = mesh.getAllPrimitives();
-
         // First time we see this node, its mesh / primitive list changed: build everything.
         if (!entry || node.getStructureChangedAt() > entry.structureBuiltAt) {
+            const primitives = mesh.getAllPrimitives();
             ResourceLayer.node(node, ctx)
             // *memoryLeak*
             const items = primitives.map((p) => RenderItemBuilder.buildPrimitive(node, p, ctx));
@@ -89,12 +87,16 @@ export class RenderItemBuilder {
             geometry: geometryHashes.hashes,
             pipeline: pipelineHashes.hashes
         };
-
+        console.log(materialHashes.computed)
         // resource layer: only for what was actually computed
-        if (geometryHashes.computed) ResourceLayer.geometry(geometry, data.geometry, ctx);
+        if (geometryHashes.computed) {
+            ResourceLayer.geometry(geometry, data.geometry, ctx);
+            UpdateLayer.updateAttributeBuffers(geometry, geometryHashes.hashes, ctx);
+        }
         if (materialHashes.computed) {
             ResourceLayer.material(material, data.material, ctx);
             UpdateLayer.uploadFactors(material, data.material, ctx);
+            UpdateLayer.uploadTextures(material, ctx);
         }
         if (generated.vertex || generated.fragment) ResourceLayer.shaders(p, data.pipeline, generated, ctx);
         if (pipelineHashes.computed) ResourceLayer.pipeline(p, data, ctx);

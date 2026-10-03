@@ -7,7 +7,7 @@ import {
 } from "./BufferProducer.ts";
 import {BindGroupLayoutProducer, type MaterialBindingPlan} from "./BindGroupLayoutProducer.ts";
 import type {ImageWrapper} from "../wrappers/ImageWrapper.ts";
-import {type TextureDescriptor, TextureProducer} from "./TextureDescriptorProducer.ts";
+import {type TextureDescriptor, TextureProducer, type TextureUpdateDescriptor} from "./TextureDescriptorProducer.ts";
 import type {SamplerWrapper} from "../wrappers/SamplerWrapper.ts";
 import {SamplerProducer} from "./SamplerProducer.ts";
 import type {ShaderModuleWrapper} from "../wrappers/ShaderModuleWrapper.ts";
@@ -87,6 +87,10 @@ export class CentralProducer {
 
     produceTexture(image: ImageWrapper): TextureDescriptor {
         return TextureProducer.produce(image);
+    }
+
+    produceTextureUpdate(image: ImageWrapper): TextureUpdateDescriptor {
+        return TextureProducer.produceUpdate(image);
     }
 
     produceSampler(wrapper: SamplerWrapper): GPUSamplerDescriptor {

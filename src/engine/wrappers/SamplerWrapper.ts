@@ -16,8 +16,8 @@ export class SamplerWrapper {
         minFilter: Sampler["minFilter"] = "linear",
         magFilter: Sampler["magFilter"] = "linear",
         mipFilter: Sampler["mipFilter"] = "linear",
-        addressModeU: Sampler["addressModeU"] = "clamp-to-edge",
-        addressModeV: Sampler["addressModeV"] = "clamp-to-edge",
+        addressModeU: Sampler["addressModeU"] = "repeat",
+        addressModeV: Sampler["addressModeV"] = "repeat",
     ) {
         this.minFilter = minFilter;
         this.magFilter = magFilter;

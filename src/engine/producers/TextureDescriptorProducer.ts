@@ -1,7 +1,8 @@
 import type {ImageWrapper} from "../wrappers/ImageWrapper.ts";
 
-export interface TextureDescriptor {
-    texture: GPUTextureDescriptor;
+export type TextureDescriptor = GPUTextureDescriptor
+
+export interface TextureUpdateDescriptor {
     data: ArrayBuffer;
     bytesPerRow: number;
     width: number;
@@ -15,9 +16,23 @@ const BYTES_PER_TEXEL: Partial<Record<GPUTextureFormat, number>> = {
 
 export class TextureProducer {
     static produce(image: ImageWrapper): TextureDescriptor {
-        const { width, height } = image.getDimensions();
+        const {width, height} = image.getDimensions();
         const format = image.getFormat();
+
+        return {
+            label: image.uuid,
+            size: {width, height},
+            format,
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+        };
+    }
+
+    static produceUpdate(image: ImageWrapper): TextureUpdateDescriptor {
         const data = image.getData();
+        const format = image.getFormat();
+        const {width, height} = image.getDimensions()
+        const bytesPerRow = BYTES_PER_TEXEL[format]! * width;
+
 
         const bytesPerTexel = BYTES_PER_TEXEL[format];
         if (bytesPerTexel === undefined) {
@@ -30,17 +45,11 @@ export class TextureProducer {
         }
 
         return {
-            texture: {
-                label: image.uuid,
-                size: { width, height },
-                format,
-                usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-            },
-            data,
-            bytesPerRow: width * bytesPerTexel,
             width,
             height,
-        };
+            bytesPerRow,
+            data
+        }
     }
 }
 

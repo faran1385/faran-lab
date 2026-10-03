@@ -12,8 +12,10 @@ type InputFunctions = {
 export class TextureHashProvider {
     private hashHandler: AggregateHashHandler;
     private readonly changeStamp = new ChangeStamp();
+    private wrapperFunctions: InputFunctions;
 
     constructor(T: InputFunctions) {
+        this.wrapperFunctions = T;
         this.hashHandler = new AggregateHashHandler((hasher) =>
             `${T.getImage().hashProvider.convertToHash(hasher)}|${T.getSampler().hashProvider.convertToHash(hasher)}`
         );
@@ -28,6 +30,10 @@ export class TextureHashProvider {
     }
 
     getChangedAt(): number {
-        return this.changeStamp.get();
+        return Math.max(
+            this.changeStamp.get(),
+            this.wrapperFunctions.getImage().hashProvider.getChangedAt(),
+            this.wrapperFunctions.getSampler().hashProvider.getChangedAt()
+        )
     }
 }

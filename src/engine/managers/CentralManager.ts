@@ -7,6 +7,8 @@ import {BindGroupManager} from "./BindGroupManager.ts";
 import {PipelineManager} from "./PipelineManager.ts";
 import {BindGroupLayoutManager} from "./BindGroupLayoutManager.ts";
 
+
+
 export class CentralManager {
     readonly bufferManager: BufferManager;
     readonly shaderModuleManager: ShaderModuleManager;

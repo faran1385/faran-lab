@@ -13,7 +13,7 @@ export class BufferWrapper<TUsage extends GPUBufferUsageFlags = GPUBufferUsageFl
         this.data = data;
         this.usage = usage;
 
-        this.hashProvider=new BufferHashProvider(this.uuid)
+        this.hashProvider = new BufferHashProvider(this.uuid)
     }
 
 
@@ -27,7 +27,7 @@ export class BufferWrapper<TUsage extends GPUBufferUsageFlags = GPUBufferUsageFl
 
     setData(data: ArrayBuffer): void {
         this.data = data;
-        this.hashProvider.markHashHandler();
+        this.hashProvider.markNeedsUpdate()
         this.hashProvider.markChangeStamp()
     }
 
