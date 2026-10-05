@@ -390,8 +390,6 @@ export class mat4 {
             0, 0, 0, 1
         );
 
-        this.transpose(RT, RT);
-
         const TI = this.fromValues(
             1, 0, 0, 0,
             0, 1, 0, 0,
@@ -399,7 +397,7 @@ export class mat4 {
             -eye[0], -eye[1], -eye[2], 1,
         );
 
-        matrixMultiplication(out, TI, RT, 4);
+        matrixMultiplication(out, RT, TI, 4);
         return out;
     }
 
@@ -413,12 +411,24 @@ export class mat4 {
             out[1] = (mat[8] - mat[2]) / (4 * w);
             out[2] = (mat[1] - mat[4]) / (4 * w);
             out[3] = w;
+        } else if (mat[0] > mat[5] && mat[0] > mat[10]) {
+            const s = 2 * Math.sqrt(1 + mat[0] - mat[5] - mat[10]);
+            out[3] = (mat[6] - mat[9]) / s;
+            out[0] = 0.25 * s;
+            out[1] = (mat[4] + mat[1]) / s;
+            out[2] = (mat[8] + mat[2]) / s;
+        } else if (mat[5] > mat[10]) {
+            const s = 2 * Math.sqrt(1 + mat[5] - mat[0] - mat[10]);
+            out[3] = (mat[8] - mat[2]) / s;
+            out[0] = (mat[4] + mat[1]) / s;
+            out[1] = 0.25 * s;
+            out[2] = (mat[9] + mat[6]) / s;
         } else {
-            const x = 0.5 * Math.sqrt(1 + mat[0] - mat[4] - mat[8])
-            out[3] = (mat[6] - mat[9]) / (4 * x)
-            out[1] = (mat[4] + mat[1]) / (4 * x)
-            out[2] = (mat[8] + mat[2]) / (4 * x)
-            out[0] = x
+            const s = 2 * Math.sqrt(1 + mat[10] - mat[0] - mat[5]);
+            out[3] = (mat[1] - mat[4]) / s;
+            out[0] = (mat[8] + mat[2]) / s;
+            out[1] = (mat[9] + mat[6]) / s;
+            out[2] = 0.25 * s;
         }
 
         return out;
