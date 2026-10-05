@@ -26,6 +26,11 @@ export class PerspectiveCamera extends Camera {
         return this;
     }
 
+    getFov(): number { return this.fovY; }
+    getAspect(): number { return this.aspect; }
+    getFar(): number { return this.far; }
+    getNear(): number { return this.near; }
+
     setAspect(aspect: number): this {
         this.aspect = aspect;
         this.markProjectionDirty();

@@ -9,6 +9,7 @@ import {MeshWrapper} from "./engine/wrappers/MeshWrapper.ts";
 import {NodeWrapper} from "./engine/wrappers/NodeWrapper.ts";
 import {AttributeWrapper} from "./engine/wrappers/AttributeWrapper.ts";
 import {GLBLoader} from "./engine/loaders/GLBLoader.ts";
+import {OrbitControls} from "./engine/Controls/OrbitControls.ts";
 
 const canvas = document.getElementById("gpu-canvas") as HTMLCanvasElement;
 let stats = new Stats.default();
@@ -20,7 +21,8 @@ const loader = new GLBLoader();
 // const {root} = await loader.load("/test.glb");
 
 const camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.setPosition(0, 0, 3)
+camera.setPosition(0, 0, 1)
+const controls = new OrbitControls(camera, canvas, {enableDamping: true});
 
 
 window.addEventListener("resize", () => {
@@ -61,12 +63,14 @@ const node2 = new NodeWrapper();
 node2.addChild(node1)
 scene.addNode(node2)
 
-
-
+let last = performance.now();
 function frame(): void {
+    const now = performance.now();
+    controls.update((now - last) / 1000);
+    last = now;
 
     stats.begin();
-    renderer.render(scene, camera)
+    renderer.render(scene, camera);
     stats.end();
     requestAnimationFrame(frame);
 }

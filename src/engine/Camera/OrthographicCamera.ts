@@ -35,6 +35,24 @@ export class OrthographicCamera extends Camera {
         return this;
     }
 
+
+    getBounds() {
+        return {
+            left: this.left,
+            right: this.right,
+            bottom: this.bottom,
+            top: this.top
+        }
+    }
+
+    getFar(): number {
+        return this.far;
+    }
+
+    getNear(): number {
+        return this.near;
+    }
+
     setNear(near: number): this {
         this.near = near;
         this.markProjectionDirty();
