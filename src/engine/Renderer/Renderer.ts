@@ -135,12 +135,11 @@ export class Renderer {
 
         scene.updateWorldMatrices(this._bufferUploadFunction);
 
-        // Recorded after the traverse: building items may itself stamp wrappers (shader rebuild marks).
         this.renderCache.lastFrameEpoch = getEpoch();
-
         pass.end();
         this.device.queue.submit([encoder.finish()]);
-
+        this.renderCache.endFrame(ctx)
+        this.managers.endFrame()
         this.producer.clear()
     }
 }

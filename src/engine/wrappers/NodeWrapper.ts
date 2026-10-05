@@ -52,7 +52,7 @@ export class NodeWrapper {
         return this.mesh;
     }
 
-    setMesh(mesh: MeshWrapper) {
+    setMesh(mesh: MeshWrapper | undefined) {
         this.mesh = mesh;
         this.hashProvider.markMesh();
     }

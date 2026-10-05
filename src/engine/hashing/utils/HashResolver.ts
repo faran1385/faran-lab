@@ -3,13 +3,47 @@ import type {MaterialWrapper} from "../../wrappers/MaterialWrapper.ts";
 import type {GeometryWrapper} from "../../wrappers/GeometryWrapper.ts";
 import type {PipelineWrapper} from "../../wrappers/PipelineWrapper.ts";
 import type {MaterialBindingPlan} from "../../producers/BindGroupLayoutProducer.ts";
-import type {GeometryHashes, MaterialHashes, MaterialTextureHashes, PipelineHashes, Resolved} from "./HashData.ts";
+import type {
+    GeometryHashes,
+    HashData,
+    MaterialHashes,
+    MaterialTextureHashes,
+    PipelineHashes,
+    Resolved
+} from "./HashData.ts";
 import type {ImageWrapper} from "../../wrappers/ImageWrapper.ts";
+import type {ResourceManager} from "../../managers/Manager.ts";
+import type {Tracker} from "../../Trackers/Tracker.ts";
+import type {CentralManager} from "../../managers/CentralManager.ts";
+import type {NodeWrapper} from "../../wrappers/NodeWrapper.ts";
+import type {NodeRenderEntry} from "../../Renderer/RenderCache.ts";
+import type {RenderContext} from "../../Renderer/RenderContext.ts";
 
 interface CacheEntry<T> {
     /** The wrapper's getChangedAt() when these hashes were computed. */
     builtAt: number;
     hashes: T;
+}
+
+export const EMPTY_HASH_DATA: HashData = {
+    pipeline: {
+        pipeline: "",
+        fragmentShader: "",
+        vertexShader: ""
+    },
+    geometry: {
+        indices: "",
+        attributeBuffers: new Map(),
+        attributesShape: ""
+    },
+    material: {
+        textures: new Map(),
+        shader: "",
+        pipelineSettings: "",
+        factors: "",
+        layout: "",
+        bindgroup: ""
+    }
 }
 
 /**
@@ -84,6 +118,67 @@ export class HashResolver {
         };
         this.geometries.set(geometry, {builtAt, hashes});
         return {hashes, computed: true};
+    }
+
+    chg(manager: ResourceManager<any, Tracker<unknown>>, newHash: string, oldHash: string) {
+        if (newHash === oldHash) return;
+        if (newHash.length !== 0) manager.acquire(newHash);
+        if (oldHash.length !== 0) manager.release(oldHash);
+    }
+
+    swapData(managers: CentralManager, newHashData: HashData, oldHashData: HashData) {
+        this.chg(managers.bufferManager, newHashData.material.factors, oldHashData.material.factors)
+        this.chg(managers.bindgroupManager, newHashData.material.bindgroup, oldHashData.material.bindgroup)
+        this.chg(managers.bindgroupManager, newHashData.material.bindgroup, oldHashData.material.bindgroup)
+        this.chg(managers.bindgroupLayoutManager, newHashData.material.layout, oldHashData.material.layout)
+        this.chg(managers.pipelineLayoutManager, newHashData.material.layout, oldHashData.material.layout)
+        const materialComponentSet = new Set<string>([...newHashData.material.textures.keys(), ...oldHashData.material.textures.keys()]);
+
+        const geometryAttributeSet = new Set<string>([...newHashData.geometry.attributeBuffers.keys(), ...oldHashData.geometry.attributeBuffers.keys()]);
+        for (const component of materialComponentSet) {
+
+            const newTextureSlot = newHashData.material.textures.get(component);
+            const oldTextureSlot = oldHashData.material.textures.get(component);
+            this.chg(managers.textureManager, newTextureSlot?.image ?? "", oldTextureSlot?.image ?? "")
+
+            this.chg(managers.samplerManager, newTextureSlot?.sampler ?? "", oldTextureSlot?.sampler ?? "")
+        }
+        for (const attribute of geometryAttributeSet) {
+
+            const newAttributeHash = newHashData.geometry.attributeBuffers.get(attribute);
+            const oldAttributeHash = oldHashData.geometry.attributeBuffers.get(attribute);
+
+            this.chg(managers.bufferManager, newAttributeHash ?? "", oldAttributeHash ?? "")
+        }
+
+        this.chg(managers.bindgroupManager, newHashData.geometry.indices ?? "", oldHashData.geometry.indices ?? "")
+
+        this.chg(managers.shaderModuleManager, newHashData.pipeline.vertexShader, oldHashData.pipeline.vertexShader)
+        this.chg(managers.shaderModuleManager, newHashData.pipeline.fragmentShader, oldHashData.pipeline.fragmentShader)
+
+        this.chg(managers.pipelineManager, newHashData.pipeline.pipeline, oldHashData.pipeline.pipeline)
+    }
+
+    acquireEntry(node: NodeWrapper, entry: NodeRenderEntry, ctx: RenderContext) {
+        if (entry.items.length > 0) {
+            ctx.managers.bufferManager.acquire(node.uuid)
+            ctx.managers.bindgroupManager.acquire(node.uuid)
+        }
+
+        for (const item of entry.items) {
+            this.swapData(ctx.managers, item.hashData, EMPTY_HASH_DATA)
+        }
+    }
+
+    releaseEntry(node: NodeWrapper, entry: NodeRenderEntry, ctx: RenderContext) {
+        if (entry.items.length > 0) {
+            ctx.managers.bufferManager.release(node.uuid)
+            ctx.managers.bindgroupManager.release(node.uuid)
+        }
+
+        for (const item of entry.items) {
+            this.swapData(ctx.managers, EMPTY_HASH_DATA, item.hashData)
+        }
     }
 
     /**

@@ -4,4 +4,6 @@ export abstract class IndestructibleTracker<T> extends Tracker<T> {
     constructor(resource: T, kind: ResourceKind) {
         super(resource, kind);
     }
+
+    abstract destroy (): void;
 }

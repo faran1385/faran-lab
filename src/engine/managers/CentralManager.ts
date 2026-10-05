@@ -29,4 +29,24 @@ export class CentralManager {
         this.pipelineManager = new PipelineManager(device);
         this.bindgroupLayoutManager = new BindGroupLayoutManager(device);
     }
+
+    endFrame(){
+        this.bufferManager.increaseFrame();
+        this.shaderModuleManager.increaseFrame();
+        this.samplerManager.increaseFrame();
+        this.textureManager.increaseFrame();
+        this.pipelineLayoutManager.increaseFrame();
+        this.bindgroupManager.increaseFrame();
+        this.pipelineManager.increaseFrame();
+        this.bindgroupLayoutManager.increaseFrame();
+
+        this.bufferManager.collect();
+        this.shaderModuleManager.collect();
+        this.samplerManager.collect();
+        this.textureManager.collect();
+        this.pipelineLayoutManager.collect();
+        this.bindgroupManager.collect();
+        this.pipelineManager.collect();
+        this.bindgroupLayoutManager.collect();
+    }
 }

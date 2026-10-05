@@ -12,7 +12,8 @@ export type ResourceKind =
 export abstract class Tracker<T> {
     protected readonly resource: T;
     readonly kind: ResourceKind;
-
+    refs = 0;
+    deleteAtFrame = -1;
 
     constructor(resource: T, kind: ResourceKind) {
         this.resource = resource;
@@ -22,4 +23,6 @@ export abstract class Tracker<T> {
     get raw(): T {
         return this.resource;
     }
+
+    abstract destroy(): void;
 }

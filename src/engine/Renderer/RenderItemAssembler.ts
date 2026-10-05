@@ -18,6 +18,7 @@ export class RenderItemAssembler {
             ],
             vertexBuffers: RenderItemAssembler.vertexBuffers(p, data.geometry, ctx),
             draw: RenderItemAssembler.drawInfo(p, data.geometry, ctx),
+            hashData: data
         };
     }
 

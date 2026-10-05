@@ -8,6 +8,7 @@ import {UpdateLayer} from "./UpdateLayer.ts";
 import {ShaderCodeLayer} from "./ShaderCodeLayer.ts";
 import {ResourceLayer} from "./ResourceLayer.ts";
 import {RenderItemAssembler} from "./RenderItemAssembler.ts";
+import type {NodeRenderEntry} from "./RenderCache.ts";
 
 export type {RenderItem, DrawInfo, VertexBufferBinding, BindGroupBinding} from "./RenderItem.ts";
 export type {RenderContext, FrameInfo} from "./RenderContext.ts";
@@ -24,48 +25,51 @@ export type {RenderContext, FrameInfo} from "./RenderContext.ts";
  */
 export class RenderItemBuilder {
     static build(node: NodeWrapper, ctx: RenderContext): RenderItem[] {
-        const mesh = node.getMesh();
-        if (!mesh) return [];
-
 
         const {cache} = ctx;
-        const entry = cache.get(node);
+        const oldEntry = cache.get(node);
 
         // Quiet frame: no setter anywhere has run since the last frame, so nothing can have changed. No hashing,
         // no ensure(), no allocation: hand back the items built before.
-        if (entry && cache.lastFrameEpoch === getEpoch()) {
-            return entry.items;
+        if (oldEntry && cache.lastFrameEpoch === getEpoch()) {
+            return oldEntry.items;
         }
+        const mesh = node.getMesh();
+        ctx.cache.touch(node);
+
+        const builtAt = getEpoch();
+        const newEntry: NodeRenderEntry = {
+            items: [],
+            primitives: mesh?.getAllPrimitives() ?? [],
+            structureBuiltAt: builtAt,
+            builtAt: new Array(mesh?.getAllPrimitives().length).fill(builtAt)
+        };
 
         // First time we see this node, its mesh / primitive list changed: build everything.
-        if (!entry || node.hashProvider.getStructureChangedAt() > entry.structureBuiltAt) {
-            const primitives = mesh.getAllPrimitives();
+        if (!oldEntry || node.hashProvider.getStructureChangedAt() > oldEntry.structureBuiltAt) {
             ResourceLayer.node(node, ctx)
-            const items: RenderItem[] = []
-            for (const p of primitives) {
-                items.push(RenderItemBuilder.buildPrimitive(node, p, ctx))
+            for (let i = 0; i < newEntry.primitives.length; i++) {
+                newEntry.items.push(RenderItemBuilder.buildPrimitive(node, newEntry.primitives[i], ctx))
             }
 
-            const builtAt = getEpoch(); // after building: building itself may stamp (shader rebuild marks)
-            cache.set(node, {
-                items,
-                primitives,
-                builtAt: primitives.map(() => builtAt),
-                structureBuiltAt: builtAt,
-            });
-            return items;
+            ctx.hashes.acquireEntry(node, newEntry, ctx);
+            if (oldEntry) ctx.hashes.releaseEntry(node, oldEntry, ctx);
+            cache.set(node, newEntry);
+            return newEntry.items;
         }
 
         // Something changed somewhere: rebuild only the primitives whose own stamp (material, geometry, pipeline,
         // and everything under them) is newer than the epoch their item was built at. Nothing is cleared, so a
         // material shared by many primitives is picked up by every one of them.
-        for (let i = 0; i < entry.primitives.length; i++) {
-            if (entry.primitives[i].getChangedAt() > entry.builtAt[i]) {
-                entry.items[i] = RenderItemBuilder.buildPrimitive(node, entry.primitives[i], ctx);
-                entry.builtAt[i] = getEpoch();
+        for (let i = 0; i < newEntry.primitives.length; i++) {
+            if (newEntry.primitives[i].getChangedAt() > newEntry.builtAt[i]) {
+                newEntry.items[i] = RenderItemBuilder.buildPrimitive(node, newEntry.primitives[i], ctx);
             }
         }
-        return entry.items;
+
+        ctx.hashes.acquireEntry(node, newEntry, ctx);
+        ctx.hashes.releaseEntry(node, oldEntry, ctx);
+        return oldEntry.items;
     }
 
     // ---- primitive-level ----
@@ -103,7 +107,6 @@ export class RenderItemBuilder {
         }
         if (generated.vertex || generated.fragment) ResourceLayer.shaders(p, data.pipeline, generated, ctx);
         if (pipelineHashes.computed) ResourceLayer.pipeline(p, data, ctx);
-
         return RenderItemAssembler.assemble(node, p, data, ctx);
     }
 }

@@ -5,6 +5,10 @@ export class BufferTracker extends DestructibleTracker<GPUBuffer> {
     constructor(resource: GPUBuffer) {
         super(resource, "buffer");
     }
+
+    destroy() {
+        this.raw.destroy();
+    }
 }
 
 export class TextureTracker extends DestructibleTracker<GPUTexture> {
@@ -22,10 +26,18 @@ export class TextureTracker extends DestructibleTracker<GPUTexture> {
         this.views.set(key, view);
         return view;
     }
+
+    destroy() {
+        this.raw.destroy();
+    }
 }
+
 export class BindGroupTracker extends IndestructibleTracker<GPUBindGroup> {
     constructor(resource: GPUBindGroup) {
         super(resource, "bindGroup");
+    }
+
+    destroy() {
     }
 }
 
@@ -33,11 +45,17 @@ export class BindGroupLayoutTracker extends IndestructibleTracker<GPUBindGroupLa
     constructor(resource: GPUBindGroupLayout) {
         super(resource, "bindGroupLayout");
     }
+
+    destroy() {
+    }
 }
 
 export class PipelineLayoutTracker extends IndestructibleTracker<GPUPipelineLayout> {
     constructor(resource: GPUPipelineLayout) {
         super(resource, "pipelineLayout");
+    }
+
+    destroy() {
     }
 }
 
@@ -45,16 +63,25 @@ export class PipelineTracker extends IndestructibleTracker<GPURenderPipeline> {
     constructor(resource: GPURenderPipeline) {
         super(resource, "pipeline");
     }
+
+    destroy() {
+    }
 }
 
 export class ShaderModuleTracker extends IndestructibleTracker<GPUShaderModule> {
     constructor(resource: GPUShaderModule) {
         super(resource, "shaderModule");
     }
+
+    destroy() {
+    }
 }
 
 export class SamplerTracker extends IndestructibleTracker<GPUSampler> {
     constructor(resource: GPUSampler) {
         super(resource, "sampler");
+    }
+
+    destroy() {
     }
 }

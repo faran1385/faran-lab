@@ -1,3 +1,5 @@
+import type {HashData} from "../hashing/utils/HashData.ts";
+
 export interface DrawInfo {
     indexed: boolean;
     count: number
@@ -16,6 +18,7 @@ export interface BindGroupBinding {
 }
 
 export interface RenderItem {
+    hashData: HashData,
     pipeline: GPURenderPipeline;
     bindGroups: BindGroupBinding[];
     vertexBuffers: VertexBufferBinding[];

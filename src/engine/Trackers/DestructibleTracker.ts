@@ -8,4 +8,6 @@ export abstract class DestructibleTracker<T extends Destructible> extends Tracke
     constructor(resource: T, kind: ResourceKind) {
         super(resource, kind);
     }
+
+    abstract destroy(): void
 }

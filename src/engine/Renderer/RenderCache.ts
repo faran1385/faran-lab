@@ -1,6 +1,7 @@
 import type {NodeWrapper} from "../wrappers/NodeWrapper.ts";
 import type {PrimitiveWrapper} from "../wrappers/PrimitiveWrapper.ts";
 import type {RenderItem} from "./RenderItem.ts";
+import type {RenderContext} from "./RenderContext.ts";
 
 /**
  * Render items last built for one node.
@@ -24,6 +25,8 @@ export interface NodeRenderEntry {
  */
 export class RenderCache {
     private readonly entries = new WeakMap<NodeWrapper, NodeRenderEntry>();
+    private currentNodeHolder = new Set<NodeWrapper>();
+    private previousNodeHolder = new Set<NodeWrapper>();
 
     /**
      * The global epoch at the end of the previous frame. If it still equals getEpoch(), nothing that can affect
@@ -31,6 +34,28 @@ export class RenderCache {
      */
     lastFrameEpoch = -1;
     lastCameraUUID = ""
+
+
+    private swapNodeHolders() {
+        [this.currentNodeHolder, this.previousNodeHolder] = [this.previousNodeHolder, this.currentNodeHolder]
+    }
+
+    endFrame(ctx: RenderContext) {
+
+        for (const node of this.previousNodeHolder) {
+            ctx.hashes.releaseEntry(node, this.get(node)!, ctx)
+        }
+        this.previousNodeHolder.clear();
+
+        // causes a bug
+        // this.swapNodeHolders();
+    }
+
+
+    touch(node: NodeWrapper) {
+        this.currentNodeHolder.add(node);
+        this.previousNodeHolder.delete(node);
+    }
 
     get(node: NodeWrapper): NodeRenderEntry | undefined {
         return this.entries.get(node);

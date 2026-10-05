@@ -51,8 +51,7 @@ export class BasicFragmentAssembler extends FragmentAssemblerBase {
         const baseColor = componentsMap.get("baseColor");
         const codeBody = `
         
-            let baseColorTexture=${baseColor?.texture ? `textureSample(${baseColor.texture?.access},${baseColor.sampler?.access},input.uv)` : "vec4f(1.)"};
-            let output=vec4f(baseColorTexture);
+            let output=vec4f(input.color.xyz,input.color.a);
             
             return FragmentOutput(output);
         `

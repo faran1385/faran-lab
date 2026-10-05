@@ -33,8 +33,6 @@ export class ResourceLayer {
                 buffers: ctx.managers.bufferManager,
                 node
             }));
-        } else {
-            /// should delete the node buffer and nodeBindgroup
         }
     }
 
