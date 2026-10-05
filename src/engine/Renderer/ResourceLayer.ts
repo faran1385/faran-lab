@@ -2,7 +2,6 @@ import type {PrimitiveWrapper} from "../wrappers/PrimitiveWrapper.ts";
 import type {MaterialWrapper} from "../wrappers/MaterialWrapper.ts";
 import type {GeometryWrapper} from "../wrappers/GeometryWrapper.ts";
 import type {HashData, GeometryHashes, MaterialHashes, PipelineHashes} from "../hashing/utils/HashData.ts";
-import type {GeneratedStages} from "./ShaderCodeLayer.ts";
 import type {RenderContext} from "./RenderContext.ts";
 import type {NodeWrapper} from "../wrappers/NodeWrapper.ts";
 
@@ -64,19 +63,15 @@ export class ResourceLayer {
         }));
     }
 
-    /** Only the stages whose code was just regenerated can have a new module. */
-    static shaders(p: PrimitiveWrapper, hashes: PipelineHashes, generated: GeneratedStages, ctx: RenderContext): void {
+    static shaders(p: PrimitiveWrapper, hashes: PipelineHashes, ctx: RenderContext): void {
         const {managers, producer} = ctx;
         const pipeline = p.getPipeline();
 
-        if (generated.vertex) {
-            const wrapper = pipeline.getVertexShaderWrapper();
-            managers.shaderModuleManager.ensure(hashes.vertexShader, () => producer.produceShaderModule(wrapper));
-        }
-        if (generated.fragment) {
-            const wrapper = pipeline.getFragmentShaderWrapper();
-            managers.shaderModuleManager.ensure(hashes.fragmentShader, () => producer.produceShaderModule(wrapper));
-        }
+        const vWrapper = pipeline.getVertexShaderWrapper();
+        managers.shaderModuleManager.ensure(hashes.vertexShader, () => producer.produceShaderModule(vWrapper));
+
+        const fWrapper = pipeline.getFragmentShaderWrapper();
+        managers.shaderModuleManager.ensure(hashes.fragmentShader, () => producer.produceShaderModule(fWrapper));
     }
 
     static pipeline(p: PrimitiveWrapper, data: HashData, ctx: RenderContext): void {

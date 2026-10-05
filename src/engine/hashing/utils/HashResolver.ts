@@ -129,7 +129,6 @@ export class HashResolver {
     swapData(managers: CentralManager, newHashData: HashData, oldHashData: HashData) {
         this.chg(managers.bufferManager, newHashData.material.factors, oldHashData.material.factors)
         this.chg(managers.bindgroupManager, newHashData.material.bindgroup, oldHashData.material.bindgroup)
-        this.chg(managers.bindgroupManager, newHashData.material.bindgroup, oldHashData.material.bindgroup)
         this.chg(managers.bindgroupLayoutManager, newHashData.material.layout, oldHashData.material.layout)
         this.chg(managers.pipelineLayoutManager, newHashData.material.layout, oldHashData.material.layout)
         const materialComponentSet = new Set<string>([...newHashData.material.textures.keys(), ...oldHashData.material.textures.keys()]);
@@ -151,7 +150,7 @@ export class HashResolver {
             this.chg(managers.bufferManager, newAttributeHash ?? "", oldAttributeHash ?? "")
         }
 
-        this.chg(managers.bindgroupManager, newHashData.geometry.indices ?? "", oldHashData.geometry.indices ?? "")
+        this.chg(managers.bufferManager, newHashData.geometry.indices ?? "", oldHashData.geometry.indices ?? "")
 
         this.chg(managers.shaderModuleManager, newHashData.pipeline.vertexShader, oldHashData.pipeline.vertexShader)
         this.chg(managers.shaderModuleManager, newHashData.pipeline.fragmentShader, oldHashData.pipeline.fragmentShader)

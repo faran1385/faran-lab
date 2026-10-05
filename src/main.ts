@@ -8,14 +8,15 @@ import {PrimitiveWrapper} from "./engine/wrappers/PrimitiveWrapper.ts";
 import {MeshWrapper} from "./engine/wrappers/MeshWrapper.ts";
 import {NodeWrapper} from "./engine/wrappers/NodeWrapper.ts";
 import {AttributeWrapper} from "./engine/wrappers/AttributeWrapper.ts";
+import {GLBLoader} from "./engine/loaders/GLBLoader.ts";
 
 const canvas = document.getElementById("gpu-canvas") as HTMLCanvasElement;
 let stats = new Stats.default();
 stats.showPanel(1);
 document.body.appendChild(stats.dom);
 
-// const loader = new GLBLoader();
-//
+const loader = new GLBLoader();
+
 // const {root} = await loader.load("/test.glb");
 
 const camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -58,12 +59,8 @@ mesh1.setPrimitive(p1)
 node1.setMesh(mesh1)
 const node2 = new NodeWrapper();
 node2.addChild(node1)
-scene.addNode(node1)
+scene.addNode(node2)
 
-window.addEventListener("click", () => {
-    const x = node1.getMesh() ? undefined : mesh1;
-    node1.setMesh(x)
-})
 
 
 function frame(): void {

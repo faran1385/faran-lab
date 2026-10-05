@@ -19,7 +19,7 @@ export class BasicVertexAssembler extends VertexAssemblerBase {
              ${bindingValues.get("worldMatrix")?.access} *
              vec4f(${inputValues.get("position")?.access},1.);
         
-            return VertexOutput(pos,${dataMap.get("baseColor")?.uv?.access ?? "vec2f(0,0)"},input.color);
+            return VertexOutput(pos,${dataMap.get("baseColor")?.uv?.access ?? "vec2f(0,0)"},${inputValues.get("color")?.access ?? "vec4f(1.)"});
         `
 
         return {

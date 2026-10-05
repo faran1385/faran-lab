@@ -36,19 +36,16 @@ export class RenderCache {
     lastCameraUUID = ""
 
 
-    private swapNodeHolders() {
-        [this.currentNodeHolder, this.previousNodeHolder] = [this.previousNodeHolder, this.currentNodeHolder]
-    }
+    delete(node: NodeWrapper) { this.entries.delete(node); }
 
     endFrame(ctx: RenderContext) {
-
-        for (const node of this.previousNodeHolder) {
-            ctx.hashes.releaseEntry(node, this.get(node)!, ctx)
+        for (const node of this.previousNodeHolder) {          // used last frame, not touched this frame
+            const entry = this.entries.get(node);
+            if (entry) ctx.hashes.releaseEntry(node, entry, ctx);
+            this.entries.delete(node);                         // so a re-added node rebuilds from scratch
         }
         this.previousNodeHolder.clear();
-
-        // causes a bug
-        // this.swapNodeHolders();
+        [this.currentNodeHolder, this.previousNodeHolder] = [this.previousNodeHolder, this.currentNodeHolder];
     }
 
 

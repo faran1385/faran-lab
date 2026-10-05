@@ -7,20 +7,25 @@ export abstract class ResourceManager<TDescriptor, TTracker extends Tracker<unkn
 
 
     acquire(key: string) {
-        const tracker = this.cache.get(key)!;
-        if (tracker.refs === 0) {
+        const tracker = this.cache.get(key);
+        if (!tracker) throw new Error(`${this.constructor.name}.acquire: no tracker for "${key}" (ensure() first, or it was already destroyed)`);
+
+        if (tracker.refs === 0) {            // revive
             this.pendingDelete.delete(key);
-            tracker.deleteAtFrame = -1
+            tracker.deleteAtFrame = -1;
         }
         tracker.refs++;
     }
 
     release(key: string) {
-        const tracker = this.cache.get(key)!;
-        tracker.refs--;
-        // grace set to zero for now I'll change it after I make sure the base works fine
-        tracker.deleteAtFrame = this.frame + 0
-        if (tracker.refs === 0) this.pendingDelete.set(key, tracker);
+        const tracker = this.cache.get(key);
+        if (!tracker) throw new Error(`${this.constructor.name}.release: no tracker for "${key}"`);
+        if (tracker.refs <= 0) throw new Error(`${this.constructor.name}.release: refs would go below 0 for "${key}" (acquire/release mismatch)`);
+
+        if (--tracker.refs === 0) {
+            tracker.deleteAtFrame = this.frame + 0;   // keep GRACE_FRAMES = 0 for now
+            this.pendingDelete.set(key, tracker);
+        }
     }
 
     collect() {

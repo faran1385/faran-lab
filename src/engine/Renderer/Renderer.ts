@@ -139,6 +139,7 @@ export class Renderer {
         pass.end();
         this.device.queue.submit([encoder.finish()]);
         this.renderCache.endFrame(ctx)
+        console.log(this.managers.pipelineManager.getCacheLength())
         this.managers.endFrame()
         this.producer.clear()
     }

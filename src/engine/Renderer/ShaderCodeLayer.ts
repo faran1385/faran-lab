@@ -8,12 +8,11 @@ export interface GeneratedStages {
 
 /** The shader code layer: runs a primitive's assemblers when its code generation flag says the code is out of date. */
 export class ShaderCodeLayer {
-    static generate(p: PrimitiveWrapper, ctx: RenderContext): GeneratedStages {
+    static generate(p: PrimitiveWrapper, ctx: RenderContext) {
         const {producer} = ctx;
         const pipeline = p.getPipeline();
         const vertexWrapper = pipeline.getVertexShaderWrapper();
         const fragmentWrapper = pipeline.getFragmentShaderWrapper();
-        const generated: GeneratedStages = {vertex: false, fragment: false};
 
         if (vertexWrapper.hashProvider.needsUpdateCodeGen()) {
             const entryPoint = vertexWrapper.getEntryPoint();
@@ -23,7 +22,6 @@ export class ShaderCodeLayer {
             }), entryPoint);
             vertexWrapper.setShader(code, entryPoint);
             vertexWrapper.hashProvider.syncCodeGen();
-            generated.vertex = true;
         }
 
         if (fragmentWrapper.hashProvider.needsUpdateCodeGen()) {
@@ -35,9 +33,7 @@ export class ShaderCodeLayer {
             }), entryPoint);
             fragmentWrapper.setShader(code, entryPoint);
             fragmentWrapper.hashProvider.syncCodeGen();
-            generated.fragment = true;
         }
 
-        return generated;
     }
 }
