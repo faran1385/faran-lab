@@ -169,9 +169,13 @@ export class vec3 {
         const vv = out === v ? this.clone(v) : v;
 
 
-        out[0] = m[0] * vv[0] + m[4] * vv[1] + m[8] * vv[2];
-        out[1] = m[1] * vv[0] + m[5] * vv[1] + m[9] * vv[2];
-        out[2] = m[2] * vv[0] + m[6] * vv[1] + m[10] * vv[2];
+        const x = vv[0], y = vv[1], z = vv[2];
+        const w = m[3] * x + m[7] * y + m[11] * z + m[15];
+        const iw = w === 0 ? 1 : 1 / w;
+
+        out[0] = (m[0] * x + m[4] * y + m[8] * z + m[12]) * iw;
+        out[1] = (m[1] * x + m[5] * y + m[9] * z + m[13]) * iw;
+        out[2] = (m[2] * x + m[6] * y + m[10] * z + m[14]) * iw;
 
         return out;
     }
@@ -181,7 +185,7 @@ export class vec3 {
         const lengthSquare = length * length;
 
         if (lengthSquare === 0) {
-            out.set([0, 0, 0, 0])
+            out.set([v[0], v[1], v[2]])
             return out;
         }
 
