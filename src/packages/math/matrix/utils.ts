@@ -24,9 +24,9 @@ export function matrixMultiplication(
 
 export function matrixTranspose(out: Float32Array, a: Float32Array, dimension: number) {
     if (out !== a) {
-        for (let i = 0; i < dimension; i++) {
-            for (let j = 0; j < dimension; j++) {
-                out[j + i * dimension] = a[i + j * dimension];
+        for (let col = 0; col < dimension; col++) {
+            for (let row = 0; row < dimension; row++) {
+                out[col * dimension + row] = a[row * dimension + col];
             }
         }
     } else {
