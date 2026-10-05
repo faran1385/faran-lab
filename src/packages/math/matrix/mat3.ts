@@ -278,12 +278,24 @@ export class mat3 {
             out[1] = (mat[6] - mat[2]) / (4 * w);
             out[2] = (mat[1] - mat[3]) / (4 * w);
             out[3] = w;
+        } else if (mat[0] > mat[4] && mat[0] > mat[8]) {
+            const s = 2 * Math.sqrt(1 + mat[0] - mat[4] - mat[8]);
+            out[3] = (mat[5] - mat[7]) / s;
+            out[0] = 0.25 * s;
+            out[1] = (mat[3] + mat[1]) / s;
+            out[2] = (mat[6] + mat[2]) / s;
+        } else if (mat[4] > mat[8]) {
+            const s = 2 * Math.sqrt(1 + mat[4] - mat[0] - mat[8]);
+            out[3] = (mat[6] - mat[2]) / s;
+            out[0] = (mat[3] + mat[1]) / s;
+            out[1] = 0.25 * s;
+            out[2] = (mat[7] + mat[5]) / s;
         } else {
-            const x = 0.5 * Math.sqrt(1 + mat[0] - mat[4] - mat[8])
-            out[3] = (mat[5] - mat[7]) / (4 * x)
-            out[1] = (mat[3] + mat[1]) / (4 * x)
-            out[2] = (mat[6] + mat[2]) / (4 * x)
-            out[0] = x
+            const s = 2 * Math.sqrt(1 + mat[8] - mat[0] - mat[4]);
+            out[3] = (mat[1] - mat[3]) / s;
+            out[0] = (mat[6] + mat[2]) / s;
+            out[1] = (mat[7] + mat[5]) / s;
+            out[2] = 0.25 * s;
         }
 
         return out;
