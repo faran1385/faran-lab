@@ -19,7 +19,7 @@ export class BasicVertexAssembler extends VertexAssemblerBase {
              ${bindingValues.get("worldMatrix")?.access} *
              vec4f(${inputValues.get("position")?.access},1.);
         
-            return VertexOutput(pos,${dataMap.get("baseColor")?.uv?.access ?? "vec2f(0,0)"},${inputValues.get("color")?.access ?? "vec4f(1.)"});
+            return VertexOutput(pos,${dataMap.get("baseColor")?.uv?.access ?? "vec2f(0,0)"});
         `
 
         return {
@@ -33,10 +33,6 @@ export class BasicVertexAssembler extends VertexAssemblerBase {
                 type: "vec2f",
                 name: "uv",
                 location: 0,
-            }, {
-                type: "vec4f",
-                name: "color",
-                location: 1,
             }]
         }
     }
@@ -51,7 +47,8 @@ export class BasicFragmentAssembler extends FragmentAssemblerBase {
         const baseColor = componentsMap.get("baseColor");
         const codeBody = `
         
-            let output=vec4f(input.color.xyz,input.color.a);
+            let baseColorTexture=${baseColor?.texture ? `textureSample(${baseColor.texture?.access},${baseColor.sampler?.access},input.uv)` : "vec4f(1.)"};
+            let output=vec4f(baseColorTexture.xyz * ${baseColor?.factor?.access ?? "vec3f(1)"}.xyz,1.);
             
             return FragmentOutput(output);
         `
@@ -67,10 +64,6 @@ export class BasicFragmentAssembler extends FragmentAssemblerBase {
                 location: 0,
                 type: "vec2f",
                 name: "uv"
-            }, {
-                location: 1,
-                type: "vec4f",
-                name: "color"
             }]
         }
     }

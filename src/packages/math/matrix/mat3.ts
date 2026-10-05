@@ -42,7 +42,8 @@ export class mat3 {
     }
 
     static copy(out: Float32Array, mat: Float32Array) {
-        return out.set(mat);
+        out.set(mat);
+        return out;
     }
 
     static transpose(out: Float32Array, mat: Float32Array) {
@@ -78,7 +79,9 @@ export class mat3 {
             - Bx * (Ay * Cz - Cy * Az)
             + Cx * (Ay * Bz - By * Az);
 
-        if (Math.abs(det) < 1e-8) {
+        const scale = Math.hypot(Ax, Ay, Az) * Math.hypot(Bx, By, Bz) * Math.hypot(Cx, Cy, Cz);
+
+        if (scale === 0 || Math.abs(det) <= 1e-6 * scale) {
             throw new Error("Matrix is not invertible");
         }
 
@@ -216,11 +219,10 @@ export class mat3 {
         const MT = this.create();
         this.transpose(MT, M);
 
-        const Rx = this.create();
-        this.rotateX(Rx, MT, rad);
-
-        matrixMultiplication(M, Rx, M, 3);
-        matrixMultiplication(out, mat, M, 3);
+        const R = this.create();
+        this.rotateX(R, M, rad);
+        matrixMultiplication(R, R, MT, 3);
+        matrixMultiplication(out, mat, R, 3);
 
         return out;
     }

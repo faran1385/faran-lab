@@ -48,7 +48,8 @@ export class mat4 {
     }
 
     static copy(out: Float32Array, mat: Float32Array) {
-        return out.set(mat);
+        out.set(mat);
+        return out;
     }
 
     static transpose(out: Float32Array, mat: Float32Array) {
@@ -271,15 +272,14 @@ export class mat4 {
             B[0], B[1], B[2], 0,
             C[0], C[1], C[2], 0,
             0, 0, 0, 1
-        )
+        );
         const MT = this.create();
         this.transpose(MT, M);
 
-        const Rx = this.create();
-        this.rotateX(Rx, MT, rad);
-
-        matrixMultiplication(M, Rx, M, 4);
-        matrixMultiplication(out, mat, M, 4);
+        const R = this.create();
+        this.rotateX(R, M, rad);              // M * RotX
+        matrixMultiplication(R, R, MT, 4);    // M * RotX * Mᵀ
+        matrixMultiplication(out, mat, R, 4);
 
         return out;
     }
@@ -384,10 +384,10 @@ export class mat4 {
         vec3.normalize(Y, Y);
 
         const RT = this.fromValues(
-            X[0], X[1], X[2], 0,
-            Y[0], Y[1], Y[2], 0,
-            Z[0], Z[1], Z[2], 0,
-            0, 0, 0, 1
+            X[0], Y[0], Z[0], 0,
+            X[1], Y[1], Z[1], 0,
+            X[2], Y[2], Z[2], 0,
+            0,    0,    0,    1
         );
 
         const TI = this.fromValues(

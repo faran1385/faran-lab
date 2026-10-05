@@ -85,7 +85,7 @@ export class NodeWrapper {
     }
 
     setRotation(x: number, y: number, z: number) {
-        quat.fromEuler(this.rotation, z, y, x)
+        quat.fromEuler(this.rotation, x, y, z)
         this.markSubtreeDirty();
     }
 
@@ -111,8 +111,9 @@ export class NodeWrapper {
     removeChild(child: NodeWrapper) {
         if (this.children.delete(child.uuid)) {
             child.parent = undefined;
+            child.markSubtreeDirty()
+            this.updateCachedChildren();
         }
-        this.updateCachedChildren();
     }
 
     getParent() {
@@ -135,7 +136,11 @@ export class NodeWrapper {
 
     buildWorldMatrix(parentMatrix: Float32Array | null, uploadToGPUBuffer: (hash: string, data: GPUAllowSharedBufferSource, offset: number) => void) {
         mat4.compose(this.localMatrix, this.translation as any, this.rotation as any, this.scale as any);
-        if (parentMatrix) mat4.mul(this.worldMatrix, parentMatrix, this.localMatrix);
+        if (parentMatrix) {
+            mat4.mul(this.worldMatrix, parentMatrix, this.localMatrix);
+        } else {
+            this.worldMatrix.set(this.localMatrix);
+        }
 
         this.hashProvider.syncTransformUpdate()
         if (this.mesh && this.mesh.getPrimitivesCount() > 0) uploadToGPUBuffer(this.uuid, this.worldMatrix, 0);

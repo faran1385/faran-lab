@@ -108,10 +108,10 @@ export class vec3 {
         );
     }
 
-    static copy(out: Float32Array, mat: Float32Array) {
-        return out.set(mat);
+    static copy(out: Float32Array, a: Float32Array) {
+        out.set(a);
+        return out;
     }
-
 
     static cross(out: Float32Array, a: Float32Array, b: Float32Array) {
         out[0] = a[1] * b[2] - a[2] * b[1];
@@ -123,33 +123,25 @@ export class vec3 {
 
     static slerp(out: Float32Array, a: Float32Array, b: Float32Array, t: number) {
         const A = vec3.create();
-        this.normalize(A, a)
+        this.normalize(A, a);
         const B = vec3.create();
-        this.normalize(B, b)
+        this.normalize(B, b);
 
-        let dot = this.dot(A, B);
+        const dot = Math.max(-1, Math.min(1, this.dot(A, B)));
 
-        dot = Math.max(-1, Math.min(1, dot));
-
-        if (Math.abs(dot) >= 0.9999) {
-            if (dot < 0) {
-                this.scale(B, B, -1);
-            }
+        if (dot >= 0.9999) {
             this.lerp(out, A, B, t);
-            this.normalize(out, out);
-            return out;
+            return this.normalize(out, out);
         }
 
         const theta = Math.acos(dot);
         const sinTheta = Math.sin(theta);
 
-        this.scale(A, A, Math.sin(((1 - t) * theta) / sinTheta))
-        this.scale(B, B, Math.sin((t * theta) / sinTheta))
+        this.scale(A, A, Math.sin((1 - t) * theta) / sinTheta);
+        this.scale(B, B, Math.sin(t * theta) / sinTheta);
 
-        this.add(out, A, B)
-        this.normalize(out, out);
-
-        return out;
+        this.add(out, A, B);
+        return this.normalize(out, out);
     }
 
     static transformMat3(out: Float32Array, v: Float32Array, m: Float32Array) {

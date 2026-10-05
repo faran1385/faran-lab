@@ -20,8 +20,9 @@ const loader = new GLBLoader();
 
 // const {root} = await loader.load("/test.glb");
 
+
 const camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.setPosition(0, 0, 1)
+camera.setPosition(0, 0, 3)
 const controls = new OrbitControls(camera, canvas, {enableDamping: true});
 
 
@@ -63,11 +64,16 @@ const node2 = new NodeWrapper();
 node2.addChild(node1)
 scene.addNode(node2)
 
+// node1.setRotation(.3, 0, 0)
+// node1.setRotation(0, .5, 0)
+
 let last = performance.now();
+
 function frame(): void {
     const now = performance.now();
     controls.update((now - last) / 1000);
     last = now;
+    node2.setRotation(0, performance.now() / 1000, 0)
 
     stats.begin();
     renderer.render(scene, camera);

@@ -12,36 +12,36 @@ export abstract class Camera {
     private viewMatrix = mat4.create();
     private projectionMatrix = mat4.create();
 
-    private readonly viewFlag = new VersionFlag();
-    private readonly projectionFlag = new VersionFlag();
+    private readonly _viewFlag = new VersionFlag();
+    private readonly _projectionFlag = new VersionFlag();
     private readonly uploadVewFlag = new VersionFlag();
     private readonly uploadProjectionFlag = new VersionFlag();
 
     constructor() {
         this.uuid = uuidv4();
-        this.viewFlag.addVersion();
+        this._viewFlag.addVersion();
         this.uploadVewFlag.addVersion()
-        this.projectionFlag.addVersion();
+        this._projectionFlag.addVersion();
         this.uploadProjectionFlag.addVersion()
     }
 
     setPosition(x: number, y: number, z: number): this {
         vec3.set(this.position, x, y, z);
-        this.viewFlag.addVersion();
+        this._viewFlag.addVersion();
         this.uploadVewFlag.addVersion()
         return this;
     }
 
     lookAt(x: number, y: number, z: number): this {
         vec3.set(this.target, x, y, z);
-        this.viewFlag.addVersion();
+        this._viewFlag.addVersion();
         this.uploadVewFlag.addVersion()
         return this;
     }
 
     setUp(x: number, y: number, z: number): this {
         vec3.set(this.up, x, y, z);
-        this.viewFlag.addVersion();
+        this._viewFlag.addVersion();
         this.uploadVewFlag.addVersion()
         return this;
     }
@@ -51,29 +51,22 @@ export abstract class Camera {
     }
 
     getViewMatrix() {
-        if (this.viewFlag.needsUpdate()) {
+        if (this._viewFlag.needsUpdate()) {
             mat4.lookAt(this.viewMatrix, this.position, this.target, this.up);
-            this.viewFlag.sync();
+            this._viewFlag.sync();
         }
         return this.viewMatrix;
     }
 
     getProjectionMatrix() {
-        if (this.projectionFlag.needsUpdate()) {
+        if (this._projectionFlag.needsUpdate()) {
             this.updateProjectionMatrix(this.projectionMatrix);
-            this.projectionFlag.sync();
+            this._projectionFlag.sync();
         }
         return this.projectionMatrix;
     }
 
 
-    isViewDirty(): boolean {
-        return this.viewFlag.needsUpdate();
-    }
-
-    isProjectionDirty(): boolean {
-        return this.projectionFlag.needsUpdate();
-    }
 
     isUploadViewDirty() {
         return this.uploadVewFlag.needsUpdate();
@@ -92,7 +85,7 @@ export abstract class Camera {
     }
 
     protected markProjectionDirty(): void {
-        this.projectionFlag.addVersion();
+        this._projectionFlag.addVersion();
         this.uploadProjectionFlag.addVersion()
     }
 

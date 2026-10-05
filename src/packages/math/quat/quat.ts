@@ -110,34 +110,31 @@ export class quat {
 
     static slerp(out: Float32Array, a: Float32Array, b: Float32Array, t: number) {
         const A = vec4.create();
-        this.normalize(A, a)
+        this.normalize(A, a);
         const B = vec4.create();
-        this.normalize(B, b)
-
+        this.normalize(B, b);
 
         let dot = vec4.dot(A, B);
 
-        dot = Math.max(-1, Math.min(1, dot));
+        if (dot < 0) {
+            vec4.scale(B, B, -1);
+            dot = -dot;
+        }
+        dot = Math.min(1, dot);
 
-        if (Math.abs(dot) >= 0.9999) {
-            if (dot < 0) {
-                vec4.scale(B, B, -1);
-            }
+        if (dot >= 0.9999) {
             this.lerp(out, A, B, t);
-            this.normalize(out, out);
-            return out;
+            return this.normalize(out, out);
         }
 
         const theta = Math.acos(dot);
         const sinTheta = Math.sin(theta);
 
-        vec4.scale(A, A, Math.sin(((1 - t) * theta) / sinTheta))
-        vec4.scale(B, B, Math.sin((t * theta) / sinTheta))
+        vec4.scale(A, A, Math.sin((1 - t) * theta) / sinTheta);
+        vec4.scale(B, B, Math.sin(t * theta) / sinTheta);
 
-        this.add(out, A, B)
-        this.normalize(out, out);
-
-        return out;
+        this.add(out, A, B);
+        return this.normalize(out, out);
     }
 
     static toMat3(out: Float32Array, quat: Float32Array) {
@@ -218,19 +215,15 @@ export class quat {
     }
 
 
-    static fromEuler(out: Float32Array, roll: number, yaw: number, pitch: number) {
-        const cr = Math.cos(roll / 2)
-        const sr = Math.sin(roll / 2)
-        const cp = Math.cos(pitch / 2)
-        const sp = Math.sin(pitch / 2)
-        const cy = Math.cos(yaw / 2)
-        const sy = Math.sin(yaw / 2)
+    static fromEuler(out: Float32Array, x: number, y: number, z: number) {
+        const cx = Math.cos(x / 2), sx = Math.sin(x / 2);
+        const cy = Math.cos(y / 2), sy = Math.sin(y / 2);
+        const cz = Math.cos(z / 2), sz = Math.sin(z / 2);
 
-        out[0] = cy * sp * cr + sy * cp * sr;
-        out[1] = sy * cp * cr - cy * sp * sr;
-        out[2] = cy * cp * sr - sy * sp * cr;
-        out[3] = cy * cp * cr + sy * sp * sr;
-
+        out[0] = sx * cy * cz + cx * sy * sz;
+        out[1] = cx * sy * cz - sx * cy * sz;
+        out[2] = cx * cy * sz - sx * sy * cz;
+        out[3] = cx * cy * cz + sx * sy * sz;
         return out;
     }
 }

@@ -97,8 +97,9 @@ export class vec4 {
         return out;
     }
 
-    static copy(out: Float32Array, mat: Float32Array) {
-        return out.set(mat);
+    static copy(out: Float32Array, a: Float32Array) {
+        out.set(a);
+        return out;
     }
 
     static distance(a: Float32Array, b: Float32Array) {
