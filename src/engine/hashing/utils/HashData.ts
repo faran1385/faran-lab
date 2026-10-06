@@ -2,6 +2,7 @@
  * Every hash the render path needs, resolved once by the HashResolver and handed to everything downstream.
  * Producers, the resource layer and the item assembler read these strings; none of them calls a convertTo*Hash().
  */
+import type {PipelineVariant} from "../../wrappers/PipelineWrapper.ts";
 
 export interface MaterialTextureHashes {
     image: string;
@@ -34,7 +35,8 @@ export interface GeometryHashes {
 export interface PipelineHashes {
     vertexShader: string;
     fragmentShader: string;
-    pipeline: string;
+    /** One pipeline hash per cull-mode variant, in draw order. Look up through PIPELINE_VARIANT_ORDER. */
+    pipelines: Map<PipelineVariant, string>;
 }
 
 export interface HashData {

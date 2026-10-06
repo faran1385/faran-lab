@@ -3,6 +3,7 @@ import type {PrimitiveWrapper} from "../wrappers/PrimitiveWrapper.ts";
 import type {GeometryHashes, HashData} from "../hashing/utils/HashData.ts";
 import type {DrawInfo, RenderItem, VertexBufferBinding} from "./RenderItem.ts";
 import type {RenderContext} from "./RenderContext.ts";
+import {PIPELINE_VARIANT_ORDER} from "../wrappers/PipelineWrapper.ts";
 
 /** The item layer: pure lookup. Reads resolved hashes and the managers' resources, creates and computes nothing. */
 export class RenderItemAssembler {
@@ -10,7 +11,7 @@ export class RenderItemAssembler {
         const {managers, rendererUUID} = ctx;
 
         return {
-            pipeline: managers.pipelineManager.getRaw(data.pipeline.pipeline),
+            pipelines: RenderItemAssembler.pipelines(data, ctx),
             bindGroups: [
                 {slot: 0, bindGroup: managers.bindgroupManager.getRaw(rendererUUID)},
                 {slot: 1, bindGroup: managers.bindgroupManager.getRaw(data.material.bindgroup)},
@@ -20,6 +21,16 @@ export class RenderItemAssembler {
             draw: RenderItemAssembler.drawInfo(p, data.geometry, ctx),
             hashData: data
         };
+    }
+
+    /** Fixed draw order, never Map iteration order: back faces (cullMode "front") must be drawn before front faces. */
+    private static pipelines(data: HashData, ctx: RenderContext): GPURenderPipeline[] {
+        const result: GPURenderPipeline[] = [];
+        for (const variant of PIPELINE_VARIANT_ORDER) {
+            const hash = data.pipeline.pipelines.get(variant);
+            if (hash !== undefined) result.push(ctx.managers.pipelineManager.getRaw(hash));
+        }
+        return result;
     }
 
     private static vertexBuffers(p: PrimitiveWrapper, geometry: GeometryHashes, ctx: RenderContext): VertexBufferBinding[] {

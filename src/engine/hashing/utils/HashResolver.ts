@@ -1,7 +1,7 @@
 import type {Hasher} from "./Hasher.ts";
 import type {MaterialWrapper} from "../../wrappers/MaterialWrapper.ts";
 import type {GeometryWrapper} from "../../wrappers/GeometryWrapper.ts";
-import type {PipelineWrapper} from "../../wrappers/PipelineWrapper.ts";
+import {PIPELINE_VARIANT_ORDER, pipelineVariantsOf, type PipelineWrapper} from "../../wrappers/PipelineWrapper.ts";
 import type {MaterialBindingPlan} from "../../producers/BindGroupLayoutProducer.ts";
 import type {
     GeometryHashes,
@@ -27,7 +27,7 @@ interface CacheEntry<T> {
 
 export const EMPTY_HASH_DATA: HashData = {
     pipeline: {
-        pipeline: "",
+        pipelines: new Map(),
         fragmentShader: "",
         vertexShader: ""
     },
@@ -155,7 +155,12 @@ export class HashResolver {
         this.chg(managers.shaderModuleManager, newHashData.pipeline.vertexShader, oldHashData.pipeline.vertexShader)
         this.chg(managers.shaderModuleManager, newHashData.pipeline.fragmentShader, oldHashData.pipeline.fragmentShader)
 
-        this.chg(managers.pipelineManager, newHashData.pipeline.pipeline, oldHashData.pipeline.pipeline)
+        // Per variant. A variant hash embeds its cull mode, so equal hashes only ever meet under the same key:
+        // a variant present on both sides with the same hash nets out, a changed one acquires new / releases old,
+        // and a variant that appeared or disappeared only acquires or only releases.
+        for (const variant of PIPELINE_VARIANT_ORDER) {
+            this.chg(managers.pipelineManager, newHashData.pipeline.pipelines.get(variant) ?? "", oldHashData.pipeline.pipelines.get(variant) ?? "")
+        }
     }
 
     acquireEntry(node: NodeWrapper, entry: NodeRenderEntry, ctx: RenderContext) {
@@ -182,16 +187,19 @@ export class HashResolver {
 
     /**
      * Per primitive. Needs the shader hashes, so it runs after code generation. `computed` is true when any pipeline
-     * input differs from what this primitive's pipeline was last resolved with.
+     * input differs from what this primitive's pipelines were last resolved with. The variants (one pipeline per cull
+     * mode) are derived from the material's alphaMode and doubleSided, which `material.pipelineSettings` covers.
      */
-    resolvePipeline(pipeline: PipelineWrapper, material: MaterialHashes, geometry: GeometryHashes): Resolved<PipelineHashes> {
+    resolvePipeline(pipeline: PipelineWrapper, materialWrapper: MaterialWrapper, material: MaterialHashes, geometry: GeometryHashes): Resolved<PipelineHashes> {
         const h = this.hasher;
         const vertexShader = pipeline.getVertexShaderWrapper().hashProvider.convertToHash(h);
         const fragmentShader = pipeline.getFragmentShaderWrapper().hashProvider.convertToHash(h);
 
-        const changed = pipeline.hashProvider.setInputs(vertexShader, fragmentShader, material.layout, geometry.attributesShape, material.pipelineSettings, "front");
-        const hash = changed ? pipeline.hashProvider.convertToHash(h) : pipeline.hashProvider.getCachedHash();
+        const changed = pipeline.hashProvider.setInputs(vertexShader, fragmentShader, material.layout, geometry.attributesShape, material.pipelineSettings);
+        const pipelines = changed
+            ? pipeline.hashProvider.computeVariants(h, pipelineVariantsOf(materialWrapper.getAlphaMode(), materialWrapper.getDoubleSided()))
+            : pipeline.hashProvider.getCachedVariants();
 
-        return {hashes: {vertexShader, fragmentShader, pipeline: hash}, computed: changed};
+        return {hashes: {vertexShader, fragmentShader, pipelines}, computed: changed};
     }
 }

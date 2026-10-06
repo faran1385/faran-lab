@@ -77,14 +77,17 @@ export class ResourceLayer {
     static pipeline(p: PrimitiveWrapper, data: HashData, ctx: RenderContext): void {
         const {managers, producer, frame} = ctx;
 
-        managers.pipelineManager.ensure(data.pipeline.pipeline, () => producer.producePipeline({
-            frame: {colorFormat: frame.colorFormat, depthFormat: frame.depthFormat},
-            hashes: data,
-            geometry: p.getGeometry(),
-            material: p.getMaterial(),
-            pipelineLayouts: managers.pipelineLayoutManager,
-            pipeline: p.getPipeline(),
-            shaderModules: managers.shaderModuleManager
-        }));
+        for (const [cullMode, hash] of data.pipeline.pipelines) {
+            managers.pipelineManager.ensure(hash, () => producer.producePipeline({
+                cullMode,
+                frame: {colorFormat: frame.colorFormat, depthFormat: frame.depthFormat},
+                hashes: data,
+                geometry: p.getGeometry(),
+                material: p.getMaterial(),
+                pipelineLayouts: managers.pipelineLayoutManager,
+                pipeline: p.getPipeline(),
+                shaderModules: managers.shaderModuleManager
+            }));
+        }
     }
 }

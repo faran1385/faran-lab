@@ -1,4 +1,4 @@
-import type {PipelineWrapper} from "../wrappers/PipelineWrapper.ts";
+import type {PipelineVariant, PipelineWrapper} from "../wrappers/PipelineWrapper.ts";
 import type {MaterialWrapper} from "../wrappers/MaterialWrapper.ts";
 import type {GeometryWrapper} from "../wrappers/GeometryWrapper.ts";
 import type {HashData} from "../hashing/utils/HashData.ts";
@@ -13,6 +13,8 @@ export interface FrameTargetInfo {
 
 export interface PipelineProduceArgs {
     pipeline: PipelineWrapper;
+    /** Which variant to build. This is the only thing that differs between a primitive's pipelines. */
+    cullMode: PipelineVariant;
     material: MaterialWrapper;
     geometry: GeometryWrapper;
     hashes: HashData;
@@ -23,7 +25,7 @@ export interface PipelineProduceArgs {
 
 export class PipelineProducer {
     static produce(
-        {pipeline, material, hashes, frame, shaderModules, pipelineLayouts}: PipelineProduceArgs,
+        {pipeline, cullMode, material, hashes, frame, shaderModules, pipelineLayouts}: PipelineProduceArgs,
         getAttributePlan: () => GeometryAttributePlan,
     ): GPURenderPipelineDescriptor {
         const vs = pipeline.getVertexShaderWrapper();
@@ -60,7 +62,7 @@ export class PipelineProducer {
             },
             primitive: {
                 topology: "triangle-list",
-                cullMode: PipelineProducer.cullMode(material, pipeline.hashProvider.getFacePass()),
+                cullMode,
             },
             depthStencil: {
                 format: frame.depthFormat,
@@ -68,12 +70,5 @@ export class PipelineProducer {
                 depthCompare: "less",
             },
         };
-    }
-
-    private static cullMode(material: MaterialWrapper, facePass: "single" | "back" | "front"): GPUCullMode {
-        if (!material.getDoubleSided()) return "back";
-        if (facePass === "back") return "front";  // this variant draws back faces only
-        if (facePass === "front") return "back";  // this variant draws front faces only
-        return "none";
     }
 }

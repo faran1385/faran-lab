@@ -85,7 +85,7 @@ export class RenderItemBuilder {
         UpdateLayer.syncShaderInputs(p, materialHashes.hashes, geometryHashes.hashes);
         ShaderCodeLayer.generate(p, ctx);                       // return value no longer needed
 
-        const pipelineHashes = hashes.resolvePipeline(p.getPipeline(), materialHashes.hashes, geometryHashes.hashes);
+        const pipelineHashes = hashes.resolvePipeline(p.getPipeline(), material, materialHashes.hashes, geometryHashes.hashes);
         const data: HashData = {
             material: materialHashes.hashes,
             geometry: geometryHashes.hashes,

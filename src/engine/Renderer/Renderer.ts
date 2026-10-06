@@ -116,19 +116,24 @@ export class Renderer {
 
         scene.traverse((node) => {
             for (const item of RenderItemBuilder.build(node, ctx)) {
-                pass.setPipeline(item.pipeline);
+                // bind groups and buffers are shared by every variant: set once, then one setPipeline + draw per variant
                 for (const bg of item.bindGroups) {
                     pass.setBindGroup(bg.slot, bg.bindGroup)
                 }
                 for (const vb of item.vertexBuffers) {
                     pass.setVertexBuffer(vb.slot, vb.buffer)
                 }
-
                 if (item.draw.indexed) {
                     pass.setIndexBuffer(item.draw.indexBuffer!, item.draw.indexFormat!);
-                    pass.drawIndexed(item.draw.count);
-                } else {
-                    pass.draw(item.draw.count);
+                }
+
+                for (const pipeline of item.pipelines) {
+                    pass.setPipeline(pipeline);
+                    if (item.draw.indexed) {
+                        pass.drawIndexed(item.draw.count);
+                    } else {
+                        pass.draw(item.draw.count);
+                    }
                 }
             }
         });

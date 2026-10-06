@@ -19,7 +19,11 @@ export interface BindGroupBinding {
 
 export interface RenderItem {
     hashData: HashData,
-    pipeline: GPURenderPipeline;
+    /**
+     * One pipeline per cull-mode variant, in draw order (back faces before front faces for double-sided blend).
+     * Everything else in the item is shared by all of them.
+     */
+    pipelines: GPURenderPipeline[];
     bindGroups: BindGroupBinding[];
     vertexBuffers: VertexBufferBinding[];
     draw: DrawInfo;
