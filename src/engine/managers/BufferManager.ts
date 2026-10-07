@@ -11,6 +11,7 @@ export class BufferManager extends ResourceManager<BufferDescriptor, BufferTrack
         const buffer = this.device.createBuffer({ label, size, usage, mappedAtCreation: true });
         new Uint8Array(buffer.getMappedRange()).set(new Uint8Array(data));
         buffer.unmap();
+        console.log("created")
         return new BufferTracker(buffer);
     }
 

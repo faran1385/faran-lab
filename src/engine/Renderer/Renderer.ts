@@ -145,6 +145,7 @@ export class Renderer {
         this.device.queue.submit([encoder.finish()]);
         this.renderCache.endFrame(ctx)
         this.managers.endFrame()
+        console.log(this.managers.bufferManager.getCacheLength())
         this.producer.clear()
     }
 }

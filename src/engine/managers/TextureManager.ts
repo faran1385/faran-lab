@@ -19,8 +19,13 @@ export class TextureManager extends ResourceManager<TextureDescriptor, TextureTr
     }
 
     protected build(getDescriptor: () => TextureDescriptor): TextureTracker {
-        const desc = getDescriptor();
+        const {desc, uploadData} = getDescriptor();
         const texture = this.device.createTexture(desc);
+        this.device.queue.writeTexture({texture}, uploadData.data, {bytesPerRow: uploadData.bytesPerRow}, {
+            width: uploadData.width,
+            height: uploadData.height
+        });
+
         return new TextureTracker(texture);
     }
 }

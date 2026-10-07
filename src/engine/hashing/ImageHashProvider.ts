@@ -7,7 +7,7 @@ import {VersionFlag} from "./utils/VersionFlag.ts";
 export class ImageHashProvider {
     protected hashHandler!: HashHandler;
     private readonly changeStamp = new ChangeStamp();
-    private needsUpdateFlag = new VersionFlag()
+    private needsUpdateFlag = new VersionFlag(false)
 
     constructor(uuid: string, getDimentions: ImageWrapper["getDimensions"], getFormat: ImageWrapper["getFormat"]) {
         this.hashHandler = new HashHandler(() => `${uuid}|${getDimentions().width}|${getDimentions().height}|${getFormat()}`);

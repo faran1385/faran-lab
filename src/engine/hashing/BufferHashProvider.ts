@@ -2,7 +2,7 @@ import {VersionFlag} from "./utils/VersionFlag.ts";
 import {ChangeStamp} from "./utils/ChangeStamp.ts";
 
 export class BufferHashProvider {
-    private needsUpdateFlag = new VersionFlag()
+    private needsUpdateFlag = new VersionFlag(false)
     private wrapperUUID: string
     private readonly changeStamp = new ChangeStamp();
 

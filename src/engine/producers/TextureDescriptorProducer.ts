@@ -1,6 +1,9 @@
 import type {ImageWrapper} from "../wrappers/ImageWrapper.ts";
 
-export type TextureDescriptor = GPUTextureDescriptor
+export type TextureDescriptor = {
+    desc: GPUTextureDescriptor,
+    uploadData: TextureUpdateDescriptor
+}
 
 export interface TextureUpdateDescriptor {
     data: ArrayBuffer;
@@ -20,10 +23,13 @@ export class TextureProducer {
         const format = image.getFormat();
 
         return {
-            label: image.uuid,
-            size: {width, height},
-            format,
-            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+            uploadData: this.produceUpdate(image),
+            desc: {
+                label: image.uuid,
+                size: {width, height},
+                format,
+                usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+            }
         };
     }
 

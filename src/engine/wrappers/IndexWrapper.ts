@@ -6,7 +6,7 @@ export class IndexAttributeWrapper extends BufferWrapper<GPUBufferUsage["INDEX"]
     readonly format: IndexFormat;
 
     constructor(data: ArrayBuffer, format: IndexFormat) {
-        super(data, GPUBufferUsage.INDEX);
+        super(data, GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST);
         this.format = format;
     }
 }

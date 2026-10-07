@@ -51,7 +51,6 @@ export class UpdateLayer {
         }
 
         if (!isTheLastFrameCamera) cache.lastCameraUUID = camera.uuid
-
     }
 
     /**
@@ -60,7 +59,6 @@ export class UpdateLayer {
      */
     static uploadFactors(material: MaterialWrapper, hashes: MaterialHashes, ctx: RenderContext): void {
         const {managers, producer} = ctx;
-
         if (material.hashProvider.factorNeedsUpdate()) {
             const item = producer.getFactorPlan(material).get("alphaCutOff")!;
             this.preAllocatedArray.set([item.factor as number], 0);
@@ -101,12 +99,14 @@ export class UpdateLayer {
         const {managers} = ctx;
 
         const indices = geometry.getIndices();
-
-        if (indices && indices.hashProvider.needsUpdate()) managers.bufferManager.upload(hashes.indices!, indices.getData(), 0)
+        if (indices && indices.hashProvider.needsUpdate()) {
+            managers.bufferManager.upload(hashes.indices!, indices.getData(), 0)
+            indices.hashProvider.syncNeedsUpdate();
+        }
 
         for (const attribute of geometry.getAttributes().values()) {
             if (!attribute.hashProvider.needsUpdate()) continue;
-
+            console.log("er")
             managers.bufferManager.upload(hashes.attributeBuffers.get(attribute.name)!, attribute.getData())
             attribute.hashProvider.syncNeedsUpdate()
         }
