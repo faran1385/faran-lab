@@ -32,13 +32,7 @@ export class MaterialHashProvider {
             getSortedComponents: T.getSortedComponents
         }
         this.pipelineSettingsHash = new HashHandler(() => `${T.getAlphaMode()}|${T.getDoubleSided()}`)
-        this.factorsHash = new AggregateHashHandler(() => {
-            let i = 1;
-            T.getSortedComponents().forEach((c) => {
-                i += c.getFactors().length;
-            })
-            return `${uuid}${i}`
-        })
+        this.factorsHash = new AggregateHashHandler(() => uuid + T.getSortedComponents().map(c => `${c.name}${c.getFactors().length}`).join("|"))
         this.shaderHash = new AggregateHashHandler((hasher) =>
             `${T.getAlphaMode()}|` + T.getSortedComponents()
                 .map((c) => `${c.name}:${c.hashProvider.convertToShaderKeyHash(hasher)}`)

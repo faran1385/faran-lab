@@ -100,6 +100,10 @@ export class UpdateLayer {
     static updateAttributeBuffers(geometry: GeometryWrapper, hashes: GeometryHashes, ctx: RenderContext): void {
         const {managers} = ctx;
 
+        const indices = geometry.getIndices();
+
+        if (indices && indices.hashProvider.needsUpdate()) managers.bufferManager.upload(hashes.indices!, indices.getData(), 0)
+
         for (const attribute of geometry.getAttributes().values()) {
             if (!attribute.hashProvider.needsUpdate()) continue;
 

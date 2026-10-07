@@ -226,7 +226,6 @@ export class FragmentShaderProducer {
     ): FragmentShaderDescriptor {
         const bindingPlan = getBindingPlan();
         const factorPlan = getFactorsPlan();
-
         return {
             bindings: [...sceneBindings(), ...materialBindings(bindingPlan, factorPlan)],
             componentDataMap: fragmentComponentDataMap(bindingPlan, factorPlan),
