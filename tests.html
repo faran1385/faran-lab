@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>faran-lab renderer stress tests</title>
+    <link rel="icon" href="data:,"/>
+    <style>
+        body { font: 14px/1.45 ui-monospace, Menlo, Consolas, monospace; background: #101114; color: #d8dae0; margin: 0; padding: 16px; }
+        h1 { font-size: 16px; margin: 0 0 4px; }
+        #summary { margin: 0 0 14px; color: #9aa0ad; }
+        #rigs { position: fixed; right: 12px; top: 12px; display: flex; flex-direction: column; gap: 6px; max-height: 90vh; overflow: hidden; }
+        #rigs canvas { width: 128px; height: 128px; border: 1px solid #2a2d36; background: #000; }
+        details { border-left: 3px solid #444; margin: 6px 0; padding: 2px 10px; max-width: 980px; }
+        details.pass { border-color: #3fb950; }
+        details.warn { border-color: #d29922; }
+        details.fail, details.error { border-color: #f85149; }
+        summary { cursor: pointer; }
+        small { color: #7b8190; }
+        .desc { color: #7b8190; margin: 4px 0; }
+        pre { white-space: pre-wrap; word-break: break-word; margin: 4px 0; padding: 6px 8px; background: #181a20; border-radius: 4px; }
+        pre.fail { color: #ff9b95; }
+        pre.warn { color: #e3b341; }
+        pre.info { color: #8b949e; }
+    </style>
+</head>
+<body>
+<h1>faran-lab renderer stress tests</h1>
+<p id="summary">starting…</p>
+<div id="results"></div>
+<div id="rigs"></div>
+<script type="module" src="/src/tests/run.ts"></script>
+</body>
+</html>

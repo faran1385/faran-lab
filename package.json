@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:render": "vite --open /tests.html"
   },
   "devDependencies": {
     "@types/stats.js": "^0.17.4",
