@@ -10,7 +10,7 @@ export class ImageHashProvider {
     private needsUpdateFlag = new VersionFlag()
 
     constructor(uuid: string, getDimentions: ImageWrapper["getDimensions"], getFormat: ImageWrapper["getFormat"]) {
-        this.hashHandler = new HashHandler(() => `${uuid}|${getDimentions()}|${getFormat()}`);
+        this.hashHandler = new HashHandler(() => `${uuid}|${getDimentions().width}|${getDimentions().height}|${getFormat()}`);
 
     }
 

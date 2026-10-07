@@ -26,7 +26,7 @@ export class Renderer {
     colorRenderTarget: RenderTarget | null = null;
     depthRenderTarget!: RenderTarget;
 
-    private hasher!: Hasher;
+    hasher!: Hasher;
     private hashResolver!: HashResolver;
     private readonly producer = new CentralProducer();
     private readonly renderCache = new RenderCache();
@@ -144,7 +144,6 @@ export class Renderer {
         pass.end();
         this.device.queue.submit([encoder.finish()]);
         this.renderCache.endFrame(ctx)
-        console.log(this.managers.pipelineManager.getCacheLength())
         this.managers.endFrame()
         this.producer.clear()
     }

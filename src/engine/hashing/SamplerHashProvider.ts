@@ -15,7 +15,7 @@ export class SamplerHashProvider {
     private readonly changeStamp = new ChangeStamp();
 
     constructor(T: InputFunctions) {
-        this.hashHandler = new HashHandler(() => `${T.getMinFilter()}|${T.getMinFilter()}|${T.getMipFilter()}|${T.getAddressModeU()}|${T.getAddressModeV()}`);
+        this.hashHandler = new HashHandler(() => `${T.getMinFilter()}|${T.getMagFilter()}|${T.getMipFilter()}|${T.getAddressModeU()}|${T.getAddressModeV()}`);
     }
 
     markHashHandler() {

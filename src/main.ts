@@ -10,6 +10,12 @@ import {NodeWrapper} from "./engine/wrappers/NodeWrapper.ts";
 import {AttributeWrapper} from "./engine/wrappers/AttributeWrapper.ts";
 import {GLBLoader} from "./engine/loaders/GLBLoader.ts";
 import {OrbitControls} from "./engine/Controls/OrbitControls.ts";
+import {MaterialComponentWrapper} from "./engine/wrappers/MaterialComponentWrapper.ts";
+import {FragmentAssemblerBase, type FragmentPhase2Output} from "./engine/Assemblers/BaseAssembler.ts";
+import {BasicVertexAssembler} from "./engine/Assemblers/BasicAssembler/BasicAssembler.ts";
+import {ImageWrapper} from "./engine/wrappers/ImageWrapper.ts";
+import {SamplerWrapper} from "./engine/wrappers/SamplerWrapper.ts";
+import {TextureWrapper} from "./engine/wrappers/TextureWrapper.ts";
 
 const canvas = document.getElementById("gpu-canvas") as HTMLCanvasElement;
 let stats = new Stats.default();
@@ -36,6 +42,45 @@ const renderer = new Renderer(canvas);
 await renderer.init()
 renderer.setSize(window.innerWidth, window.innerHeight)
 
+class AlphaCutoffProbeAssembler extends FragmentAssemblerBase {
+    protected fragmentPhase2(
+        _varyingValues: any,
+        bindingValues: any,
+        _components: any,
+        _builtinValues: any,
+    ): FragmentPhase2Output {
+        const cutoff = bindingValues.get("alphaCutOff")!.access;
+
+        return {
+            body: `
+                let v = ${cutoff};
+                return FragmentOutput(vec4f(v, v, v, 1.0));
+            `,
+            usedBuiltins: [],
+            expectedFromVertex: [],
+            outputs: [{type: "vec4f", name: "color", location: 0}],
+        };
+    }
+}
+
+const mat = new MaterialWrapper({
+    alphaCutoff: 0.8,
+});
+
+// Sorted order: c, d
+//
+// c = f32
+// d = vec4f
+//
+// This layout ends up larger because d needs 16-byte alignment.
+mat.setComponent(
+    new MaterialComponentWrapper("c", [0])
+);
+
+mat.setComponent(
+    new MaterialComponentWrapper("d", [1, 0, 1, 1])
+);
+
 
 const pa1 = new AttributeWrapper("position", new Float32Array([
     -0.5, -0.5, 0.0,
@@ -43,42 +88,40 @@ const pa1 = new AttributeWrapper("position", new Float32Array([
     0.0, 0.5, 0.0
 ]).buffer, "float32x3")
 
+const geometry = new GeometryWrapper();
+geometry.setAttribute(pa1);
 
-const color1 = new AttributeWrapper("color", new Float32Array([
-    1, 0, 0, 1.0,
-    0, 1, 0, 1.0,
-    0, 0, 1, 1.0,
-]).buffer, "float32x4")
+const material = new MaterialWrapper();
 
-const mat1 = new MaterialWrapper();
+const component = new MaterialComponentWrapper(
+    "baseColor",
+    [1, 1, 1, 1],
+);
 
-const geo1 = new GeometryWrapper();
-geo1.setAttribute(pa1);
-geo1.setAttribute(color1);
-const mesh1 = new MeshWrapper();
-const p1 = new PrimitiveWrapper(mat1, geo1);
-const node1 = new NodeWrapper();
-mesh1.setPrimitive(p1)
-node1.setMesh(mesh1)
-const node2 = new NodeWrapper();
-node2.addChild(node1)
-scene.addNode(node2)
+material.setComponent(component);
 
-// node1.setRotation(.3, 0, 0)
-// node1.setRotation(0, .5, 0)
+const before = material.hashProvider.convertToShaderHash(
+    renderer.hasher
+);
 
-let last = performance.now();
+const image = new ImageWrapper(
+    new Uint8Array([255, 255, 255, 255]).buffer,
+    1,
+    1,
+);
 
-function frame(): void {
-    const now = performance.now();
-    controls.update((now - last) / 1000);
-    last = now;
-    node2.setRotation(0, performance.now() / 1000, 0)
+const sampler = new SamplerWrapper();
+const texture = new TextureWrapper(image, sampler);
 
-    stats.begin();
-    renderer.render(scene, camera);
-    stats.end();
-    requestAnimationFrame(frame);
-}
+component.setTexture({
+    wrapper: texture,
+    texCoord: "0",
+});
 
-requestAnimationFrame(frame);
+const after = material.hashProvider.convertToShaderHash(
+    renderer.hasher
+);
+
+console.log("shader hash before:", before);
+console.log("shader hash after:", after);
+console.log("changed:", before !== after);

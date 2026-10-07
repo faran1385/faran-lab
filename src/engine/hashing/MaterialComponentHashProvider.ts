@@ -21,7 +21,7 @@ export class MaterialComponentHashProvider {
         this.wrapperGetFunctions = T;
 
         this.shapeHash = new HashHandler(() => (this.wrapperGetFunctions.getTexture() ? "1" : "0"))
-        this.shaderKeyHash = new HashHandler(() => (this.wrapperGetFunctions.getTexture() ? this.wrapperGetFunctions.getTexture()!.texCoord : "0"))
+        this.shaderKeyHash = new HashHandler(() => (this.wrapperGetFunctions.getTexture() ? this.wrapperGetFunctions.getTexture()!.texCoord : "none"))
         this.resourceHash = new AggregateHashHandler((hasher) =>
             this.wrapperGetFunctions.getTexture() ? this.wrapperGetFunctions.getTexture()!.wrapper.hashProvider.convertToHash(hasher) : "notex"
         )
