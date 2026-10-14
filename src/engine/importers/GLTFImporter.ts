@@ -9,7 +9,7 @@ import {
     type Material,
     type Sampler,
     type DecodedImage,
-    type Texture, uvAttributeName, type MaterialComponentIR,
+    type Texture, uvAttributeName, jointsAttributeName, weightsAttributeName, type MaterialComponentIR,
 } from "./utils/IR.ts";
 import {ImageDecoder} from "./utils/ImageDecoder.ts";
 import {mat4} from "../../packages/math/matrix/mat4.ts";
@@ -77,11 +77,6 @@ const SIMPLE_ATTRIBUTE_MAP: Record<
     NORMAL: {irKey: "normal", componentCount: 3, format: "float32x3"},
     TANGENT: {irKey: "tangent", componentCount: 4, format: "float32x4"},
 };
-
-// Attributes we know about but don't support yet — skip with a warning
-// instead of failing the whole import. Skinning is explicitly deferred
-// (see architecture doc, "Deferred" section) so this is expected, not a bug.
-const KNOWN_DEFERRED_ATTRIBUTES = new Set(["JOINTS_0", "WEIGHTS_0"]);
 
 
 // ── accessor reading ─────────────────────────────────────────────────────
@@ -241,6 +236,31 @@ function readFloatAttribute(
     return Float32Array.from(raw.values);
 }
 
+// Reads a JOINTS_n accessor as uint16x4. glTF stores joint indices as
+// UNSIGNED_BYTE or UNSIGNED_SHORT VEC4 (never normalized); both fold into
+// uint16 so the IR needs only one joint-index format.
+function readJointsAttribute(
+    gltf: any,
+    buffers: ArrayBuffer[],
+    accessorIndex: number,
+): Uint16Array {
+    const raw = readRawAccessor(gltf, buffers, accessorIndex);
+    if (raw.componentCount !== 4) {
+        throw new Error(
+            `GLTFImporter: JOINTS accessor ${accessorIndex} has ${raw.componentCount} components, expected 4`,
+        );
+    }
+    if (
+        raw.componentType !== GLComponentType.UNSIGNED_BYTE &&
+        raw.componentType !== GLComponentType.UNSIGNED_SHORT
+    ) {
+        throw new Error(
+            `GLTFImporter: JOINTS accessor ${accessorIndex} has componentType ${raw.componentType}, expected UNSIGNED_BYTE or UNSIGNED_SHORT`,
+        );
+    }
+    return Uint16Array.from(raw.values);
+}
+
 // Reads an accessor as vertex indices, upconverting UNSIGNED_BYTE to
 // uint16 since our IR only distinguishes "uint16" | "uint32" (see ir.ts).
 function readIndices(
@@ -342,8 +362,29 @@ function importGeometry(
             continue;
         }
 
-        if (KNOWN_DEFERRED_ATTRIBUTES.has(semantic)) {
-            console.warn(`GLTFImporter: skipping "${semantic}" — skinning is deferred (see architecture doc)`);
+        // Skinning: JOINTS_n -> joints{n} (uint16x4), WEIGHTS_n -> weights{n}
+        // (float32x4, dequantized if stored as normalized ubyte/ushort).
+        // Joint indices refer to positions in the owning skin's joints[] —
+        // skin/inverseBindMatrices import is a separate step.
+        const jointsMatch = /^JOINTS_(\d+)$/.exec(semantic);
+        if (jointsMatch) {
+            const data = readJointsAttribute(gltf, buffers, accessorIndex);
+            const attributeIndex = poolAttribute(pool, accessorIndex, {
+                format: "uint16x4",
+                data: data.buffer as ArrayBuffer,
+            });
+            attributes[jointsAttributeName(+(jointsMatch[1]))] = attributeIndex;
+            continue;
+        }
+
+        const weightsMatch = /^WEIGHTS_(\d+)$/.exec(semantic);
+        if (weightsMatch) {
+            const data = readFloatAttribute(gltf, buffers, accessorIndex, 4);
+            const attributeIndex = poolAttribute(pool, accessorIndex, {
+                format: "float32x4",
+                data: data.buffer as ArrayBuffer,
+            });
+            attributes[weightsAttributeName(+(weightsMatch[1]))] = attributeIndex;
             continue;
         }
 

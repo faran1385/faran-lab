@@ -52,6 +52,7 @@ export type VertexFormat =
     | "float32x3"
     | "float32x4"
     | "uint16x2"
+    | "uint16x4"
     | "uint32";
 
 export interface Attribute {
