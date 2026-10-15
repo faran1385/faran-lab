@@ -24,9 +24,9 @@ export class UpdateLayer {
      * into the code) and the attribute shape (names and formats, not buffer contents). The node layout is in it too:
      * whether the node is skinned decides which group 2 bindings the vertex code declares.
      */
-    static syncShaderInputs(primitive: PrimitiveWrapper, material: MaterialHashes, geometry: GeometryHashes, nodeLayout: string): boolean {
+    static syncShaderInputs(primitive: PrimitiveWrapper, material: MaterialHashes, geometry: GeometryHashes, nodeLayout: string, skinningId?: string): boolean {
         const pipeline = primitive.getPipeline();
-        const key = `${material.shader}|${material.layout}|${geometry.attributesShape}|${nodeLayout}`;
+        const key = `${material.shader}|${material.layout}|${geometry.attributesShape}|${nodeLayout}|${skinningId ?? "no-skinning"}`;
         if (pipeline.hashProvider.getShaderInputsKey() === key) return false;
 
         pipeline.hashProvider.setShaderInputsKey(key);

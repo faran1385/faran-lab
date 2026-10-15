@@ -36,18 +36,22 @@ export class RenderItemBuilder {
 
         const entry = cache.get(node);
 
-        // Quiet frame: nothing anywhere changed since the last frame
+        // Quiet frame: nothing anywhere changed since the last frame.
         if (entry && cache.lastFrameEpoch === getEpoch()) return entry.items;
 
-        // Structure path: first time we see the node, or its mesh / primitive list changed
-        if (!entry || node.hashProvider.getStructureChangedAt() > entry.structureBuiltAt) {
+        // A skinning-method swap changes the palette key without changing the node's structure stamp.
+        const currentPaletteKey = skin?.getPaletteKey();
+        const paletteChanged = !!entry && entry.nodeKeys.paletteBuffer !== currentPaletteKey;
+
+        // Structure path: first sighting, changed mesh structure, or changed palette representation.
+        if (!entry || paletteChanged || node.hashProvider.getStructureChangedAt() > entry.structureBuiltAt) {
             const primitives = node.getMesh()?.getAllPrimitives() ?? [];
 
             const nodeKeys = hashes.resolveNode(node);
             ResourceLayer.node(node, nodeKeys, ctx);
             const items: RenderItem[] = new Array(primitives.length);
             for (let i = 0; i < primitives.length; i++) {
-                items[i] = RenderItemBuilder.buildPrimitive(primitives[i], nodeKeys, ctx);
+                items[i] = RenderItemBuilder.buildPrimitive(primitives[i], nodeKeys, ctx, skin?.getSkinning());
             }
 
             // after building: building itself may stamp wrappers (shader dirty marks)
@@ -69,9 +73,9 @@ export class RenderItemBuilder {
         // Incremental path: rebuild only primitives whose own stamp is newer than when their item was built.
         // In place, no new entry: unchanged items keep their counts untouched.
         for (let i = 0; i < entry.primitives.length; i++) {
-            if (entry.primitives[i].getChangedAt() <= entry.builtAt[i]) continue;
+            if (entry.primitives[i].getChangedAt() <= entry.builtAt[i] && !paletteChanged) continue;
 
-            const next = RenderItemBuilder.buildPrimitive(entry.primitives[i], entry.nodeKeys, ctx);
+            const next = RenderItemBuilder.buildPrimitive(entry.primitives[i], entry.nodeKeys, ctx, skin?.getSkinning());
             hashes.swapData(managers, next.hashData, entry.items[i].hashData);   // acquire new, release old, per key
             entry.items[i] = next;
             entry.builtAt[i] = getEpoch();                                       // after building
@@ -80,7 +84,7 @@ export class RenderItemBuilder {
     }
     // ---- primitive-level ----
 
-    private static buildPrimitive(p: PrimitiveWrapper, nodeKeys: NodeResourceKeys, ctx: RenderContext): RenderItem {
+    private static buildPrimitive(p: PrimitiveWrapper, nodeKeys: NodeResourceKeys, ctx: RenderContext, skinningMethod?: import("../skinning/SkinningMethod.ts").SkinningMethod): RenderItem {
         const material = p.getMaterial();
         const geometry = p.getGeometry();
         const {hashes, producer} = ctx;
@@ -88,8 +92,8 @@ export class RenderItemBuilder {
         const materialHashes = hashes.resolveMaterial(material, (m) => producer.getBindingPlan(m));
         const geometryHashes = hashes.resolveGeometry(geometry);
 
-        UpdateLayer.syncShaderInputs(p, materialHashes.hashes, geometryHashes.hashes, nodeKeys.layout);
-        ShaderCodeLayer.generate(p, nodeKeys.paletteBuffer !== undefined, ctx);   // return value no longer needed
+        UpdateLayer.syncShaderInputs(p, materialHashes.hashes, geometryHashes.hashes, nodeKeys.layout, skinningMethod?.id);
+        ShaderCodeLayer.generate(p, skinningMethod, ctx);
 
         const pipelineHashes = hashes.resolvePipeline(p.getPipeline(), material, materialHashes.hashes, geometryHashes.hashes, nodeKeys.layout);
         const data: HashData = {

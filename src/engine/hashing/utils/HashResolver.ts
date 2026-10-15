@@ -172,8 +172,8 @@ export class HashResolver {
         return {
             matrixBuffer: node.uuid,
             layout: nodeLayoutKey(skin !== undefined),
-            bindgroup: `${node.uuid}|${skin?.uuid ?? "none"}`,
-            paletteBuffer: skin?.uuid,
+            bindgroup: `${node.uuid}|${skin?.getPaletteKey() ?? "none"}`,
+            paletteBuffer: skin?.getPaletteKey(),
         };
     }
 
