@@ -40,7 +40,8 @@ export class ResourceLayer {
         managers.bufferManager.ensure(keys.matrixBuffer, () => producer.produceBufferFromNodeMatrix(node));
         managers.bindgroupLayoutManager.ensure(keys.layout, () => producer.produceNodeBindGroupLayout(skin !== undefined));
         if (skin && keys.paletteBuffer !== undefined) {
-            managers.bufferManager.ensure(keys.paletteBuffer, () => producer.produceBufferFromSkinPalette(skin));
+            const created = managers.bufferManager.ensure(keys.paletteBuffer, () => producer.produceBufferFromSkinPalette(skin));
+            if (created) skin.getSkinning()?.invalidatePalette();
         }
         managers.bindgroupManager.ensure(keys.bindgroup, () => producer.produceBindgroupFromNode({
             layouts: managers.bindgroupLayoutManager,
