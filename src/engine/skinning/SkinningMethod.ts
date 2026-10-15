@@ -1,4 +1,4 @@
-import type {SkinInstanceWrapper} from "../wrappers/SkinInstanceWrapper.ts";
+import type {SkinInstanceWrapper} from "./SkinInstanceWrapper.ts";
 import type {RenderContext} from "../Renderer/RenderContext.ts";
 import type {StructField} from "../producers/AssemblerProducers.ts";
 

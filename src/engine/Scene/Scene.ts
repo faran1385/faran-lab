@@ -1,5 +1,6 @@
 import {NodeWrapper} from "../wrappers/NodeWrapper.ts";
 import {v4 as uuidv4} from "uuid";
+import type {CentralManager} from "../managers/CentralManager.ts";
 
 export class Scene {
     private readonly worldRoot = new NodeWrapper();
@@ -34,19 +35,19 @@ export class Scene {
         }
     }
 
-    private walkWorldMatrices(node: NodeWrapper, parentMatrix: Float32Array | null, uploadToGPUBuffer: (hash: string, data: GPUAllowSharedBufferSource, offset: number) => void) {
+    private walkWorldMatrices(node: NodeWrapper, parentMatrix: Float32Array | null, managers: CentralManager) {
         if (node.hashProvider.transformNeedsUpdate()) {
-            node.buildWorldMatrix(parentMatrix, uploadToGPUBuffer);
+            node.buildWorldMatrix(parentMatrix, managers);
             return; // invariant: descendants are already dirty, buildWorldMatrix handles them
         }
         for (const child of node.getChildren()) {
-            this.walkWorldMatrices(child, node.getWorldMatrix(), uploadToGPUBuffer);
+            this.walkWorldMatrices(child, node.getWorldMatrix(), managers);
         }
     };
 
-    updateWorldMatrices(uploadToGPUBuffer: (hash: string, data: GPUAllowSharedBufferSource, offset: number) => void): void {
+    updateWorldMatrices(managers: CentralManager): void {
         for (const root of this.worldRoot.getChildren()) {
-            this.walkWorldMatrices(root, null, uploadToGPUBuffer);
+            this.walkWorldMatrices(root, null, managers);
         }
     }
 }

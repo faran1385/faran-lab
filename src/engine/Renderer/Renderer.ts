@@ -10,9 +10,7 @@ import {RenderItemBuilder} from "./RenderItemBuilder.ts";
 import {RenderCache} from "./RenderCache.ts";
 import {getEpoch} from "../hashing/utils/epoch.ts";
 import {getWorldEpoch} from "../hashing/utils/worldEpoch.ts";
-import type {SkinInstanceWrapper} from "../wrappers/SkinInstanceWrapper.ts";
 import {UpdateLayer} from "./UpdateLayer.ts";
-import type {BufferManager} from "../managers/BufferManager.ts";
 
 
 export class Renderer {
@@ -32,8 +30,6 @@ export class Renderer {
     private hashResolver!: HashResolver;
     private readonly producer = new CentralProducer();
     private readonly renderCache = new RenderCache();
-    private _bufferUploadFunction!: BufferManager["upload"]
-    private readonly frameSkins = new Set<SkinInstanceWrapper>();
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -62,7 +58,6 @@ export class Renderer {
             data: new Float32Array(32).buffer
         }))
 
-        this._bufferUploadFunction = this.managers.bufferManager.upload.bind(this.managers.bufferManager)
 
         // scene bindgroup initialization since the only binding is camera witch is static
         this.managers.bindgroupManager.ensure(this.uuid, () => this.producer.produceSceneBindgroup({
@@ -111,10 +106,9 @@ export class Renderer {
             hashes: this.hashResolver,
             frame: {colorFormat: this.format, depthFormat: this.depthRenderTarget.format},
             cache: this.renderCache,
-            frameSkins: this.frameSkins,
             worldEpoch: getWorldEpoch(),   // refreshed after the world pass, before the skins update
         }
-        this.frameSkins.clear()
+        this.renderCache.frameSkins.clear()
 
         // global
         UpdateLayer.updateCamera(camera, ctx)
@@ -143,12 +137,12 @@ export class Renderer {
             }
         });
 
-        scene.updateWorldMatrices(this._bufferUploadFunction);
+        scene.updateWorldMatrices(ctx.managers);
 
         // after the world pass (joint worlds are current) and the traversal (palette buffers exist), before submit.
         // Each skin's own method writes its palette.
         ctx.worldEpoch = getWorldEpoch();
-        for (const skin of this.frameSkins) skin.getSkinning()?.update(ctx);
+        for (const skin of this.renderCache.frameSkins) skin.getSkinning()?.update(ctx);
 
         this.renderCache.lastFrameEpoch = getEpoch();
         pass.end();

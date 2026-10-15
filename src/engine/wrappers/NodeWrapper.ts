@@ -6,8 +6,9 @@ import {vec3} from "../../packages/math/vector/vec3.ts";
 import {quat} from "../../packages/math/quat/quat.ts";
 import {NodeHashProvider} from "../hashing/NodeHashProvider.ts";
 import {NodeAnimationHandler} from "./NodeAnimationHandler.ts";
-import type {SkinInstanceWrapper} from "./SkinInstanceWrapper.ts";
+import type {SkinInstanceWrapper} from "../skinning/SkinInstanceWrapper.ts";
 import {bumpWorldEpoch} from "../hashing/utils/worldEpoch.ts";
+import type {CentralManager} from "../managers/CentralManager.ts";
 
 export class NodeWrapper {
     readonly uuid: string;
@@ -161,7 +162,7 @@ export class NodeWrapper {
         return this.worldVersion;
     }
 
-    buildWorldMatrix(parentMatrix: Float32Array | null, uploadToGPUBuffer: (hash: string, data: GPUAllowSharedBufferSource, offset: number) => void) {
+    buildWorldMatrix(parentMatrix: Float32Array | null, managers: CentralManager) {
         mat4.compose(this.localMatrix, this.translation as any, this.rotation as any, this.scale as any);
         if (parentMatrix) {
             mat4.mul(this.worldMatrix, parentMatrix, this.localMatrix);
@@ -172,10 +173,10 @@ export class NodeWrapper {
         this.hashProvider.syncTransformUpdate()
         this.worldVersion++;
         bumpWorldEpoch();
-        if (this.mesh && this.mesh.getPrimitivesCount() > 0) uploadToGPUBuffer(this.uuid, this.worldMatrix, 0);
+        if (this.mesh && this.mesh.getPrimitivesCount() > 0) managers.bufferManager.upload(this.uuid, this.worldMatrix, 0);
 
         this.children.forEach((child: NodeWrapper) => {
-            child.buildWorldMatrix(this.worldMatrix, uploadToGPUBuffer);
+            child.buildWorldMatrix(this.worldMatrix, managers);
         });
     }
 }

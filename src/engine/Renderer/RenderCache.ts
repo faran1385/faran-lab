@@ -3,6 +3,7 @@ import type {PrimitiveWrapper} from "../wrappers/PrimitiveWrapper.ts";
 import type {RenderItem} from "./RenderItem.ts";
 import type {RenderContext} from "./RenderContext.ts";
 import type {NodeResourceKeys} from "../hashing/utils/HashData.ts";
+import type {SkinInstanceWrapper} from "../skinning/SkinInstanceWrapper.ts";
 
 /**
  * Render items last built for one node.
@@ -30,7 +31,7 @@ export class RenderCache {
     private readonly entries = new WeakMap<NodeWrapper, NodeRenderEntry>();
     private currentNodeHolder = new Set<NodeWrapper>();
     private previousNodeHolder = new Set<NodeWrapper>();
-
+    readonly frameSkins = new Set<SkinInstanceWrapper>();
     /**
      * The global epoch at the end of the previous frame. If it still equals getEpoch(), nothing that can affect
      * a render item has changed anywhere, and every cached item can be reused without looking at any wrapper.
@@ -39,7 +40,9 @@ export class RenderCache {
     lastCameraUUID = ""
 
 
-    delete(node: NodeWrapper) { this.entries.delete(node); }
+    delete(node: NodeWrapper) {
+        this.entries.delete(node);
+    }
 
     endFrame(ctx: RenderContext) {
         for (const node of this.previousNodeHolder) {          // used last frame, not touched this frame

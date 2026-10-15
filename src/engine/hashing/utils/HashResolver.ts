@@ -170,9 +170,7 @@ export class HashResolver {
     resolveNode(node: NodeWrapper): NodeResourceKeys {
         const skin = node.getSkinInstance();
         const skinning = skin?.getSkinning();
-        if (skin && !skinning) {
-            throw new Error(`HashResolver: skin "${skin.name ?? skin.uuid}" has no skinning method; call skin.setSkinning(...)`);
-        }
+
         // the palette key carries the method id: another method means another palette size, so another buffer and bind group
         const paletteBuffer = skin?.getPaletteKey();
         return {

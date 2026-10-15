@@ -1,5 +1,5 @@
 import {v4 as uuidv4} from "uuid";
-import type {NodeWrapper} from "./NodeWrapper.ts";
+import type {NodeWrapper} from "../wrappers/NodeWrapper.ts";
 import type {AnimationInterpolation, AnimationPath} from "../importers/utils/IR.ts";
 
 /** Keyframe data, shared by every channel that uses the same sampler. See IR.AnimationSampler for the layout. */

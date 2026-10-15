@@ -1,7 +1,8 @@
 import {v4 as uuidv4} from "uuid";
-import type {NodeWrapper} from "./NodeWrapper.ts";
-import type {SkinningMethod} from "../skinning/SkinningMethod.ts";
+import type {NodeWrapper} from "../wrappers/NodeWrapper.ts";
+import type {SkinningMethod} from "./SkinningMethod.ts";
 import {bumpEpoch} from "../hashing/utils/epoch.ts";
+import {LBSSkinning} from "../../packages/animations/LBSSkinning.ts";
 
 /**
  * A skin as it exists in a live scene: the joint nodes (resolved from the file's node indices) and their inverse bind
@@ -17,7 +18,7 @@ export class SkinInstanceWrapper {
     private readonly jointNodes: readonly NodeWrapper[];
     /** One column-major mat4 (16 floats) per joint, in jointNodes order. */
     private readonly inverseBindMatrices: Float32Array;
-    private skinning?: SkinningMethod;
+    private skinning: SkinningMethod = new LBSSkinning();
 
     constructor(jointNodes: readonly NodeWrapper[], inverseBindMatrices: Float32Array, name?: string) {
         if (jointNodes.length === 0) {
@@ -28,6 +29,8 @@ export class SkinInstanceWrapper {
                 `SkinInstanceWrapper: ${jointNodes.length} joints need ${jointNodes.length * 16} inverse bind matrix floats, got ${inverseBindMatrices.length}`,
             );
         }
+
+        this.skinning.attach(this);
 
         this.uuid = uuidv4();
         this.name = name;
@@ -40,7 +43,7 @@ export class SkinInstanceWrapper {
      * so changing it rebuilds the palette buffer, the node bind group and the vertex shader of every node using this
      * skin. The method instance must not be shared with another skin.
      */
-    setSkinning(method: SkinningMethod | undefined): void {
+    setSkinning(method: SkinningMethod): void {
         if (this.skinning === method) return;
         method?.attach(this);
         this.skinning?.detach(this);
@@ -48,13 +51,13 @@ export class SkinInstanceWrapper {
         bumpEpoch();   // wakes the render cache: nodes compare the method they were built with
     }
 
-    getSkinning(): SkinningMethod | undefined {
+    getSkinning(): SkinningMethod {
         return this.skinning;
     }
 
     /** Key of this skin's palette buffer. Includes the method id: another method means another buffer size/layout. */
-    getPaletteKey(): string | undefined {
-        return this.skinning ? `${this.uuid}|${this.skinning.id}` : undefined;
+    getPaletteKey(): string {
+        return `${this.uuid}|${this.skinning.id}`;
     }
 
     getJointNodes(): readonly NodeWrapper[] {

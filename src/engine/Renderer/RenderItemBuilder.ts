@@ -32,7 +32,7 @@ export class RenderItemBuilder {
 
         // collect before the quiet-frame return too: the skin step runs every frame. One pointer read for plain nodes.
         const skin = node.getSkinInstance();
-        if (skin && node.getMesh()?.getPrimitivesCount()) ctx.frameSkins.add(skin);
+        if (skin && node.getMesh()?.getPrimitivesCount()) ctx.cache.frameSkins.add(skin);
 
         const entry = cache.get(node);
 

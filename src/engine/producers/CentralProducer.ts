@@ -40,7 +40,7 @@ import {
     type VertexShaderDescriptor, VertexShaderProducer
 } from "./AssemblerProducers.ts";
 import type {NodeWrapper} from "../wrappers/NodeWrapper.ts";
-import type {SkinInstanceWrapper} from "../wrappers/SkinInstanceWrapper.ts";
+import type {SkinInstanceWrapper} from "../skinning/SkinInstanceWrapper.ts";
 import type {SkinningMethod} from "../skinning/SkinningMethod.ts";
 import type {Camera} from "../Camera/Camera.ts";
 

@@ -1,5 +1,5 @@
-import {mat4} from "../../packages/math/matrix/mat4.ts";
-import {BaseSkinningMethod, type SkinContext, type SkinningShaderParts} from "./SkinningMethod.ts";
+import {mat4} from "../math/matrix/mat4.ts";
+import {BaseSkinningMethod, type SkinContext, type SkinningShaderParts} from "../../engine/skinning/SkinningMethod.ts";
 
 const MAT4_BYTES = 64;
 
@@ -27,17 +27,17 @@ export class LBSSkinning extends BaseSkinningMethod {
             structs: "",
             skinFn: "lbsSkin",
             functions: `
-fn lbsSkin(pos: vec3f, nrm: vec3f, joints: vec4u, weights: vec4f) -> SkinnedVertex {
-    let m = palette[joints.x].matrix * weights.x
-          + palette[joints.y].matrix * weights.y
-          + palette[joints.z].matrix * weights.z
-          + palette[joints.w].matrix * weights.w;
-    var out: SkinnedVertex;
-    out.position = (m * vec4f(pos, 1.0)).xyz;
-    // upper 3x3 of the blended matrix; exact for rotation + uniform scale
-    out.normal = normalize((m * vec4f(nrm, 0.0)).xyz);
-    return out;
-}`,
+            fn lbsSkin(pos: vec3f, nrm: vec3f, joints: vec4u, weights: vec4f) -> SkinnedVertex {
+                let m = palette[joints.x].matrix * weights.x
+                      + palette[joints.y].matrix * weights.y
+                      + palette[joints.z].matrix * weights.z
+                      + palette[joints.w].matrix * weights.w;
+                var out: SkinnedVertex;
+                out.position = (m * vec4f(pos, 1.0)).xyz;
+                // upper 3x3 of the blended matrix; exact for rotation + uniform scale
+                out.normal = normalize((m * vec4f(nrm, 0.0)).xyz);
+                return out;
+            }`,
         };
     }
 
@@ -54,7 +54,6 @@ fn lbsSkin(pos: vec3f, nrm: vec3f, joints: vec4u, weights: vec4f) -> SkinnedVert
         const skin = this.skin;
         const {bufferManager} = ctx.managers;
         const key = skin.getPaletteKey();
-        if (key === undefined) return;
 
         // A different GPUBuffer than the one last written (first frame, swapped method, skin left the scene and its
         // buffer was destroyed and recreated with initial contents) always needs a full write.

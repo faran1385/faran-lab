@@ -1,5 +1,5 @@
 import {v4 as uuidv4} from "uuid";
-import type {SkinInstanceWrapper} from "./SkinInstanceWrapper.ts";
+import type {SkinInstanceWrapper} from "../skinning/SkinInstanceWrapper.ts";
 
 /**
  * Everything animation-related a node can carry, kept out of NodeWrapper itself. Today that is the skin instance the

@@ -1,7 +1,7 @@
 import {BufferWrapper} from "../wrappers/BufferWrapper.ts";
 import type {MaterialFactorsPlan} from "./utils.ts";
 import type {NodeWrapper} from "../wrappers/NodeWrapper.ts";
-import type {SkinInstanceWrapper} from "../wrappers/SkinInstanceWrapper.ts";
+import type {SkinInstanceWrapper} from "../skinning/SkinInstanceWrapper.ts";
 import type {SkinningMethod} from "../skinning/SkinningMethod.ts";
 
 export interface BufferDescriptor {
@@ -43,10 +43,7 @@ export class NodeMatrixBufferProducer {
 export class SkinPaletteBufferProducer {
     static produce(skin: SkinInstanceWrapper, method: SkinningMethod) {
         const data = method.initialPalette(skin.getJointCount());
-        const expected = skin.getJointCount() * method.paletteStrideBytes;
-        if (data.byteLength !== expected) {
-            throw new Error(`SkinPaletteBufferProducer: "${method.id}" initialPalette is ${data.byteLength}B, expected ${expected}B (${skin.getJointCount()} joints x ${method.paletteStrideBytes}B)`);
-        }
+
         return new BufferWrapper(data, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);
     }
 }
