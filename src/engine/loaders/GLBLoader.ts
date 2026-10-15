@@ -1,5 +1,7 @@
 import {GLTFImporter} from "../importers/GLTFImporter.ts";
 import {IRToSceneConvertor} from "../importers/utils/IRToSceneConvertor.ts";
+import {LBSSkinningMethod} from "../skinning/LBSSkinningMethod.ts";
+import type {SkinningMethod} from "../skinning/SkinningMethod.ts";
 
 export interface GLBParseResult {
     json: any;
@@ -13,7 +15,7 @@ const CHUNK_TYPE_BIN = 0x004e4942; // "BIN\0"
 export class GLBLoader {
     private cache = new Map<string, GLBParseResult>();
 
-    constructor() {
+    constructor(private readonly createSkinningMethod: () => SkinningMethod = () => new LBSSkinningMethod()) {
     }
 
     async load(url: string) {
@@ -23,7 +25,7 @@ export class GLBLoader {
             buffers: [result.binaryChunk ?? new ArrayBuffer()],
             json: result.json
         })
-        const convertedData = IRToSceneConvertor.convert(sceneIR);
+        const convertedData = IRToSceneConvertor.convert(sceneIR, this.createSkinningMethod);
         this.cache.set(url, result);
 
         return convertedData;
