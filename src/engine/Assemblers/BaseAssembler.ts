@@ -83,16 +83,17 @@ function renderStruct(structName: string, fields: OutputFieldDecl[]): string {
     return `struct ${structName} {\n${lines.join("\n")}\n};`;
 }
 
-export type VertexPhase2Output = { body: string; usedBuiltins: UsedBuiltin[]; outputs: OutputFieldDecl[] }
+export type VertexPhase2Output = { body: string; usedBuiltins: UsedBuiltin[]; outputs: OutputFieldDecl[] };
+export type SkinningValues = { skinFn: string };
 
 export abstract class VertexAssemblerBase {
     assemble(d: VertexShaderDescriptor, entryPoint: string): string {
-        const {preamble, inputValues, bindingValues, dataMap, builtinValues} = this.vertexPhase1(d);
+        const {preamble, inputValues, bindingValues, dataMap, builtinValues, skinningValues} = this.vertexPhase1(d);
         const {
             body,
             usedBuiltins,
             outputs,
-        } = this.vertexPhase2(inputValues, bindingValues, dataMap, builtinValues);
+        } = this.vertexPhase2(inputValues, bindingValues, dataMap, builtinValues, skinningValues);
         return this.vertexPhase3(preamble, body, usedBuiltins, outputs, entryPoint);
     }
 
@@ -112,6 +113,8 @@ export abstract class VertexAssemblerBase {
         const {bindingCode, values} = buildBindingDecls(d.bindings);
         const bindingValues = toValueMap(values);
         parts.push(bindingCode);
+        if (d.skinning?.structs) parts.push(d.skinning.structs);
+        if (d.skinning?.functions) parts.push(d.skinning.functions);
 
 
         const builtinValues: ValueMap = new Map(
@@ -128,7 +131,8 @@ export abstract class VertexAssemblerBase {
             dataMap.set(i, value)
         })
 
-        return {preamble: parts.join("\n\n"), dataMap, inputValues, bindingValues, builtinValues};
+        const skinningValues = d.skinning ? {skinFn: d.skinning.skinFn} : undefined;
+        return {preamble: parts.join("\n\n"), dataMap, inputValues, bindingValues, builtinValues, skinningValues};
     }
 
     protected abstract vertexPhase2(
@@ -136,6 +140,7 @@ export abstract class VertexAssemblerBase {
         bindingValues: ValueMap,
         dataMap: Map<string, ComponentData>,
         builtinValues: ValueMap,
+        skinningValues?: SkinningValues,
     ): VertexPhase2Output;
 
     protected vertexPhase3(preamble: string, body: string, usedBuiltins: UsedBuiltin[], outputs: OutputFieldDecl[], entryPoint: string): string {

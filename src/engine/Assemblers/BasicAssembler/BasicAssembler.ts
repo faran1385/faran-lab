@@ -3,7 +3,7 @@ import {
     type ComponentsMap,
     FragmentAssemblerBase, type FragmentPhase2Output,
     type ValueMap,
-    VertexAssemblerBase, type VertexPhase2Output
+    VertexAssemblerBase, type VertexPhase2Output, type SkinningValues
 } from "../BaseAssembler.ts";
 
 export class BasicVertexAssembler extends VertexAssemblerBase {
@@ -12,6 +12,7 @@ export class BasicVertexAssembler extends VertexAssemblerBase {
         bindingValues: ValueMap,
         dataMap: Map<string, ComponentData>,
         _builtinValues: ValueMap,
+        _skinningValues?: SkinningValues,
     ): VertexPhase2Output {
         const codeBody = `
             let pos=${bindingValues.get("projection")?.access} *
