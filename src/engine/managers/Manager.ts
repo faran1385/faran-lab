@@ -42,9 +42,11 @@ export abstract class ResourceManager<TDescriptor, TTracker extends Tracker<unkn
         this.frame++
     }
 
-    ensure(hash: string, getDescriptor: () => TDescriptor): void {
-        if (this.cache.has(hash)) return;
+    /** Returns true when a new GPU resource was created, false when an existing allocation was reused. */
+    ensure(hash: string, getDescriptor: () => TDescriptor): boolean {
+        if (this.cache.has(hash)) return false;
         this.cache.set(hash, this.build(getDescriptor));
+        return true;
     }
 
     get(hash: string): TTracker {
