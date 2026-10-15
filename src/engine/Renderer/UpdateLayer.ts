@@ -21,8 +21,8 @@ export class UpdateLayer {
      * shader code. Here the last-seen key lives on the primitive's own pipeline wrapper.
      *
      * The key holds the material's shader hash, its layout hash (the binding plan decides the binding numbers written
-     * into the code) and the attribute shape (names and formats, not buffer contents). The node layout is in it too:
-     * whether the node is skinned decides which group 2 bindings the vertex code declares.
+     * into the code), attribute shape (names and formats, not buffer contents), node layout, and skinning-method id.
+     * The method id selects both the generated WGSL and the method-specific pipeline cache.
      */
     static syncShaderInputs(primitive: PrimitiveWrapper, material: MaterialHashes, geometry: GeometryHashes, nodeLayout: string, skinningId?: string): boolean {
         const pipeline = primitive.getPipeline(skinningId);
