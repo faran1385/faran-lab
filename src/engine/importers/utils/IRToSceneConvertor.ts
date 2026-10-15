@@ -46,8 +46,7 @@ export type ConvertedIRResult = {
 interface NodeBuildContext {
     byIndex: Map<number, NodeWrapper>;
     skinned: { wrapper: NodeWrapper; skin: number }[];
-    /** Meshes drawn by at least one node without a skin (see attachSkins). */
-    unskinnedMeshes: Set<MeshWrapper>;
+
 }
 
 /**
@@ -85,7 +84,7 @@ export class IRToSceneConvertor {
         );
         const meshes = ir.meshes.map((mesh) => this.createMeshWrapper(mesh, primitives));
 
-        const context: NodeBuildContext = {byIndex: new Map(), skinned: [], unskinnedMeshes: new Set()};
+        const context: NodeBuildContext = {byIndex: new Map(), skinned: []};
         const root = this.createSceneRoot(ir.roots, meshes, context);
 
         // Both need the finished tree, so they run after it.
@@ -217,7 +216,7 @@ export class IRToSceneConvertor {
 
         if (node.mesh !== undefined) {
             wrapper.setMesh(meshes[node.mesh]);
-            if (node.skin === undefined) context.unskinnedMeshes.add(meshes[node.mesh]);
+ 
         }
 
         if (node.skin !== undefined) {
