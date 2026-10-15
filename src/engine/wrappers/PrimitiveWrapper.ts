@@ -2,6 +2,7 @@ import type {GeometryWrapper} from "./GeometryWrapper.ts";
 import type {MaterialWrapper} from "./MaterialWrapper.ts";
 import {v4 as uuidv4} from "uuid";
 import {BasicFragmentAssembler, BasicVertexAssembler} from "../Assemblers/BasicAssembler/BasicAssembler.ts";
+import {VertexSkinnedAssembler} from "../Assemblers/SkinnedAssembler/VertexSkinnedAssembler.ts";
 import {PipelineWrapper} from "./PipelineWrapper.ts";
 import {FragmentAssemblerBase, type VertexAssemblerBase} from "../Assemblers/BaseAssembler.ts";
 
@@ -12,6 +13,7 @@ export class PrimitiveWrapper {
     private material: MaterialWrapper;
 
     private vertexAssembler: VertexAssemblerBase = new BasicVertexAssembler();
+    private skinnedVertexAssembler?: VertexAssemblerBase;
     private fragmentAssembler: FragmentAssemblerBase = new BasicFragmentAssembler();
     private pipelineWrapper = new PipelineWrapper();
     /** Separate generated shader/pipeline state for each skinning method used with this shared primitive. */
@@ -59,8 +61,14 @@ export class PrimitiveWrapper {
         this.forEachPipeline((pipeline) => pipeline.markVertexShaderDirty())
     }
 
-    getVertexAssembler(): VertexAssemblerBase {
-        return this.vertexAssembler;
+    getVertexAssembler(skinningId?: string): VertexAssemblerBase {
+        if (!skinningId) return this.vertexAssembler;
+        return this.skinnedVertexAssembler ??= new VertexSkinnedAssembler();
+    }
+
+    setSkinnedVertexAssembler(assembler: VertexAssemblerBase): void {
+        this.skinnedVertexAssembler = assembler;
+        this.forEachPipeline((pipeline) => pipeline.markVertexShaderDirty());
     }
 
     setFragmentAssembler(a: FragmentAssemblerBase): void {
