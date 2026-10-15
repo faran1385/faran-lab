@@ -18,7 +18,7 @@ export class ShaderCodeLayer {
 
         if (vertexWrapper.hashProvider.needsUpdateCodeGen()) {
             const entryPoint = vertexWrapper.getEntryPoint();
-            const code = p.getVertexAssembler().assemble(producer.produceVertexShader({
+            const code = p.getVertexAssembler(skinningMethod?.id).assemble(producer.produceVertexShader({
                 geometry: p.getGeometry(),
                 material: p.getMaterial(),
                 skinningMethod,
