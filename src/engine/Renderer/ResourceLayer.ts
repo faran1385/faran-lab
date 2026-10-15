@@ -74,9 +74,9 @@ export class ResourceLayer {
         }));
     }
 
-    static shaders(p: PrimitiveWrapper, hashes: PipelineHashes, ctx: RenderContext): void {
+    static shaders(p: PrimitiveWrapper, hashes: PipelineHashes, ctx: RenderContext, skinningId?: string): void {
         const {managers, producer} = ctx;
-        const pipeline = p.getPipeline();
+        const pipeline = p.getPipeline(skinningId);
 
         const vWrapper = pipeline.getVertexShaderWrapper();
         managers.shaderModuleManager.ensure(hashes.vertexShader, () => producer.produceShaderModule(vWrapper));
@@ -85,7 +85,7 @@ export class ResourceLayer {
         managers.shaderModuleManager.ensure(hashes.fragmentShader, () => producer.produceShaderModule(fWrapper));
     }
 
-    static pipeline(p: PrimitiveWrapper, data: HashData, nodeKeys: NodeResourceKeys, ctx: RenderContext): void {
+    static pipeline(p: PrimitiveWrapper, data: HashData, nodeKeys: NodeResourceKeys, ctx: RenderContext, skinningId?: string): void {
         const {managers, producer, frame} = ctx;
 
         // The pipeline layout joins the material layout (group 1) with the node layout (group 2), so it is keyed by both.
@@ -104,7 +104,7 @@ export class ResourceLayer {
                 geometry: p.getGeometry(),
                 material: p.getMaterial(),
                 pipelineLayouts: managers.pipelineLayoutManager,
-                pipeline: p.getPipeline(),
+                pipeline: p.getPipeline(skinningId),
                 shaderModules: managers.shaderModuleManager
             }));
         }
