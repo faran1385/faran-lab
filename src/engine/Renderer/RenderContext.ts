@@ -18,5 +18,7 @@ export interface RenderContext {
     cache: RenderCache,
     rendererUUID: string,
     /** Skins of the skinned mesh nodes visited this frame. Filled by RenderItemBuilder, consumed by the SkinUpdater. */
-    frameSkins: Set<SkinInstanceWrapper>,
+    frameSkins: Set<SkinInstanceWrapper>;
+    /** Set after world matrices are current, before skinning methods update their palettes. */
+    worldMoved: boolean;
 }

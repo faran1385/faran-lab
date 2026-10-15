@@ -10,10 +10,9 @@ import {RenderItemBuilder} from "./RenderItemBuilder.ts";
 import {RenderCache} from "./RenderCache.ts";
 import {getEpoch} from "../hashing/utils/epoch.ts";
 import {getWorldEpoch} from "../hashing/utils/worldEpoch.ts";
-import type {SkinUpdater} from "./SkinUpdater.ts";
 import type {SkinInstanceWrapper} from "../wrappers/SkinInstanceWrapper.ts";
 import {UpdateLayer} from "./UpdateLayer.ts";
-import type {BufferManager} from "../managers/BufferManager.ts";
+
 
 
 export class Renderer {
@@ -33,8 +32,7 @@ export class Renderer {
     private hashResolver!: HashResolver;
     private readonly producer = new CentralProducer();
     private readonly renderCache = new RenderCache();
-    private _bufferUploadFunction!: BufferManager["upload"]
-    private skinUpdater?: SkinUpdater;
+    private _bufferUploadFunction!: (hash: string, data: GPUAllowSharedBufferSource, offset?: number) => void;
     private readonly frameSkins = new Set<SkinInstanceWrapper>();
     private lastWorldEpoch = -1;   // -1: the first frame always reports worldMoved
 
@@ -86,11 +84,6 @@ export class Renderer {
     }
 
 
-    /** Plug in the skinning module (LBS, DQS, ...) that writes the palette buffers each frame. */
-    setSkinUpdater(updater: SkinUpdater | undefined): void {
-        this.skinUpdater = updater;
-    }
-
     render(scene: Scene, camera: Camera): void {
 
         this.colorRenderTarget?.ensureTexture(this.device)
@@ -121,6 +114,7 @@ export class Renderer {
             frame: {colorFormat: this.format, depthFormat: this.depthRenderTarget.format},
             cache: this.renderCache,
             frameSkins: this.frameSkins,
+            worldMoved: false,
         }
         this.frameSkins.clear()
 
@@ -155,12 +149,11 @@ export class Renderer {
 
         // after the world pass (joint worlds are current) and the traversal (palette buffers exist), before submit
         const worldEpoch = getWorldEpoch();
-        if (this.skinUpdater && this.frameSkins.size > 0) {
-            this.skinUpdater.update({
-                skins: this.frameSkins,
-                worldMoved: worldEpoch !== this.lastWorldEpoch,
-                upload: this._bufferUploadFunction,
-            });
+        ctx.worldMoved = worldEpoch !== this.lastWorldEpoch;
+        for (const skin of this.frameSkins) {
+            const method = skin.getSkinning();
+            if (!method) throw new Error(`Renderer: skin "${skin.name ?? skin.uuid}" has no skinning method`);
+            method.update(ctx);
         }
         this.lastWorldEpoch = worldEpoch;
 
