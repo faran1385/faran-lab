@@ -32,5 +32,7 @@ export interface SkinningMethod {
     shaderParts(): SkinningShaderParts;
     initialPalette(jointCount: number): ArrayBuffer;
     attach(skin: SkinInstanceWrapper): void;
+    /** Force the next update to rewrite the entire palette after its GPU allocation is recreated. */
+    invalidatePalette(): void;
     update(ctx: SkinningContext): void;
 }
