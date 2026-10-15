@@ -2,6 +2,7 @@ import type {NodeWrapper} from "../wrappers/NodeWrapper.ts";
 import type {PrimitiveWrapper} from "../wrappers/PrimitiveWrapper.ts";
 import type {RenderItem} from "./RenderItem.ts";
 import type {RenderContext} from "./RenderContext.ts";
+import type {NodeResourceKeys} from "../hashing/utils/HashData.ts";
 
 /**
  * Render items last built for one node.
@@ -11,6 +12,8 @@ import type {RenderContext} from "./RenderContext.ts";
  */
 export interface NodeRenderEntry {
     items: RenderItem[];
+    /** The node-level resources (group 2) these items were built with. */
+    nodeKeys: NodeResourceKeys;
     primitives: PrimitiveWrapper[];
     /** Epoch at which items[i] was (re)built. items[i] is stale once primitives[i].getChangedAt() is newer. */
     builtAt: number[];
@@ -41,7 +44,7 @@ export class RenderCache {
     endFrame(ctx: RenderContext) {
         for (const node of this.previousNodeHolder) {          // used last frame, not touched this frame
             const entry = this.entries.get(node);
-            if (entry) ctx.hashes.releaseEntry(node, entry, ctx);
+            if (entry) ctx.hashes.releaseEntry(entry, ctx);
             this.entries.delete(node);                         // so a re-added node rebuilds from scratch
         }
         this.previousNodeHolder.clear();

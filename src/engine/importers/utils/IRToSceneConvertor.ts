@@ -11,6 +11,8 @@ import type {
     Mesh,
     Node,
     AttributeName,
+    Skin,
+    AnimationClip,
 } from "./IR.ts";
 
 import {AttributeWrapper} from "../../wrappers/AttributeWrapper.ts";
@@ -24,10 +26,28 @@ import {MaterialWrapper} from "../../wrappers/MaterialWrapper.ts";
 import {PrimitiveWrapper} from "../../wrappers/PrimitiveWrapper.ts";
 import {MeshWrapper} from "../../wrappers/MeshWrapper.ts";
 import {NodeWrapper} from "../../wrappers/NodeWrapper.ts";
+import {SkinInstanceWrapper} from "../../wrappers/SkinInstanceWrapper.ts";
+import {AnimationClipWrapper, type AnimationChannelWrapper} from "../../wrappers/AnimationClipWrapper.ts";
+import {VertexLBSSkinnedAssembler} from "../../Assemblers/SkinnedAssembler/VertexLBSSkinnedAssembler.ts";
 
 
 export type ConvertedIRResult = {
     root: NodeWrapper
+    /** One per skin in the file. Skinned nodes already reference theirs through their animation handler. */
+    skinInstances: SkinInstanceWrapper[]
+    /** The file's animations ("walk", "run", ...). Not owned by a skin, see AnimationClipWrapper. */
+    clips: AnimationClipWrapper[]
+}
+
+/**
+ * State collected while the node tree is built, for the steps that need the finished tree: skins resolve joint node
+ * indices, clips resolve channel targets, and skinned nodes get their skin attached.
+ */
+interface NodeBuildContext {
+    byIndex: Map<number, NodeWrapper>;
+    skinned: { wrapper: NodeWrapper; skin: number }[];
+    /** Meshes drawn by at least one node without a skin (see attachSkins). */
+    unskinnedMeshes: Set<MeshWrapper>;
 }
 
 /**
@@ -65,9 +85,15 @@ export class IRToSceneConvertor {
         );
         const meshes = ir.meshes.map((mesh) => this.createMeshWrapper(mesh, primitives));
 
-        return {
-            root: this.createSceneRoot(ir.roots, meshes)
-        }
+        const context: NodeBuildContext = {byIndex: new Map(), skinned: [], unskinnedMeshes: new Set()};
+        const root = this.createSceneRoot(ir.roots, meshes, context);
+
+        // Both need the finished tree, so they run after it.
+        const skinInstances = ir.skins.map((skin) => this.createSkinInstance(skin, context));
+        this.attachSkins(context, skinInstances);
+        const clips = ir.animations.map((clip) => this.createClipWrapper(clip, context));
+
+        return {root, skinInstances, clips};
     }
 
     // -- attributes / geometry -------------------------------------------
@@ -181,27 +207,106 @@ export class IRToSceneConvertor {
 
     // -- node graph ------------------------------------------------------
 
-    private static createNodeWrapper(node: Node, meshes: MeshWrapper[]): NodeWrapper {
+    private static createNodeWrapper(node: Node, meshes: MeshWrapper[], context: NodeBuildContext): NodeWrapper {
         const wrapper = new NodeWrapper(node.translation, node.rotation, node.scale, node.name);
+        context.byIndex.set(node.index, wrapper);
 
         if (node.mesh !== undefined) {
             wrapper.setMesh(meshes[node.mesh]);
+            if (node.skin === undefined) context.unskinnedMeshes.add(meshes[node.mesh]);
+        }
+
+        if (node.skin !== undefined) {
+            context.skinned.push({wrapper, skin: node.skin});
         }
 
         for (const child of node.children) {
-            wrapper.addChild(this.createNodeWrapper(child, meshes));
+            wrapper.addChild(this.createNodeWrapper(child, meshes, context));
         }
 
         return wrapper;
     }
 
-    private static createSceneRoot(roots: Node[], meshes: MeshWrapper[]): NodeWrapper {
+    private static createSceneRoot(roots: Node[], meshes: MeshWrapper[], context: NodeBuildContext): NodeWrapper {
         const root = new NodeWrapper(undefined, undefined, undefined, "RendererSceneRoot");
 
         for (const node of roots) {
-            root.addChild(this.createNodeWrapper(node, meshes));
+            root.addChild(this.createNodeWrapper(node, meshes, context));
         }
 
         return root;
+    }
+
+    // -- skins -----------------------------------------------------------
+
+    private static createSkinInstance(skin: Skin, context: NodeBuildContext): SkinInstanceWrapper {
+        const jointNodes = skin.joints.map((nodeIndex) => {
+            const node = context.byIndex.get(nodeIndex);
+            if (!node) {
+                // importNode only walks the scene's node tree, so a joint outside it was never imported.
+                throw new Error(`IRToSceneConvertor: skin joint node ${nodeIndex} is not part of the imported scene`);
+            }
+            return node;
+        });
+
+        return new SkinInstanceWrapper(jointNodes, skin.inverseBindMatrices, skin.name);
+    }
+
+    /**
+     * Gives every skinned node its skin instance and switches its primitives to the skinned vertex assembler.
+     *
+     * Assemblers live on the primitive, and a mesh may be drawn by several nodes. A mesh shared between a skinned
+     * and an unskinned node can't have both, so that case warns: the unskinned node would run the skinned assembler
+     * against a bind group without a palette.
+     */
+    private static attachSkins(context: NodeBuildContext, skinInstances: SkinInstanceWrapper[]): void {
+        for (const {wrapper, skin} of context.skinned) {
+            const instance = skinInstances[skin];
+            if (!instance) {
+                throw new Error(`IRToSceneConvertor: node references skin ${skin}, which does not exist`);
+            }
+
+            wrapper.getAnimationHandler().setSkinInstance(instance);
+
+            const mesh = wrapper.getMesh();
+            if (!mesh) continue;
+
+            if (context.unskinnedMeshes.has(mesh)) {
+                console.warn(
+                    `IRToSceneConvertor: mesh of skinned node "${wrapper.getName() ?? wrapper.uuid}" is also used by a node without a skin; its primitives can only have one vertex assembler`,
+                );
+            }
+
+            for (const primitive of mesh.getAllPrimitives()) {
+                if (primitive.getVertexAssembler() instanceof VertexLBSSkinnedAssembler) continue;
+                primitive.setVertexAssembler(new VertexLBSSkinnedAssembler());
+            }
+        }
+    }
+
+    // -- animation clips -------------------------------------------------
+
+    private static createClipWrapper(clip: AnimationClip, context: NodeBuildContext): AnimationClipWrapper {
+        const channels: AnimationChannelWrapper[] = [];
+
+        for (const channel of clip.channels) {
+            const target = context.byIndex.get(channel.node);
+            if (!target) {
+                // Clips may animate nodes outside the scene (cameras, unused props). Nothing to drive here.
+                console.warn(
+                    `IRToSceneConvertor: clip "${clip.name ?? "(unnamed)"}" targets node ${channel.node}, which is not part of the imported scene; channel skipped`,
+                );
+                continue;
+            }
+
+            const sampler = clip.samplers[channel.sampler];
+            if (!sampler) {
+                throw new Error(`IRToSceneConvertor: clip "${clip.name ?? "(unnamed)"}" references missing sampler ${channel.sampler}`);
+            }
+
+            channels.push({target, path: channel.path, sampler});
+        }
+
+        return new AnimationClipWrapper(channels, clip.duration, clip.name);
     }
 }

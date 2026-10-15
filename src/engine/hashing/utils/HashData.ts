@@ -35,8 +35,25 @@ export interface GeometryHashes {
 export interface PipelineHashes {
     vertexShader: string;
     fragmentShader: string;
+    /** Pipeline layout key: the material layout plus the node layout the pipeline is used with. */
+    layout: string;
     /** One pipeline hash per cull-mode variant, in draw order. Look up through PIPELINE_VARIANT_ORDER. */
     pipelines: Map<PipelineVariant, string>;
+}
+
+/**
+ * Keys of the resources one node owns (group 2). Stored on the node's render entry, so releasing them never has to
+ * re-read the node: its skin may have changed since the entry was built.
+ */
+export interface NodeResourceKeys {
+    /** World matrix uniform buffer (identity-keyed: node uuid). */
+    matrixBuffer: string;
+    /** Node bind group layout key (see nodeLayoutKey). */
+    layout: string;
+    /** Node bind group: node uuid plus skin instance uuid, or "none". */
+    bindgroup: string;
+    /** Joint palette storage buffer (identity-keyed: skin instance uuid). Skinned nodes only. */
+    paletteBuffer?: string;
 }
 
 export interface HashData {

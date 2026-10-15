@@ -10,6 +10,12 @@ import {
     type Sampler,
     type DecodedImage,
     type Texture, uvAttributeName, jointsAttributeName, weightsAttributeName, type MaterialComponentIR,
+    type Skin,
+    type AnimationClip,
+    type AnimationSampler,
+    type AnimationChannel,
+    type AnimationPath,
+    type AnimationInterpolation,
 } from "./utils/IR.ts";
 import {ImageDecoder} from "./utils/ImageDecoder.ts";
 import {mat4} from "../../packages/math/matrix/mat4.ts";
@@ -631,6 +637,7 @@ function importNode(gltf: any, nodeIndex: number, visiting: Set<number>): Node {
     visiting.delete(nodeIndex);
 
     const node: Node = {
+        index: nodeIndex,
         translation,
         rotation,
         scale,
@@ -638,7 +645,90 @@ function importNode(gltf: any, nodeIndex: number, visiting: Set<number>): Node {
     };
     if (gltfNode.name) node.name = gltfNode.name;
     if (gltfNode.mesh !== undefined) node.mesh = gltfNode.mesh;
+    if (gltfNode.skin !== undefined) node.skin = gltfNode.skin;
     return node;
+}
+
+// ── skins ────────────────────────────────────────────────────────────────
+
+function importSkin(gltf: any, buffers: ArrayBuffer[], gltfSkin: any): Skin {
+    const joints: number[] = gltfSkin.joints ?? [];
+    if (joints.length === 0) {
+        throw new Error("GLTFImporter: skin has no joints");
+    }
+
+    let inverseBindMatrices: Float32Array;
+    if (gltfSkin.inverseBindMatrices !== undefined) {
+        inverseBindMatrices = readFloatAttribute(gltf, buffers, gltfSkin.inverseBindMatrices, 16);
+        if (inverseBindMatrices.length !== joints.length * 16) {
+            throw new Error(
+                `GLTFImporter: skin has ${joints.length} joints but ${inverseBindMatrices.length / 16} inverse bind matrices`,
+            );
+        }
+    } else {
+        // glTF: absent inverseBindMatrices means every joint's inverse bind matrix is the identity.
+        inverseBindMatrices = new Float32Array(joints.length * 16);
+        for (let i = 0; i < joints.length; i++) {
+            const o = i * 16;
+            inverseBindMatrices[o] = inverseBindMatrices[o + 5] = inverseBindMatrices[o + 10] = inverseBindMatrices[o + 15] = 1;
+        }
+    }
+
+    const skin: Skin = {joints, inverseBindMatrices};
+    if (gltfSkin.name) skin.name = gltfSkin.name;
+    if (gltfSkin.skeleton !== undefined) skin.skeleton = gltfSkin.skeleton;
+    return skin;
+}
+
+// ── animations ───────────────────────────────────────────────────────────
+
+const ANIMATION_PATHS = new Set<string>(["translation", "rotation", "scale"]);
+
+function normalizeInterpolation(mode: string | undefined): AnimationInterpolation {
+    switch (mode) {
+        case "STEP":
+            return "step";
+        case "CUBICSPLINE":
+            return "cubicspline";
+        case "LINEAR":
+        default:
+            return "linear";
+    }
+}
+
+function importAnimationSampler(gltf: any, buffers: ArrayBuffer[], gltfSampler: any): AnimationSampler {
+    const times = readFloatAttribute(gltf, buffers, gltfSampler.input, 1);
+    const outputAccessor = gltf.accessors[gltfSampler.output];
+    const values = readFloatAttribute(gltf, buffers, gltfSampler.output, GLTF_TYPE_COMPONENT_COUNT[outputAccessor.type]);
+    return {interpolation: normalizeInterpolation(gltfSampler.interpolation), times, values};
+}
+
+function importAnimation(gltf: any, buffers: ArrayBuffer[], gltfAnimation: any): AnimationClip {
+    const samplers: AnimationSampler[] = (gltfAnimation.samplers ?? []).map(
+        (s: any) => importAnimationSampler(gltf, buffers, s),
+    );
+
+    const channels: AnimationChannel[] = [];
+    for (const gltfChannel of gltfAnimation.channels ?? []) {
+        const path: string = gltfChannel.target?.path;
+        const nodeIndex: number | undefined = gltfChannel.target?.node;
+        if (nodeIndex === undefined) continue; // extension-driven channel, nothing to animate
+        if (!ANIMATION_PATHS.has(path)) {
+            // "weights" (morph targets) and "pointer" are deferred, same as morph targets in geometry.
+            console.warn(`GLTFImporter: skipping animation channel with unsupported path "${path}"`);
+            continue;
+        }
+        channels.push({node: nodeIndex, path: path as AnimationPath, sampler: gltfChannel.sampler});
+    }
+
+    let duration = 0;
+    for (const sampler of samplers) {
+        if (sampler.times.length > 0) duration = Math.max(duration, sampler.times[sampler.times.length - 1]);
+    }
+
+    const clip: AnimationClip = {samplers, channels, duration};
+    if (gltfAnimation.name) clip.name = gltfAnimation.name;
+    return clip;
 }
 
 // ── top-level import ─────────────────────────────────────────────────────
@@ -659,7 +749,7 @@ export class GLTFImporter {
         const images: DecodedImage[] = []
         let imageIndex = 0;
 
-        for (const image of gltf.images) {
+        for (const image of gltf.images ?? []) {
 
             const decodedImage = await importImage(gltf, buffers, image, imageIndex)
             images.push(decodedImage);
@@ -730,8 +820,11 @@ export class GLTFImporter {
 
         const roots: Node[] = rootNodeIndices.map((i) => importNode(gltf, i, new Set()));
 
+        const skins: Skin[] = (gltf.skins ?? []).map((s: any) => importSkin(gltf, buffers, s));
+        const animations: AnimationClip[] = (gltf.animations ?? []).map((a: any) => importAnimation(gltf, buffers, a));
+
         return {
-            roots, geometries, materials, images, samplers, textures, primitives, meshes,
+            roots, skins, animations, geometries, materials, images, samplers, textures, primitives, meshes,
             attributes: pool.attributes,
         };
     }

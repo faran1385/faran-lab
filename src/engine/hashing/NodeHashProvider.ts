@@ -9,6 +9,8 @@ type InputFunctions = {
 export class NodeHashProvider {
     private readonly transformFlag = new VersionFlag();
     private readonly meshStamp = new ChangeStamp();
+    /** Skin assigned / removed: changes the node's bind group layout and its primitives' shaders, like a mesh swap. */
+    private readonly skinStamp = new ChangeStamp();
 
     private wrapperFunctions: InputFunctions;
 
@@ -18,7 +20,7 @@ export class NodeHashProvider {
     }
 
     getStructureChangedAt(): number {
-        const own = this.meshStamp.get();
+        const own = Math.max(this.meshStamp.get(), this.skinStamp.get());
         return this.wrapperFunctions.getMesh() ? Math.max(own, this.wrapperFunctions.getMesh()!.hashProvider.getChangedAt()) : own;
     }
 
@@ -37,5 +39,9 @@ export class NodeHashProvider {
 
     markMesh() {
         this.meshStamp.mark()
+    }
+
+    markSkin() {
+        this.skinStamp.mark()
     }
 }

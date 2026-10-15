@@ -8,7 +8,8 @@ export interface GeneratedStages {
 
 /** The shader code layer: runs a primitive's assemblers when its code generation flag says the code is out of date. */
 export class ShaderCodeLayer {
-    static generate(p: PrimitiveWrapper, ctx: RenderContext) {
+    /** @param skinned whether the node being drawn has a skin: the vertex descriptor then carries the palette binding */
+    static generate(p: PrimitiveWrapper, skinned: boolean, ctx: RenderContext) {
         const {producer} = ctx;
         const pipeline = p.getPipeline();
         const vertexWrapper = pipeline.getVertexShaderWrapper();
@@ -19,6 +20,7 @@ export class ShaderCodeLayer {
             const code = p.getVertexAssembler().assemble(producer.produceVertexShader({
                 geometry: p.getGeometry(),
                 material: p.getMaterial(),
+                skinned,
             }), entryPoint);
             vertexWrapper.setShader(code, entryPoint);
             vertexWrapper.hashProvider.syncCodeGen();

@@ -21,11 +21,12 @@ export class UpdateLayer {
      * shader code. Here the last-seen key lives on the primitive's own pipeline wrapper.
      *
      * The key holds the material's shader hash, its layout hash (the binding plan decides the binding numbers written
-     * into the code) and the attribute shape (names and formats, not buffer contents).
+     * into the code) and the attribute shape (names and formats, not buffer contents). The node layout is in it too:
+     * whether the node is skinned decides which group 2 bindings the vertex code declares.
      */
-    static syncShaderInputs(primitive: PrimitiveWrapper, material: MaterialHashes, geometry: GeometryHashes): boolean {
+    static syncShaderInputs(primitive: PrimitiveWrapper, material: MaterialHashes, geometry: GeometryHashes, nodeLayout: string): boolean {
         const pipeline = primitive.getPipeline();
-        const key = `${material.shader}|${material.layout}|${geometry.attributesShape}`;
+        const key = `${material.shader}|${material.layout}|${geometry.attributesShape}|${nodeLayout}`;
         if (pipeline.hashProvider.getShaderInputsKey() === key) return false;
 
         pipeline.hashProvider.setShaderInputsKey(key);

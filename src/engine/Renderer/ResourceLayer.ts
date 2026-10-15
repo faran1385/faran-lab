@@ -1,7 +1,13 @@
 import type {PrimitiveWrapper} from "../wrappers/PrimitiveWrapper.ts";
 import type {MaterialWrapper} from "../wrappers/MaterialWrapper.ts";
 import type {GeometryWrapper} from "../wrappers/GeometryWrapper.ts";
-import type {HashData, GeometryHashes, MaterialHashes, PipelineHashes} from "../hashing/utils/HashData.ts";
+import type {
+    HashData,
+    GeometryHashes,
+    MaterialHashes,
+    NodeResourceKeys,
+    PipelineHashes
+} from "../hashing/utils/HashData.ts";
 import type {RenderContext} from "./RenderContext.ts";
 import type {NodeWrapper} from "../wrappers/NodeWrapper.ts";
 
@@ -23,16 +29,24 @@ export class ResourceLayer {
         }
     }
 
-    static node(node: NodeWrapper, ctx: RenderContext) {
+    /** Group 2: the node's matrix buffer, its layout (plain or skinned), its palette buffer if skinned, its bind group. */
+    static node(node: NodeWrapper, keys: NodeResourceKeys, ctx: RenderContext) {
         const nodeMesh = node.getMesh();
-        if (nodeMesh && nodeMesh.getPrimitivesCount() > 0) {
-            ctx.managers.bufferManager.ensure(node.uuid, () => ctx.producer.produceBufferFromNodeMatrix(node));
-            ctx.managers.bindgroupManager.ensure(node.uuid, () => ctx.producer.produceBindgroupFromNode({
-                layouts: ctx.managers.bindgroupLayoutManager,
-                buffers: ctx.managers.bufferManager,
-                node
-            }));
+        if (!nodeMesh || nodeMesh.getPrimitivesCount() === 0) return;
+
+        const {managers, producer} = ctx;
+        const skin = node.getSkinInstance();
+
+        managers.bufferManager.ensure(keys.matrixBuffer, () => producer.produceBufferFromNodeMatrix(node));
+        managers.bindgroupLayoutManager.ensure(keys.layout, () => producer.produceNodeBindGroupLayout(skin !== undefined));
+        if (skin && keys.paletteBuffer !== undefined) {
+            managers.bufferManager.ensure(keys.paletteBuffer, () => producer.produceBufferFromSkinPalette(skin));
         }
+        managers.bindgroupManager.ensure(keys.bindgroup, () => producer.produceBindgroupFromNode({
+            layouts: managers.bindgroupLayoutManager,
+            buffers: managers.bufferManager,
+            keys,
+        }));
     }
 
     static material(material: MaterialWrapper, hashes: MaterialHashes, ctx: RenderContext): void {
@@ -58,9 +72,6 @@ export class ResourceLayer {
             textures: managers.textureManager,
             samplers: managers.samplerManager,
         }));
-        managers.pipelineLayoutManager.ensure(hashes.layout, () => producer.producePipelineLayout({
-            material, hashes, layouts: managers.bindgroupLayoutManager
-        }));
     }
 
     static shaders(p: PrimitiveWrapper, hashes: PipelineHashes, ctx: RenderContext): void {
@@ -74,8 +85,16 @@ export class ResourceLayer {
         managers.shaderModuleManager.ensure(hashes.fragmentShader, () => producer.produceShaderModule(fWrapper));
     }
 
-    static pipeline(p: PrimitiveWrapper, data: HashData, ctx: RenderContext): void {
+    static pipeline(p: PrimitiveWrapper, data: HashData, nodeKeys: NodeResourceKeys, ctx: RenderContext): void {
         const {managers, producer, frame} = ctx;
+
+        // The pipeline layout joins the material layout (group 1) with the node layout (group 2), so it is keyed by both.
+        managers.pipelineLayoutManager.ensure(data.pipeline.layout, () => producer.producePipelineLayout({
+            material: p.getMaterial(),
+            hashes: data.material,
+            nodeLayout: nodeKeys.layout,
+            layouts: managers.bindgroupLayoutManager,
+        }));
 
         for (const [cullMode, hash] of data.pipeline.pipelines) {
             managers.pipelineManager.ensure(hash, () => producer.producePipeline({

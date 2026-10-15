@@ -4,7 +4,12 @@ import {
     getWGSLTypeFromVertexFormat,
     type WGSLType
 } from "./utils.ts";
-import {FACTORS_BINDING, type MaterialBindingPlan} from "./BindGroupLayoutProducer.ts";
+import {
+    FACTORS_BINDING,
+    NODE_MATRIX_BINDING,
+    NODE_PALETTE_BINDING,
+    type MaterialBindingPlan
+} from "./BindGroupLayoutProducer.ts";
 
 export interface VertexInputField {
     name: string;
@@ -97,14 +102,14 @@ export function sceneBindings(): BindGroupEntry[] {
     ];
 }
 
-// --- Group 2 (per-primitive/node) — fixed shape for now -------------------
+// --- Group 2 (per-primitive/node) — two shapes: plain, and skinned (adds the joint palette) ----------
 
-export function nodeBindings(): BindGroupEntry[] {
-    return [
+export function nodeBindings(skinned: boolean): BindGroupEntry[] {
+    const entries: BindGroupEntry[] = [
         {
             kind: "uniform",
             group: 2,
-            binding: 0,
+            binding: NODE_MATRIX_BINDING,
             name: "node",
             structName: "NodeUniforms",
             fields: [
@@ -113,10 +118,26 @@ export function nodeBindings(): BindGroupEntry[] {
             size: 64,
         },
     ];
+
+    if (skinned) {
+        entries.push({
+            kind: "storage",
+            group: 2,
+            binding: NODE_PALETTE_BINDING,
+            name: "palette",
+            elementStructName: "JointMatrix",
+            elementFields: [
+                {name: "matrix", type: "mat4x4f", offset: 0},
+            ],
+            access: "read",
+        });
+    }
+
+    return entries;
 }
 
 export class VertexShaderProducer {
-    static produce(getMaterialPlan: () => MaterialBindingPlan, getAttributePlan: () => GeometryAttributePlan): VertexShaderDescriptor {
+    static produce(getMaterialPlan: () => MaterialBindingPlan, getAttributePlan: () => GeometryAttributePlan, skinned: boolean): VertexShaderDescriptor {
         const plan = getAttributePlan();
         const matPlan = getMaterialPlan();
         const componentDataMap: VertexShaderDescriptor["componentDataMap"] = new Map()
@@ -136,7 +157,7 @@ export class VertexShaderProducer {
         }));
 
 
-        return {inputs, componentDataMap, bindings: [...sceneBindings(), ...nodeBindings()]};
+        return {inputs, componentDataMap, bindings: [...sceneBindings(), ...nodeBindings(skinned)]};
     }
 }
 

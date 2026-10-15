@@ -8,6 +8,7 @@ import type {
     HashData,
     MaterialHashes,
     MaterialTextureHashes,
+    NodeResourceKeys,
     PipelineHashes,
     Resolved
 } from "./HashData.ts";
@@ -16,6 +17,7 @@ import type {ResourceManager} from "../../managers/Manager.ts";
 import type {Tracker} from "../../Trackers/Tracker.ts";
 import type {CentralManager} from "../../managers/CentralManager.ts";
 import type {NodeWrapper} from "../../wrappers/NodeWrapper.ts";
+import {nodeLayoutKey} from "../../producers/BindGroupLayoutProducer.ts";
 import type {NodeRenderEntry} from "../../Renderer/RenderCache.ts";
 import type {RenderContext} from "../../Renderer/RenderContext.ts";
 
@@ -29,7 +31,8 @@ export const EMPTY_HASH_DATA: HashData = {
     pipeline: {
         pipelines: new Map(),
         fragmentShader: "",
-        vertexShader: ""
+        vertexShader: "",
+        layout: ""
     },
     geometry: {
         indices: "",
@@ -130,7 +133,7 @@ export class HashResolver {
         this.chg(managers.bufferManager, newHashData.material.factors, oldHashData.material.factors)
         this.chg(managers.bindgroupManager, newHashData.material.bindgroup, oldHashData.material.bindgroup)
         this.chg(managers.bindgroupLayoutManager, newHashData.material.layout, oldHashData.material.layout)
-        this.chg(managers.pipelineLayoutManager, newHashData.material.layout, oldHashData.material.layout)
+        this.chg(managers.pipelineLayoutManager, newHashData.pipeline.layout, oldHashData.pipeline.layout)
         const materialComponentSet = new Set<string>([...newHashData.material.textures.keys(), ...oldHashData.material.textures.keys()]);
 
         const geometryAttributeSet = new Set<string>([...newHashData.geometry.attributeBuffers.keys(), ...oldHashData.geometry.attributeBuffers.keys()]);
@@ -163,10 +166,25 @@ export class HashResolver {
         }
     }
 
-    acquireEntry(node: NodeWrapper, entry: NodeRenderEntry, ctx: RenderContext) {
+    /** The group 2 resource keys of a node, from its current skin. Pure string building, creates nothing. */
+    resolveNode(node: NodeWrapper): NodeResourceKeys {
+        const skin = node.getSkinInstance();
+        return {
+            matrixBuffer: node.uuid,
+            layout: nodeLayoutKey(skin !== undefined),
+            bindgroup: `${node.uuid}|${skin?.uuid ?? "none"}`,
+            paletteBuffer: skin?.uuid,
+        };
+    }
+
+    acquireEntry(entry: NodeRenderEntry, ctx: RenderContext) {
         if (entry.items.length > 0) {
-            ctx.managers.bufferManager.acquire(node.uuid)
-            ctx.managers.bindgroupManager.acquire(node.uuid)
+            const {bufferManager, bindgroupManager, bindgroupLayoutManager} = ctx.managers;
+            const keys = entry.nodeKeys;
+            bufferManager.acquire(keys.matrixBuffer)
+            if (keys.paletteBuffer !== undefined) bufferManager.acquire(keys.paletteBuffer)
+            bindgroupLayoutManager.acquire(keys.layout)
+            bindgroupManager.acquire(keys.bindgroup)
         }
 
         for (const item of entry.items) {
@@ -174,10 +192,14 @@ export class HashResolver {
         }
     }
 
-    releaseEntry(node: NodeWrapper, entry: NodeRenderEntry, ctx: RenderContext) {
+    releaseEntry(entry: NodeRenderEntry, ctx: RenderContext) {
         if (entry.items.length > 0) {
-            ctx.managers.bufferManager.release(node.uuid)
-            ctx.managers.bindgroupManager.release(node.uuid)
+            const {bufferManager, bindgroupManager, bindgroupLayoutManager} = ctx.managers;
+            const keys = entry.nodeKeys;
+            bufferManager.release(keys.matrixBuffer)
+            if (keys.paletteBuffer !== undefined) bufferManager.release(keys.paletteBuffer)
+            bindgroupLayoutManager.release(keys.layout)
+            bindgroupManager.release(keys.bindgroup)
         }
 
         for (const item of entry.items) {
@@ -190,16 +212,18 @@ export class HashResolver {
      * input differs from what this primitive's pipelines were last resolved with. The variants (one pipeline per cull
      * mode) are derived from the material's alphaMode and doubleSided, which `material.pipelineSettings` covers.
      */
-    resolvePipeline(pipeline: PipelineWrapper, materialWrapper: MaterialWrapper, material: MaterialHashes, geometry: GeometryHashes): Resolved<PipelineHashes> {
+    resolvePipeline(pipeline: PipelineWrapper, materialWrapper: MaterialWrapper, material: MaterialHashes, geometry: GeometryHashes, nodeLayout: string): Resolved<PipelineHashes> {
         const h = this.hasher;
+        // The pipeline layout holds the node layout too, so a node gaining or losing a skin changes the pipeline.
+        const layout = `${material.layout}|${nodeLayout}`;
         const vertexShader = pipeline.getVertexShaderWrapper().hashProvider.convertToHash(h);
         const fragmentShader = pipeline.getFragmentShaderWrapper().hashProvider.convertToHash(h);
 
-        const changed = pipeline.hashProvider.setInputs(vertexShader, fragmentShader, material.layout, geometry.attributesShape, material.pipelineSettings);
+        const changed = pipeline.hashProvider.setInputs(vertexShader, fragmentShader, layout, geometry.attributesShape, material.pipelineSettings);
         const pipelines = changed
             ? pipeline.hashProvider.computeVariants(h, pipelineVariantsOf(materialWrapper.getAlphaMode(), materialWrapper.getDoubleSided()))
             : pipeline.hashProvider.getCachedVariants();
 
-        return {hashes: {vertexShader, fragmentShader, pipelines}, computed: changed};
+        return {hashes: {vertexShader, fragmentShader, layout, pipelines}, computed: changed};
     }
 }

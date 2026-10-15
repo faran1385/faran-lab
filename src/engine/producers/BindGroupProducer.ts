@@ -1,11 +1,16 @@
-import {FACTORS_BINDING, type MaterialBindingPlan} from "./BindGroupLayoutProducer.ts";
+import {
+    FACTORS_BINDING,
+    NODE_MATRIX_BINDING,
+    NODE_PALETTE_BINDING,
+    type MaterialBindingPlan
+} from "./BindGroupLayoutProducer.ts";
 import type {MaterialWrapper} from "../wrappers/MaterialWrapper.ts";
 import type {MaterialHashes} from "../hashing/utils/HashData.ts";
-import {type BindGroupLayoutManager, GLOBAL_LAYOUT_KEY, NODE_LAYOUT_KEY} from "../managers/BindGroupLayoutManager.ts";
+import {type BindGroupLayoutManager, GLOBAL_LAYOUT_KEY} from "../managers/BindGroupLayoutManager.ts";
 import type {BufferManager} from "../managers/BufferManager.ts";
 import type {TextureManager} from "../managers/TextureManager.ts";
 import type {SamplerManager} from "../managers/SamplerManager.ts";
-import type {NodeWrapper} from "../wrappers/NodeWrapper.ts";
+import type {NodeResourceKeys} from "../hashing/utils/HashData.ts";
 
 export interface BindGroupProduceArgs {
     material: MaterialWrapper;
@@ -60,21 +65,26 @@ export class BindGroupProducer {
 export interface NodeBindgroupProduceArgs {
     layouts: BindGroupLayoutManager,
     buffers: BufferManager,
-    node: NodeWrapper
+    keys: NodeResourceKeys
 }
 
 export class NodeBindGroupProducer {
     static produce(
-        {layouts, buffers, node}: NodeBindgroupProduceArgs,
+        {layouts, buffers, keys}: NodeBindgroupProduceArgs,
     ): GPUBindGroupDescriptor {
 
-        const layout = layouts.getRaw(NODE_LAYOUT_KEY);
+        const layout = layouts.getRaw(keys.layout);
 
         const entries: GPUBindGroupEntry[] = [
-            {binding: 0, resource: {buffer: buffers.getRaw(node.uuid)},},
+            {binding: NODE_MATRIX_BINDING, resource: {buffer: buffers.getRaw(keys.matrixBuffer)},},
         ];
 
-        return {label: node.uuid, layout, entries};
+        // the layout has a palette binding exactly when the node has a palette buffer
+        if (keys.paletteBuffer !== undefined) {
+            entries.push({binding: NODE_PALETTE_BINDING, resource: {buffer: buffers.getRaw(keys.paletteBuffer)}});
+        }
+
+        return {label: keys.bindgroup, layout, entries};
     }
 }
 

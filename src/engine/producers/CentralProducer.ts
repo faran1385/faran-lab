@@ -3,9 +3,14 @@ import {
     type BufferDescriptor,
     BufferProducer,
     MaterialFactorBufferProducer,
-    NodeMatrixBufferProducer
+    NodeMatrixBufferProducer,
+    SkinPaletteBufferProducer
 } from "./BufferProducer.ts";
-import {BindGroupLayoutProducer, type MaterialBindingPlan} from "./BindGroupLayoutProducer.ts";
+import {
+    BindGroupLayoutProducer,
+    NodeBindGroupLayoutProducer,
+    type MaterialBindingPlan
+} from "./BindGroupLayoutProducer.ts";
 import type {ImageWrapper} from "../wrappers/ImageWrapper.ts";
 import {type TextureDescriptor, TextureProducer, type TextureUpdateDescriptor} from "./TextureDescriptorProducer.ts";
 import type {SamplerWrapper} from "../wrappers/SamplerWrapper.ts";
@@ -35,6 +40,7 @@ import {
     type VertexShaderDescriptor, VertexShaderProducer
 } from "./AssemblerProducers.ts";
 import type {NodeWrapper} from "../wrappers/NodeWrapper.ts";
+import type {SkinInstanceWrapper} from "../wrappers/SkinInstanceWrapper.ts";
 import type {Camera} from "../Camera/Camera.ts";
 
 export class CentralProducer {
@@ -68,6 +74,11 @@ export class CentralProducer {
         return this.produceBuffer(NodeMatrixBufferProducer.produce(node))
     }
 
+    /** @param strideBytes bytes per joint; the skinning module that will write the palette decides it */
+    produceBufferFromSkinPalette(skin: SkinInstanceWrapper, strideBytes?: number) {
+        return this.produceBuffer(SkinPaletteBufferProducer.produce(skin, strideBytes))
+    }
+
     produceCameraBuffer(camera: Camera) {
         return this.produceBuffer(new BufferWrapper(new Float32Array([...camera.getViewMatrix(), ...camera.getProjectionMatrix()]).buffer, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST))
     }
@@ -80,8 +91,8 @@ export class CentralProducer {
         return NodeBindGroupProducer.produce(args)
     }
 
-    produceVertexShader(T: { geometry: GeometryWrapper, material: MaterialWrapper }): VertexShaderDescriptor {
-        return VertexShaderProducer.produce(() => this.getBindingPlan(T.material), () => this.getAttributePlan(T.geometry));
+    produceVertexShader(T: { geometry: GeometryWrapper, material: MaterialWrapper, skinned: boolean }): VertexShaderDescriptor {
+        return VertexShaderProducer.produce(() => this.getBindingPlan(T.material), () => this.getAttributePlan(T.geometry), T.skinned);
     }
 
 
@@ -103,6 +114,10 @@ export class CentralProducer {
 
     produceBindGroupLayout(material: MaterialWrapper): GPUBindGroupLayoutDescriptor {
         return BindGroupLayoutProducer.produce(material, () => this.getBindingPlan(material));
+    }
+
+    produceNodeBindGroupLayout(skinned: boolean): GPUBindGroupLayoutDescriptor {
+        return NodeBindGroupLayoutProducer.produce(skinned);
     }
 
     produceBindGroup(args: BindGroupProduceArgs): GPUBindGroupDescriptor {

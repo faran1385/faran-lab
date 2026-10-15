@@ -2,7 +2,6 @@ import {BindGroupLayoutTracker} from "../Trackers/Trackers.ts";
 import {ResourceManager} from "./Manager.ts";
 
 export const GLOBAL_LAYOUT_KEY = "GLOBALLAYOUT";
-export const NODE_LAYOUT_KEY = "NODELAYOUT";
 
 
 export class BindGroupLayoutManager extends ResourceManager<GPUBindGroupLayoutDescriptor, BindGroupLayoutTracker> {
@@ -21,17 +20,7 @@ export class BindGroupLayoutManager extends ResourceManager<GPUBindGroupLayoutDe
                 ],
             })
         ));
-
-        // group 2: node
-        this.cache.set(NODE_LAYOUT_KEY, new BindGroupLayoutTracker(
-            device.createBindGroupLayout({
-                label: NODE_LAYOUT_KEY,
-                entries: [
-                    // worldMatrix
-                    { binding: 0, visibility: GPUShaderStage.VERTEX, buffer: { type: "uniform" } },
-                ],
-            })
-        ));
+        // group 2 (node) layouts are not seeded: they are generated at runtime, see NodeBindGroupLayoutProducer
     }
     protected build(getDescriptor: () => GPUBindGroupLayoutDescriptor): BindGroupLayoutTracker {
         return new BindGroupLayoutTracker(this.device.createBindGroupLayout(getDescriptor()));

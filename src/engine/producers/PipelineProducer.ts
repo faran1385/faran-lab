@@ -41,7 +41,7 @@ export class PipelineProducer {
 
         return {
             label: pipeline.uuid,
-            layout: pipelineLayouts.getRaw(hashes.material.layout),
+            layout: pipelineLayouts.getRaw(hashes.pipeline.layout),
             vertex: {
                 module: shaderModules.getRaw(hashes.pipeline.vertexShader),
                 entryPoint: vs.getEntryPoint(),

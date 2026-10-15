@@ -1,13 +1,12 @@
-import type {NodeWrapper} from "../wrappers/NodeWrapper.ts";
 import type {PrimitiveWrapper} from "../wrappers/PrimitiveWrapper.ts";
-import type {GeometryHashes, HashData} from "../hashing/utils/HashData.ts";
+import type {GeometryHashes, HashData, NodeResourceKeys} from "../hashing/utils/HashData.ts";
 import type {DrawInfo, RenderItem, VertexBufferBinding} from "./RenderItem.ts";
 import type {RenderContext} from "./RenderContext.ts";
 import {PIPELINE_VARIANT_ORDER} from "../wrappers/PipelineWrapper.ts";
 
 /** The item layer: pure lookup. Reads resolved hashes and the managers' resources, creates and computes nothing. */
 export class RenderItemAssembler {
-    static assemble(node: NodeWrapper, p: PrimitiveWrapper, data: HashData, ctx: RenderContext): RenderItem {
+    static assemble(nodeKeys: NodeResourceKeys, p: PrimitiveWrapper, data: HashData, ctx: RenderContext): RenderItem {
         const {managers, rendererUUID} = ctx;
 
         return {
@@ -15,7 +14,7 @@ export class RenderItemAssembler {
             bindGroups: [
                 {slot: 0, bindGroup: managers.bindgroupManager.getRaw(rendererUUID)},
                 {slot: 1, bindGroup: managers.bindgroupManager.getRaw(data.material.bindgroup)},
-                {slot: 2, bindGroup: managers.bindgroupManager.getRaw(node.uuid)},
+                {slot: 2, bindGroup: managers.bindgroupManager.getRaw(nodeKeys.bindgroup)},
             ],
             vertexBuffers: RenderItemAssembler.vertexBuffers(p, data.geometry, ctx),
             draw: RenderItemAssembler.drawInfo(p, data.geometry, ctx),

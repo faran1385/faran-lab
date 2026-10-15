@@ -5,11 +5,20 @@ import {v4 as uuidv4} from "uuid";
 import {vec3} from "../../packages/math/vector/vec3.ts";
 import {quat} from "../../packages/math/quat/quat.ts";
 import {NodeHashProvider} from "../hashing/NodeHashProvider.ts";
+import {NodeAnimationHandler} from "./NodeAnimationHandler.ts";
+import type {SkinInstanceWrapper} from "./SkinInstanceWrapper.ts";
 
 export class NodeWrapper {
     readonly uuid: string;
     private name?: string;
     private mesh?: MeshWrapper;
+    /** Created on first use: most nodes never carry anything animation-related. */
+    private animationHandler?: NodeAnimationHandler;
+    /**
+     * Counts world-matrix rebuilds. A plain integer on purpose, not an epoch stamp: transforms must not invalidate
+     * render items. Consumers (skin palettes) compare it for equality with the value they last saw.
+     */
+    private worldVersion = 0;
     private children = new Map<string, NodeWrapper>();
     private parent?: NodeWrapper;
 
@@ -55,6 +64,19 @@ export class NodeWrapper {
     setMesh(mesh: MeshWrapper | undefined) {
         this.mesh = mesh;
         this.hashProvider.markMesh();
+    }
+
+    /** The node's animation handler, created on first call. */
+    getAnimationHandler(): NodeAnimationHandler {
+        if (!this.animationHandler) {
+            this.animationHandler = new NodeAnimationHandler(() => this.hashProvider.markSkin());
+        }
+        return this.animationHandler;
+    }
+
+    /** The skin this node's mesh is skinned with, if any. Does not create a handler. */
+    getSkinInstance(): SkinInstanceWrapper | undefined {
+        return this.animationHandler?.getSkinInstance();
     }
 
     /**
@@ -134,6 +156,10 @@ export class NodeWrapper {
         return this.worldMatrix;
     }
 
+    getWorldVersion() {
+        return this.worldVersion;
+    }
+
     buildWorldMatrix(parentMatrix: Float32Array | null, uploadToGPUBuffer: (hash: string, data: GPUAllowSharedBufferSource, offset: number) => void) {
         mat4.compose(this.localMatrix, this.translation as any, this.rotation as any, this.scale as any);
         if (parentMatrix) {
@@ -143,6 +169,7 @@ export class NodeWrapper {
         }
 
         this.hashProvider.syncTransformUpdate()
+        this.worldVersion++;
         if (this.mesh && this.mesh.getPrimitivesCount() > 0) uploadToGPUBuffer(this.uuid, this.worldMatrix, 0);
 
         this.children.forEach((child: NodeWrapper) => {
