@@ -12,7 +12,7 @@ export class ShaderCodeLayer {
     /** A supplied method adds its palette declaration and WGSL pieces to the vertex descriptor. */
     static generate(p: PrimitiveWrapper, skinningMethod: SkinningMethod | undefined, ctx: RenderContext) {
         const {producer} = ctx;
-        const pipeline = p.getPipeline();
+        const pipeline = p.getPipeline(skinningMethod?.id);
         const vertexWrapper = pipeline.getVertexShaderWrapper();
         const fragmentWrapper = pipeline.getFragmentShaderWrapper();
 
