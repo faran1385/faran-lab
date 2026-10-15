@@ -14,6 +14,8 @@ export class PrimitiveWrapper {
     private vertexAssembler: VertexAssemblerBase = new BasicVertexAssembler();
     private fragmentAssembler: FragmentAssemblerBase = new BasicFragmentAssembler();
     private pipelineWrapper = new PipelineWrapper();
+    /** Separate generated shader/pipeline state for each skinning method used with this shared primitive. */
+    private skinningPipelines = new Map<string, PipelineWrapper>();
 
     constructor(mat: MaterialWrapper, geo: GeometryWrapper) {
         this.uuid = uuidv4();
@@ -23,25 +25,38 @@ export class PrimitiveWrapper {
     }
 
 
-    getPipeline() {
-        return this.pipelineWrapper;
+    getPipeline(skinningId?: string): PipelineWrapper {
+        if (!skinningId) return this.pipelineWrapper;
+        let pipeline = this.skinningPipelines.get(skinningId);
+        if (!pipeline) {
+            pipeline = new PipelineWrapper();
+            pipeline.markVertexShaderDirty();
+            pipeline.markFragmentShaderDirty();
+            this.skinningPipelines.set(skinningId, pipeline);
+        }
+        return pipeline;
+    }
+
+    private forEachPipeline(callback: (pipeline: PipelineWrapper) => void): void {
+        callback(this.pipelineWrapper);
+        for (const pipeline of this.skinningPipelines.values()) callback(pipeline);
     }
 
     /**
      * Latest change stamp of anything this primitive renders with. Swapping the material, geometry or an assembler
      * goes through the pipeline wrapper's mark*ShaderDirty(), so its stamp already covers those setters.
      */
-    getChangedAt(): number {
+    getChangedAt(skinningId?: string): number {
         return Math.max(
             this.material.hashProvider.getChangedAt(),
             this.geometry.hashProvider.getChangedAt(),
-            this.pipelineWrapper.hashProvider.getChangedAt(),
+            this.getPipeline(skinningId).hashProvider.getChangedAt(),
         );
     }
 
     setVertexAssembler(a: VertexAssemblerBase): void {
         this.vertexAssembler = a;
-        this.pipelineWrapper.markVertexShaderDirty()
+        this.forEachPipeline((pipeline) => pipeline.markVertexShaderDirty())
     }
 
     getVertexAssembler(): VertexAssemblerBase {
@@ -50,7 +65,7 @@ export class PrimitiveWrapper {
 
     setFragmentAssembler(a: FragmentAssemblerBase): void {
         this.fragmentAssembler = a;
-        this.pipelineWrapper.markFragmentShaderDirty()
+        this.forEachPipeline((pipeline) => pipeline.markFragmentShaderDirty())
     }
 
     getFragmentAssembler(): FragmentAssemblerBase {
@@ -63,8 +78,10 @@ export class PrimitiveWrapper {
 
     setGeometry(geometry: GeometryWrapper): void {
         this.geometry = geometry;
-        this.pipelineWrapper.markFragmentShaderDirty()
-        this.pipelineWrapper.markVertexShaderDirty()
+        this.forEachPipeline((pipeline) => {
+            pipeline.markFragmentShaderDirty();
+            pipeline.markVertexShaderDirty();
+        })
     }
 
     getMaterial(): MaterialWrapper {
@@ -73,7 +90,9 @@ export class PrimitiveWrapper {
 
     setMaterial(material: MaterialWrapper): void {
         this.material = material;
-        this.pipelineWrapper.markFragmentShaderDirty()
-        this.pipelineWrapper.markVertexShaderDirty()
+        this.forEachPipeline((pipeline) => {
+            pipeline.markFragmentShaderDirty();
+            pipeline.markVertexShaderDirty();
+        })
     }
 }
