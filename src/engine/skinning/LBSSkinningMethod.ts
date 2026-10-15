@@ -71,7 +71,7 @@ export class LBSSkinningMethod implements SkinningMethod {
         for (let i = 0; i < joints.length; i++) {
             const output = palette.subarray(i * 16, i * 16 + 16);
             const inverseBind = inverseBindMatrices.subarray(i * 16, i * 16 + 16);
-            mat4.mul(output as mat4, joints[i].getWorldMatrix() as mat4, inverseBind as mat4);
+            mat4.mul(output, joints[i].getWorldMatrix(), inverseBind);
         }
 
         ctx.managers.bufferManager.upload(skin.getPaletteKey(), palette);
