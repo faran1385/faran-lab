@@ -30,6 +30,10 @@ export class RenderItemBuilder {
             // every frame, quiet or not: the presence sets must see every node that is still in the scene
         cache.touch(node);
 
+        // collect before the quiet-frame return too: the skin step runs every frame. One pointer read for plain nodes.
+        const skin = node.getSkinInstance();
+        if (skin && node.getMesh()?.getPrimitivesCount()) ctx.frameSkins.add(skin);
+
         const entry = cache.get(node);
 
         // Quiet frame: nothing anywhere changed since the last frame

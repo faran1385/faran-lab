@@ -7,6 +7,7 @@ import {quat} from "../../packages/math/quat/quat.ts";
 import {NodeHashProvider} from "../hashing/NodeHashProvider.ts";
 import {NodeAnimationHandler} from "./NodeAnimationHandler.ts";
 import type {SkinInstanceWrapper} from "./SkinInstanceWrapper.ts";
+import {bumpWorldEpoch} from "../hashing/utils/worldEpoch.ts";
 
 export class NodeWrapper {
     readonly uuid: string;
@@ -170,6 +171,7 @@ export class NodeWrapper {
 
         this.hashProvider.syncTransformUpdate()
         this.worldVersion++;
+        bumpWorldEpoch();
         if (this.mesh && this.mesh.getPrimitivesCount() > 0) uploadToGPUBuffer(this.uuid, this.worldMatrix, 0);
 
         this.children.forEach((child: NodeWrapper) => {
