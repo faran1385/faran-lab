@@ -4,6 +4,7 @@ import {
     getWGSLTypeFromVertexFormat,
     type WGSLType
 } from "./utils.ts";
+import type {SkinningMethod, SkinningShaderParts} from "../skinning/SkinningMethod.ts";
 import {
     FACTORS_BINDING,
     NODE_MATRIX_BINDING,
@@ -70,6 +71,8 @@ export interface BindGroupSamplerEntry {
 export interface VertexShaderDescriptor {
     inputs: VertexInputField[];
     bindings: BindGroupEntry[],
+    /** Present when the node is skinned: the WGSL of its skinning method (see SkinningShaderParts). */
+    skinning?: SkinningShaderParts,
     componentDataMap: Map<string, {
         uv?: string
     }>
@@ -104,7 +107,7 @@ export function sceneBindings(): BindGroupEntry[] {
 
 // --- Group 2 (per-primitive/node) — two shapes: plain, and skinned (adds the joint palette) ----------
 
-export function nodeBindings(skinned: boolean): BindGroupEntry[] {
+export function nodeBindings(skinning?: SkinningMethod): BindGroupEntry[] {
     const entries: BindGroupEntry[] = [
         {
             kind: "uniform",
@@ -119,16 +122,15 @@ export function nodeBindings(skinned: boolean): BindGroupEntry[] {
         },
     ];
 
-    if (skinned) {
+    if (skinning) {
+        // the element type is the method's: the engine declares the binding, the method decides what one joint is
         entries.push({
             kind: "storage",
             group: 2,
             binding: NODE_PALETTE_BINDING,
             name: "palette",
-            elementStructName: "JointMatrix",
-            elementFields: [
-                {name: "matrix", type: "mat4x4f", offset: 0},
-            ],
+            elementStructName: skinning.paletteElement.structName,
+            elementFields: skinning.paletteElement.fields,
             access: "read",
         });
     }
@@ -137,7 +139,7 @@ export function nodeBindings(skinned: boolean): BindGroupEntry[] {
 }
 
 export class VertexShaderProducer {
-    static produce(getMaterialPlan: () => MaterialBindingPlan, getAttributePlan: () => GeometryAttributePlan, skinned: boolean): VertexShaderDescriptor {
+    static produce(getMaterialPlan: () => MaterialBindingPlan, getAttributePlan: () => GeometryAttributePlan, skinning?: SkinningMethod): VertexShaderDescriptor {
         const plan = getAttributePlan();
         const matPlan = getMaterialPlan();
         const componentDataMap: VertexShaderDescriptor["componentDataMap"] = new Map()
@@ -157,7 +159,12 @@ export class VertexShaderProducer {
         }));
 
 
-        return {inputs, componentDataMap, bindings: [...sceneBindings(), ...nodeBindings(skinned)]};
+        return {
+            inputs,
+            componentDataMap,
+            bindings: [...sceneBindings(), ...nodeBindings(skinning)],
+            skinning: skinning?.shaderParts(),
+        };
     }
 }
 

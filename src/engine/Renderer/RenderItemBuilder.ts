@@ -39,8 +39,10 @@ export class RenderItemBuilder {
         // Quiet frame: nothing anywhere changed since the last frame
         if (entry && cache.lastFrameEpoch === getEpoch()) return entry.items;
 
-        // Structure path: first time we see the node, or its mesh / primitive list changed
-        if (!entry || node.hashProvider.getStructureChangedAt() > entry.structureBuiltAt) {
+        // Structure path: first time we see the node, its mesh / primitive list changed, or its skin got another
+        // skinning method (palette buffer, bind group and shader all depend on it; setSkinning bumped the epoch, so
+        // a quiet frame did not return above)
+        if (!entry || node.hashProvider.getStructureChangedAt() > entry.structureBuiltAt || entry.nodeKeys.skinning !== skin?.getSkinning()) {
             const primitives = node.getMesh()?.getAllPrimitives() ?? [];
 
             const nodeKeys = hashes.resolveNode(node);
@@ -88,8 +90,8 @@ export class RenderItemBuilder {
         const materialHashes = hashes.resolveMaterial(material, (m) => producer.getBindingPlan(m));
         const geometryHashes = hashes.resolveGeometry(geometry);
 
-        UpdateLayer.syncShaderInputs(p, materialHashes.hashes, geometryHashes.hashes, nodeKeys.layout);
-        ShaderCodeLayer.generate(p, nodeKeys.paletteBuffer !== undefined, ctx);   // return value no longer needed
+        UpdateLayer.syncShaderInputs(p, materialHashes.hashes, geometryHashes.hashes, nodeKeys.layout, nodeKeys.skinning?.id ?? "none");
+        ShaderCodeLayer.generate(p, nodeKeys.skinning, ctx);   // return value no longer needed
 
         const pipelineHashes = hashes.resolvePipeline(p.getPipeline(), material, materialHashes.hashes, geometryHashes.hashes, nodeKeys.layout);
         const data: HashData = {

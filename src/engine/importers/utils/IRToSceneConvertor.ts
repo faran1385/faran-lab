@@ -28,7 +28,8 @@ import {MeshWrapper} from "../../wrappers/MeshWrapper.ts";
 import {NodeWrapper} from "../../wrappers/NodeWrapper.ts";
 import {SkinInstanceWrapper} from "../../wrappers/SkinInstanceWrapper.ts";
 import {AnimationClipWrapper, type AnimationChannelWrapper} from "../../wrappers/AnimationClipWrapper.ts";
-import {VertexLBSSkinnedAssembler} from "../../Assemblers/SkinnedAssembler/VertexLBSSkinnedAssembler.ts";
+import {VertexSkinnedAssembler} from "../../Assemblers/SkinnedAssembler/VertexSkinnedAssembler.ts";
+import type {SkinningMethod} from "../../skinning/SkinningMethod.ts";
 
 
 export type ConvertedIRResult = {
@@ -65,8 +66,17 @@ interface NodeBuildContext {
  * All root nodes get collected under one identity-transform NodeWrapper
  * ("SceneRoot") rather than returned as a bare array.
  */
+export interface ConvertOptions {
+    /**
+     * Makes the skinning method of one skin (called once per skin: a method instance belongs to exactly one skin).
+     * Required when the file has skins. The converter does not choose a method itself, so it stays independent of
+     * LBS, DQS and the like.
+     */
+    createSkinning?: () => SkinningMethod;
+}
+
 export class IRToSceneConvertor {
-    static convert(ir: SceneIR): ConvertedIRResult {
+    static convert(ir: SceneIR, options: ConvertOptions = {}): ConvertedIRResult {
         const images = ir.images.map((image) => this.createImageWrapper(image));
         const samplers = ir.samplers.map((sampler) => this.createSamplerWrapper(sampler));
         const textures = ir.textures.map((texture) =>
@@ -90,6 +100,12 @@ export class IRToSceneConvertor {
 
         // Both need the finished tree, so they run after it.
         const skinInstances = ir.skins.map((skin) => this.createSkinInstance(skin, context));
+        if (skinInstances.length > 0) {
+            if (!options.createSkinning) {
+                throw new Error("IRToSceneConvertor: the file has skins, pass options.createSkinning to choose their skinning method");
+            }
+            for (const instance of skinInstances) instance.setSkinning(options.createSkinning());
+        }
         this.attachSkins(context, skinInstances);
         const clips = ir.animations.map((clip) => this.createClipWrapper(clip, context));
 
@@ -278,8 +294,8 @@ export class IRToSceneConvertor {
             }
 
             for (const primitive of mesh.getAllPrimitives()) {
-                if (primitive.getVertexAssembler() instanceof VertexLBSSkinnedAssembler) continue;
-                primitive.setVertexAssembler(new VertexLBSSkinnedAssembler());
+                if (primitive.getVertexAssembler() instanceof VertexSkinnedAssembler) continue;
+                primitive.setVertexAssembler(new VertexSkinnedAssembler());
             }
         }
     }

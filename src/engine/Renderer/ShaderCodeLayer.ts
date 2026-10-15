@@ -1,5 +1,6 @@
 import type {PrimitiveWrapper} from "../wrappers/PrimitiveWrapper.ts";
 import type {RenderContext} from "./RenderContext.ts";
+import type {SkinningMethod} from "../skinning/SkinningMethod.ts";
 
 export interface GeneratedStages {
     vertex: boolean;
@@ -8,8 +9,8 @@ export interface GeneratedStages {
 
 /** The shader code layer: runs a primitive's assemblers when its code generation flag says the code is out of date. */
 export class ShaderCodeLayer {
-    /** @param skinned whether the node being drawn has a skin: the vertex descriptor then carries the palette binding */
-    static generate(p: PrimitiveWrapper, skinned: boolean, ctx: RenderContext) {
+    /** @param skinning the skinning method of the node being drawn, if skinned: the vertex descriptor then carries the palette binding and the method's WGSL */
+    static generate(p: PrimitiveWrapper, skinning: SkinningMethod | undefined, ctx: RenderContext) {
         const {producer} = ctx;
         const pipeline = p.getPipeline();
         const vertexWrapper = pipeline.getVertexShaderWrapper();
@@ -20,7 +21,7 @@ export class ShaderCodeLayer {
             const code = p.getVertexAssembler().assemble(producer.produceVertexShader({
                 geometry: p.getGeometry(),
                 material: p.getMaterial(),
-                skinned,
+                skinning,
             }), entryPoint);
             vertexWrapper.setShader(code, entryPoint);
             vertexWrapper.hashProvider.syncCodeGen();

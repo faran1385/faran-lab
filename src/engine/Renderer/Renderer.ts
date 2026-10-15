@@ -10,7 +10,6 @@ import {RenderItemBuilder} from "./RenderItemBuilder.ts";
 import {RenderCache} from "./RenderCache.ts";
 import {getEpoch} from "../hashing/utils/epoch.ts";
 import {getWorldEpoch} from "../hashing/utils/worldEpoch.ts";
-import type {SkinUpdater} from "./SkinUpdater.ts";
 import type {SkinInstanceWrapper} from "../wrappers/SkinInstanceWrapper.ts";
 import {UpdateLayer} from "./UpdateLayer.ts";
 import type {BufferManager} from "../managers/BufferManager.ts";
@@ -34,9 +33,7 @@ export class Renderer {
     private readonly producer = new CentralProducer();
     private readonly renderCache = new RenderCache();
     private _bufferUploadFunction!: BufferManager["upload"]
-    private skinUpdater?: SkinUpdater;
     private readonly frameSkins = new Set<SkinInstanceWrapper>();
-    private lastWorldEpoch = -1;   // -1: the first frame always reports worldMoved
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -85,12 +82,6 @@ export class Renderer {
         this.depthRenderTarget.setSize(width, height);
     }
 
-
-    /** Plug in the skinning module (LBS, DQS, ...) that writes the palette buffers each frame. */
-    setSkinUpdater(updater: SkinUpdater | undefined): void {
-        this.skinUpdater = updater;
-    }
-
     render(scene: Scene, camera: Camera): void {
 
         this.colorRenderTarget?.ensureTexture(this.device)
@@ -121,6 +112,7 @@ export class Renderer {
             frame: {colorFormat: this.format, depthFormat: this.depthRenderTarget.format},
             cache: this.renderCache,
             frameSkins: this.frameSkins,
+            worldEpoch: getWorldEpoch(),   // refreshed after the world pass, before the skins update
         }
         this.frameSkins.clear()
 
@@ -153,16 +145,10 @@ export class Renderer {
 
         scene.updateWorldMatrices(this._bufferUploadFunction);
 
-        // after the world pass (joint worlds are current) and the traversal (palette buffers exist), before submit
-        const worldEpoch = getWorldEpoch();
-        if (this.skinUpdater && this.frameSkins.size > 0) {
-            this.skinUpdater.update({
-                skins: this.frameSkins,
-                worldMoved: worldEpoch !== this.lastWorldEpoch,
-                upload: this._bufferUploadFunction,
-            });
-        }
-        this.lastWorldEpoch = worldEpoch;
+        // after the world pass (joint worlds are current) and the traversal (palette buffers exist), before submit.
+        // Each skin's own method writes its palette.
+        ctx.worldEpoch = getWorldEpoch();
+        for (const skin of this.frameSkins) skin.getSkinning()?.update(ctx);
 
         this.renderCache.lastFrameEpoch = getEpoch();
         pass.end();

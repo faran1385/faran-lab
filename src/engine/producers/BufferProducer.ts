@@ -2,6 +2,7 @@ import {BufferWrapper} from "../wrappers/BufferWrapper.ts";
 import type {MaterialFactorsPlan} from "./utils.ts";
 import type {NodeWrapper} from "../wrappers/NodeWrapper.ts";
 import type {SkinInstanceWrapper} from "../wrappers/SkinInstanceWrapper.ts";
+import type {SkinningMethod} from "../skinning/SkinningMethod.ts";
 
 export interface BufferDescriptor {
     label: string;
@@ -35,23 +36,17 @@ export class NodeMatrixBufferProducer {
     }
 }
 
-/** Bytes per joint of an LBS palette: one mat4x4f. A skinning module with another layout passes its own stride. */
-export const LBS_PALETTE_STRIDE_BYTES = 64;
-
 /**
- * Allocates a skin's palette buffer; it only sizes and initializes it. Writing real values is a skinning module's job.
- * The initial contents are identity matrices (valid for the default LBS stride), so a skinned mesh draws in its
- * un-deformed pose until the first palette write instead of collapsing to the origin.
+ * Allocates a skin's palette buffer; it only sizes and initializes it, the contents come from the skinning method
+ * (`initialPalette`), and writing real values every frame is its `update`.
  */
 export class SkinPaletteBufferProducer {
-    static produce(skin: SkinInstanceWrapper, strideBytes: number = LBS_PALETTE_STRIDE_BYTES) {
-        const data = new Float32Array(skin.getJointCount() * strideBytes / 4);
-        if (strideBytes === LBS_PALETTE_STRIDE_BYTES) {
-            for (let i = 0; i < skin.getJointCount(); i++) {
-                const o = i * 16;
-                data[o] = data[o + 5] = data[o + 10] = data[o + 15] = 1;
-            }
+    static produce(skin: SkinInstanceWrapper, method: SkinningMethod) {
+        const data = method.initialPalette(skin.getJointCount());
+        const expected = skin.getJointCount() * method.paletteStrideBytes;
+        if (data.byteLength !== expected) {
+            throw new Error(`SkinPaletteBufferProducer: "${method.id}" initialPalette is ${data.byteLength}B, expected ${expected}B (${skin.getJointCount()} joints x ${method.paletteStrideBytes}B)`);
         }
-        return new BufferWrapper(data.buffer, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);
+        return new BufferWrapper(data, GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST);
     }
 }

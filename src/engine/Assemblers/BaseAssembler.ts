@@ -5,7 +5,7 @@ import type {
 import {buildBindingDecls} from "./utils.ts";
 import type {WGSLType} from "../producers/utils.ts";
 
-type AccessibleValue = { type: WGSLType; access: string };
+export type AccessibleValue = { type: WGSLType; access: string };
 export type ValueMap = Map<string, AccessibleValue>;
 
 type ComponentAccess = {
@@ -85,14 +85,26 @@ function renderStruct(structName: string, fields: OutputFieldDecl[]): string {
 
 export type VertexPhase2Output = { body: string; usedBuiltins: UsedBuiltin[]; outputs: OutputFieldDecl[] }
 
+/**
+ * What phase 1 hands phase 2 for a skinned node: the skinning function (already declared in the preamble) and the
+ * vertex inputs it needs. Absent for plain nodes.
+ */
+export type SkinValues = { fn: string; joints: AccessibleValue; weights: AccessibleValue };
+
+/** Declared by the engine for every skinned vertex shader; a skinning method's function returns it. */
+const SKINNED_VERTEX_STRUCT = `struct SkinnedVertex {
+  position: vec3f,
+  normal: vec3f,
+};`;
+
 export abstract class VertexAssemblerBase {
     assemble(d: VertexShaderDescriptor, entryPoint: string): string {
-        const {preamble, inputValues, bindingValues, dataMap, builtinValues} = this.vertexPhase1(d);
+        const {preamble, inputValues, bindingValues, dataMap, builtinValues, skinValues} = this.vertexPhase1(d);
         const {
             body,
             usedBuiltins,
             outputs,
-        } = this.vertexPhase2(inputValues, bindingValues, dataMap, builtinValues);
+        } = this.vertexPhase2(inputValues, bindingValues, dataMap, builtinValues, skinValues);
         return this.vertexPhase3(preamble, body, usedBuiltins, outputs, entryPoint);
     }
 
@@ -113,6 +125,18 @@ export abstract class VertexAssemblerBase {
         const bindingValues = toValueMap(values);
         parts.push(bindingCode);
 
+        // Skinning: the engine's result struct, then the method's own structs and functions. Module-scope order is
+        // irrelevant in WGSL, so they may reference `palette` declared above or anywhere else.
+        let skinValues: SkinValues | undefined;
+        if (d.skinning) {
+            const joints = inputValues.get("joints0");
+            const weights = inputValues.get("weights0");
+            if (!joints || !weights) {
+                throw new Error("VertexAssemblerBase: skinned node but the geometry has no joints0/weights0 attributes");
+            }
+            parts.push(SKINNED_VERTEX_STRUCT, d.skinning.structs, d.skinning.functions);
+            skinValues = {fn: d.skinning.skinFn, joints, weights};
+        }
 
         const builtinValues: ValueMap = new Map(
             VERTEX_INPUT_BUILTINS.map((b) => [b.name, {type: b.type, access: b.name}]),
@@ -128,15 +152,28 @@ export abstract class VertexAssemblerBase {
             dataMap.set(i, value)
         })
 
-        return {preamble: parts.join("\n\n"), dataMap, inputValues, bindingValues, builtinValues};
+        return {preamble: parts.join("\n\n"), dataMap, inputValues, bindingValues, builtinValues, skinValues};
     }
 
+    /**
+     * @param skin set for skinned nodes. An assembler that wants to deform vertices calls `skinPrologue` and reads
+     *             `skinned.position` / `skinned.normal` (world space) instead of the raw position / normal.
+     */
     protected abstract vertexPhase2(
         inputValues: ValueMap,
         bindingValues: ValueMap,
         dataMap: Map<string, ComponentData>,
         builtinValues: ValueMap,
+        skin?: SkinValues,
     ): VertexPhase2Output;
+
+    /** WGSL statement that declares `skinned: SkinnedVertex` from the raw vertex inputs. */
+    protected skinPrologue(inputValues: ValueMap, skin: SkinValues): string {
+        const position = inputValues.get("position");
+        if (!position) throw new Error("VertexAssemblerBase.skinPrologue: no position input");
+        const normal = inputValues.get("normal")?.access ?? "vec3f(0.0, 1.0, 0.0)";
+        return `let skinned = ${skin.fn}(${position.access}, ${normal}, ${skin.joints.access}, ${skin.weights.access});`;
+    }
 
     protected vertexPhase3(preamble: string, body: string, usedBuiltins: UsedBuiltin[], outputs: OutputFieldDecl[], entryPoint: string): string {
         const outputStruct = renderStruct("VertexOutput", outputs);

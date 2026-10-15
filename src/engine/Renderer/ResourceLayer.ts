@@ -39,8 +39,10 @@ export class ResourceLayer {
 
         managers.bufferManager.ensure(keys.matrixBuffer, () => producer.produceBufferFromNodeMatrix(node));
         managers.bindgroupLayoutManager.ensure(keys.layout, () => producer.produceNodeBindGroupLayout(skin !== undefined));
-        if (skin && keys.paletteBuffer !== undefined) {
-            managers.bufferManager.ensure(keys.paletteBuffer, () => producer.produceBufferFromSkinPalette(skin));
+        // the method the keys were resolved with, not whatever the skin has now: keys and buffer must agree
+        if (skin && keys.skinning && keys.paletteBuffer !== undefined) {
+            const method = keys.skinning;
+            managers.bufferManager.ensure(keys.paletteBuffer, () => producer.produceBufferFromSkinPalette(skin, method));
         }
         managers.bindgroupManager.ensure(keys.bindgroup, () => producer.produceBindgroupFromNode({
             layouts: managers.bindgroupLayoutManager,

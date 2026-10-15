@@ -17,6 +17,12 @@ export interface RenderContext {
     frame: FrameInfo;
     cache: RenderCache,
     rendererUUID: string,
-    /** Skins of the skinned mesh nodes visited this frame. Filled by RenderItemBuilder, consumed by the SkinUpdater. */
+    /** Skins of the skinned mesh nodes visited this frame. Filled by RenderItemBuilder, consumed by each skin's SkinningMethod. */
     frameSkins: Set<SkinInstanceWrapper>,
+    /**
+     * World epoch after this frame's world-matrix pass (see worldEpoch.ts). A skinning method remembers the value it
+     * last wrote at: equal means no joint anywhere moved since. Only meaningful once the world pass has run, i.e.
+     * while skinning methods update.
+     */
+    worldEpoch: number,
 }

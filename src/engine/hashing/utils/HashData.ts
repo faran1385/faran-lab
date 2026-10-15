@@ -1,3 +1,4 @@
+import type {SkinningMethod} from "../../skinning/SkinningMethod.ts";
 /**
  * Every hash the render path needs, resolved once by the HashResolver and handed to everything downstream.
  * Producers, the resource layer and the item assembler read these strings; none of them calls a convertTo*Hash().
@@ -52,8 +53,10 @@ export interface NodeResourceKeys {
     layout: string;
     /** Node bind group: node uuid plus skin instance uuid, or "none". */
     bindgroup: string;
-    /** Joint palette storage buffer (identity-keyed: skin instance uuid). Skinned nodes only. */
+    /** Joint palette storage buffer (skin uuid + skinning method id). Skinned nodes only. */
     paletteBuffer?: string;
+    /** The skinning method the keys above were resolved with. Skinned nodes only. */
+    skinning?: SkinningMethod;
 }
 
 export interface HashData {

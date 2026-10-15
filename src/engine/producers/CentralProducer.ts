@@ -41,6 +41,7 @@ import {
 } from "./AssemblerProducers.ts";
 import type {NodeWrapper} from "../wrappers/NodeWrapper.ts";
 import type {SkinInstanceWrapper} from "../wrappers/SkinInstanceWrapper.ts";
+import type {SkinningMethod} from "../skinning/SkinningMethod.ts";
 import type {Camera} from "../Camera/Camera.ts";
 
 export class CentralProducer {
@@ -74,9 +75,9 @@ export class CentralProducer {
         return this.produceBuffer(NodeMatrixBufferProducer.produce(node))
     }
 
-    /** @param strideBytes bytes per joint; the skinning module that will write the palette decides it */
-    produceBufferFromSkinPalette(skin: SkinInstanceWrapper, strideBytes?: number) {
-        return this.produceBuffer(SkinPaletteBufferProducer.produce(skin, strideBytes))
+    /** The skinning method decides the palette's size and initial contents. */
+    produceBufferFromSkinPalette(skin: SkinInstanceWrapper, method: SkinningMethod) {
+        return this.produceBuffer(SkinPaletteBufferProducer.produce(skin, method))
     }
 
     produceCameraBuffer(camera: Camera) {
@@ -91,8 +92,8 @@ export class CentralProducer {
         return NodeBindGroupProducer.produce(args)
     }
 
-    produceVertexShader(T: { geometry: GeometryWrapper, material: MaterialWrapper, skinned: boolean }): VertexShaderDescriptor {
-        return VertexShaderProducer.produce(() => this.getBindingPlan(T.material), () => this.getAttributePlan(T.geometry), T.skinned);
+    produceVertexShader(T: { geometry: GeometryWrapper, material: MaterialWrapper, skinning?: SkinningMethod }): VertexShaderDescriptor {
+        return VertexShaderProducer.produce(() => this.getBindingPlan(T.material), () => this.getAttributePlan(T.geometry), T.skinning);
     }
 
 
