@@ -25,7 +25,7 @@ export class UpdateLayer {
      * whether the node is skinned decides which group 2 bindings the vertex code declares.
      */
     static syncShaderInputs(primitive: PrimitiveWrapper, material: MaterialHashes, geometry: GeometryHashes, nodeLayout: string, skinningId?: string): boolean {
-        const pipeline = primitive.getPipeline();
+        const pipeline = primitive.getPipeline(skinningId);
         const key = `${material.shader}|${material.layout}|${geometry.attributesShape}|${nodeLayout}|${skinningId ?? "no-skinning"}`;
         if (pipeline.hashProvider.getShaderInputsKey() === key) return false;
 
