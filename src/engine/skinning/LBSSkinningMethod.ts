@@ -51,6 +51,10 @@ export class LBSSkinningMethod implements SkinningMethod {
         this.lastJointVersion = -1;
     }
 
+    invalidatePalette(): void {
+        this.lastJointVersion = -1;
+    }
+
     update(ctx: SkinningContext): void {
         const skin = this.skin;
         if (!skin) throw new Error("LBSSkinningMethod.update called before attach");
