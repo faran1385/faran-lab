@@ -50,7 +50,7 @@ export interface NodeResourceKeys {
     matrixBuffer: string;
     /** Node bind group layout key (see nodeLayoutKey). */
     layout: string;
-    /** Node bind group: node uuid plus skin instance uuid, or "none". */
+    /** Node bind group: node uuid plus skin palette key (skin + method id), or "none". */
     bindgroup: string;
     /** Joint palette storage buffer (skin uuid + method/layout id). Skinned nodes only. */
     paletteBuffer?: string;
