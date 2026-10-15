@@ -28,7 +28,6 @@ import {MeshWrapper} from "../../wrappers/MeshWrapper.ts";
 import {NodeWrapper} from "../../wrappers/NodeWrapper.ts";
 import {SkinInstanceWrapper} from "../../wrappers/SkinInstanceWrapper.ts";
 import {AnimationClipWrapper, type AnimationChannelWrapper} from "../../wrappers/AnimationClipWrapper.ts";
-import {VertexSkinnedAssembler} from "../../Assemblers/SkinnedAssembler/VertexSkinnedAssembler.ts";
 import type {SkinningMethod} from "../../skinning/SkinningMethod.ts";
 
 
@@ -273,19 +272,8 @@ export class IRToSceneConvertor {
 
             wrapper.getAnimationHandler().setSkinInstance(instance);
 
-            const mesh = wrapper.getMesh();
-            if (!mesh) continue;
-
-            if (context.unskinnedMeshes.has(mesh)) {
-                console.warn(
-                    `IRToSceneConvertor: mesh of skinned node "${wrapper.getName() ?? wrapper.uuid}" is also used by a node without a skin; its primitives can only have one vertex assembler`,
-                );
-            }
-
-            for (const primitive of mesh.getAllPrimitives()) {
-                if (primitive.getVertexAssembler() instanceof VertexSkinnedAssembler) continue;
-                primitive.setVertexAssembler(new VertexSkinnedAssembler());
-            }
+            // The primitive selects its skinned assembler per pipeline variant. This keeps shared meshes valid
+            // when one node uses a skin and another node draws the same primitive without skinning.
         }
     }
 
