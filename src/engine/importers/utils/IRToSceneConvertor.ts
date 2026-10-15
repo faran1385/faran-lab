@@ -46,7 +46,6 @@ export type ConvertedIRResult = {
 interface NodeBuildContext {
     byIndex: Map<number, NodeWrapper>;
     skinned: { wrapper: NodeWrapper; skin: number }[];
-
 }
 
 /**
@@ -216,7 +215,6 @@ export class IRToSceneConvertor {
 
         if (node.mesh !== undefined) {
             wrapper.setMesh(meshes[node.mesh]);
- 
         }
 
         if (node.skin !== undefined) {
@@ -255,13 +253,7 @@ export class IRToSceneConvertor {
         return new SkinInstanceWrapper(jointNodes, skin.inverseBindMatrices, skin.name);
     }
 
-    /**
-     * Gives every skinned node its skin instance and switches its primitives to the skinned vertex assembler.
-     *
-     * Assemblers live on the primitive, and a mesh may be drawn by several nodes. A mesh shared between a skinned
-     * and an unskinned node can't have both, so that case warns: the unskinned node would run the skinned assembler
-     * against a bind group without a palette.
-     */
+    /** Attaches skin instances to nodes. Primitive shader/assembler variants are selected per skinning method. */
     private static attachSkins(context: NodeBuildContext, skinInstances: SkinInstanceWrapper[]): void {
         for (const {wrapper, skin} of context.skinned) {
             const instance = skinInstances[skin];
@@ -270,9 +262,6 @@ export class IRToSceneConvertor {
             }
 
             wrapper.getAnimationHandler().setSkinInstance(instance);
-
-            // The primitive selects its skinned assembler per pipeline variant. This keeps shared meshes valid
-            // when one node uses a skin and another node draws the same primitive without skinning.
         }
     }
 
