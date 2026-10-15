@@ -73,7 +73,7 @@ export class RenderItemBuilder {
         // Incremental path: rebuild only primitives whose own stamp is newer than when their item was built.
         // In place, no new entry: unchanged items keep their counts untouched.
         for (let i = 0; i < entry.primitives.length; i++) {
-            if (entry.primitives[i].getChangedAt() <= entry.builtAt[i] && !paletteChanged) continue;
+            if (entry.primitives[i].getChangedAt(skin?.getSkinning()?.id) <= entry.builtAt[i] && !paletteChanged) continue;
 
             const next = RenderItemBuilder.buildPrimitive(entry.primitives[i], entry.nodeKeys, ctx, skin?.getSkinning());
             hashes.swapData(managers, next.hashData, entry.items[i].hashData);   // acquire new, release old, per key
@@ -95,7 +95,7 @@ export class RenderItemBuilder {
         UpdateLayer.syncShaderInputs(p, materialHashes.hashes, geometryHashes.hashes, nodeKeys.layout, skinningMethod?.id);
         ShaderCodeLayer.generate(p, skinningMethod, ctx);
 
-        const pipelineHashes = hashes.resolvePipeline(p.getPipeline(), material, materialHashes.hashes, geometryHashes.hashes, nodeKeys.layout);
+        const pipelineHashes = hashes.resolvePipeline(p.getPipeline(skinningMethod?.id), material, materialHashes.hashes, geometryHashes.hashes, nodeKeys.layout);
         const data: HashData = {
             material: materialHashes.hashes,
             geometry: geometryHashes.hashes,
@@ -107,8 +107,8 @@ export class RenderItemBuilder {
         // Order matters: pipeline needs the shader modules and layouts before it.
         ResourceLayer.geometry(geometry, data.geometry, ctx);
         ResourceLayer.material(material, data.material, ctx);
-        ResourceLayer.shaders(p, data.pipeline, ctx);
-        ResourceLayer.pipeline(p, data, nodeKeys, ctx);
+        ResourceLayer.shaders(p, data.pipeline, ctx, skinningMethod?.id);
+        ResourceLayer.pipeline(p, data, nodeKeys, ctx, skinningMethod?.id);
 
         // Data uploads: only when the hashes were recomputed (a freshly created resource already has current data)
         if (geometryHashes.computed) UpdateLayer.updateAttributeBuffers(geometry, geometryHashes.hashes, ctx);
