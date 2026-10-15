@@ -52,7 +52,7 @@ export interface NodeResourceKeys {
     layout: string;
     /** Node bind group: node uuid plus skin instance uuid, or "none". */
     bindgroup: string;
-    /** Joint palette storage buffer (identity-keyed: skin instance uuid). Skinned nodes only. */
+    /** Joint palette storage buffer (skin uuid + method/layout id). Skinned nodes only. */
     paletteBuffer?: string;
 }
 
