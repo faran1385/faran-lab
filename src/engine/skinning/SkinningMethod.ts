@@ -1,6 +1,6 @@
 import type {SkinInstanceWrapper} from "./SkinInstanceWrapper.ts";
 import type {RenderContext} from "../Renderer/RenderContext.ts";
-import type {StructField} from "../producers/AssemblerProducers.ts";
+import type {Struct} from "../producers/AssemblerProducers.ts";
 
 /** The slice of the render context a skinning method may use while updating its palette. */
 export type SkinContext = Pick<RenderContext, "managers" | "worldEpoch">;
@@ -40,15 +40,16 @@ export interface SkinningMethod {
     /** Bytes per joint in the palette buffer. */
     readonly paletteStrideBytes: number;
     /** The WGSL element type of the palette array (declared by the engine in the node bind group). */
-    readonly paletteElement: { structName: string; fields: StructField[] };
+    readonly paletteElement: Struct
 
-    shaderParts(): SkinningShaderParts;
+    readonly code: string
 
     /** Initial palette contents, `jointCount * paletteStrideBytes` bytes. Drawn until the first `update`. */
     initialPalette(jointCount: number): ArrayBuffer;
 
     /** Called by `SkinInstanceWrapper.setSkinning`. A method belongs to exactly one skin. */
     attach(skin: SkinInstanceWrapper): void;
+
     detach(skin: SkinInstanceWrapper): void;
 
     /**
@@ -62,11 +63,10 @@ export interface SkinningMethod {
 export abstract class BaseSkinningMethod implements SkinningMethod {
     abstract readonly id: string;
     abstract readonly paletteStrideBytes: number;
-    abstract readonly paletteElement: { structName: string; fields: StructField[] };
+    abstract readonly paletteElement: Struct
+    abstract readonly code: string
 
     private attachedSkin?: SkinInstanceWrapper;
-
-    abstract shaderParts(): SkinningShaderParts;
 
     abstract initialPalette(jointCount: number): ArrayBuffer;
 

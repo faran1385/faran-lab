@@ -1,6 +1,5 @@
 import {
     type ComponentData,
-    type SkinValues,
     type ValueMap,
     VertexAssemblerBase,
     type VertexPhase2Output
@@ -16,18 +15,13 @@ import {
  */
 export class VertexSkinnedAssembler extends VertexAssemblerBase {
     protected vertexPhase2(
-        inputValues: ValueMap,
+        _inputValues: ValueMap,
         bindingValues: ValueMap,
         dataMap: Map<string, ComponentData>,
         _builtinValues: ValueMap,
-        skin?: SkinValues,
     ): VertexPhase2Output {
-        if (!skin) {
-            throw new Error("VertexSkinnedAssembler: the vertex descriptor has no skinning; is the node's skin missing a skinning method?");
-        }
-
         const codeBody = `
-            ${this.skinPrologue(inputValues, skin)}
+            let skinned=skin(${_inputValues.get("position")?.access},${_inputValues.get("normal")?.access},${_inputValues.get("joints0")?.access},${_inputValues.get("weights0")?.access});
             let pos = ${bindingValues.get("projection")?.access} *
              ${bindingValues.get("view")?.access} *
              vec4f(skinned.position, 1.);

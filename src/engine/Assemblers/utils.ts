@@ -24,20 +24,20 @@ export function buildBindingDecls(entries: BindGroupEntry[]): {
     for (const entry of entries) {
         switch (entry.kind) {
             case "uniform": {
-                const fieldLines = entry.fields.map((f) => `  ${f.name}: ${f.type},`);
-                structDefs.push(`struct ${entry.structName} {\n${fieldLines.join("\n")}\n};`);
-                varDecls.push(`@group(${entry.group}) @binding(${entry.binding}) var<uniform> ${entry.name}: ${entry.structName};`);
-                for (const f of entry.fields) {
+                const fieldLines = entry.struct.fields.map((f) => `  ${f.name}: ${f.type},`);
+                structDefs.push(`struct ${entry.struct.structName} {\n${fieldLines.join("\n")}\n};`);
+                varDecls.push(`@group(${entry.group}) @binding(${entry.binding}) var<uniform> ${entry.name}: ${entry.struct.structName};`);
+                for (const f of entry.struct.fields) {
 
                     setValue(f.name, {type: f.type, access: `${entry.name}.${f.name}`})
                 }
                 break;
             }
             case "storage": {
-                const fieldLines = entry.elementFields.map((f) => `  ${f.name}: ${f.type},`);
-                structDefs.push(`struct ${entry.elementStructName} {\n${fieldLines.join("\n")}\n};`);
-                varDecls.push(`@group(${entry.group}) @binding(${entry.binding}) var<storage, ${entry.access}> ${entry.name}: array<${entry.elementStructName}>;`);
-                setValue(entry.name, {type: `array<${entry.elementStructName}>` as WGSLType, access: entry.name})
+                const fieldLines = entry.struct.fields.map((f) => `  ${f.name}: ${f.type},`);
+                structDefs.push(`struct ${entry.struct.structName} {\n${fieldLines.join("\n")}\n};`);
+                varDecls.push(`@group(${entry.group}) @binding(${entry.binding}) var<storage, ${entry.access}> ${entry.name}: array<${entry.struct.structName}>;`);
+                setValue(entry.name, {type: `array<${entry.struct.structName}>` as WGSLType, access: entry.name})
 
                 break;
             }

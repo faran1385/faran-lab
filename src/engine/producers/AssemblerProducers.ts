@@ -4,7 +4,7 @@ import {
     getWGSLTypeFromVertexFormat,
     type WGSLType
 } from "./utils.ts";
-import type {SkinningMethod, SkinningShaderParts} from "../skinning/SkinningMethod.ts";
+import type {SkinningMethod} from "../skinning/SkinningMethod.ts";
 import {
     FACTORS_BINDING,
     NODE_MATRIX_BINDING,
@@ -25,19 +25,21 @@ export type BindGroupEntry =
     | BindGroupTextureEntry
     | BindGroupSamplerEntry;
 
+export type Struct = { structName: string; fields: StructField[] };
+
 export interface StructField {
     name: string;
     type: WGSLType;
     offset: number;
 }
 
+
 export interface BindGroupUniformEntry {
     kind: "uniform";
     group: number;
     binding: number;
-    name: string;        // WGSL variable name
-    structName: string;  // WGSL struct type name
-    fields: StructField[];
+    name: string;
+    struct: Struct,
     size: number;         // total struct byte size
 }
 
@@ -46,8 +48,7 @@ export interface BindGroupStorageEntry {
     group: number;
     binding: number;
     name: string;
-    elementStructName: string;
-    elementFields: StructField[];
+    struct: Struct,
     access: "read" | "read_write";
 }
 
@@ -71,11 +72,10 @@ export interface BindGroupSamplerEntry {
 export interface VertexShaderDescriptor {
     inputs: VertexInputField[];
     bindings: BindGroupEntry[],
-    /** Present when the node is skinned: the WGSL of its skinning method (see SkinningShaderParts). */
-    skinning?: SkinningShaderParts,
     componentDataMap: Map<string, {
         uv?: string
     }>
+    extraCode: string
 }
 
 export interface FragmentShaderDescriptor {
@@ -95,11 +95,13 @@ export function sceneBindings(): BindGroupEntry[] {
             group: 0,
             binding: 0,
             name: "camera",
-            structName: "CameraUniforms",
-            fields: [
-                {name: "view", type: "mat4x4f", offset: 0},
-                {name: "projection", type: "mat4x4f", offset: 64},
-            ],
+            struct: {
+                structName: "CameraUniforms",
+                fields: [
+                    {name: "view", type: "mat4x4f", offset: 0},
+                    {name: "projection", type: "mat4x4f", offset: 64},
+                ],
+            },
             size: 128,
         },
     ];
@@ -114,10 +116,12 @@ export function nodeBindings(skinning?: SkinningMethod): BindGroupEntry[] {
             group: 2,
             binding: NODE_MATRIX_BINDING,
             name: "node",
-            structName: "NodeUniforms",
-            fields: [
-                {name: "worldMatrix", type: "mat4x4f", offset: 0},
-            ],
+            struct: {
+                structName: "NodeUniforms",
+                fields: [
+                    {name: "worldMatrix", type: "mat4x4f", offset: 0},
+                ],
+            },
             size: 64,
         },
     ];
@@ -129,8 +133,10 @@ export function nodeBindings(skinning?: SkinningMethod): BindGroupEntry[] {
             group: 2,
             binding: NODE_PALETTE_BINDING,
             name: "palette",
-            elementStructName: skinning.paletteElement.structName,
-            elementFields: skinning.paletteElement.fields,
+            struct: {
+                structName: skinning.paletteElement.structName,
+                fields: skinning.paletteElement.fields,
+            },
             access: "read",
         });
     }
@@ -151,6 +157,9 @@ export class VertexShaderProducer {
             }
         })
 
+        let extraCode = ''
+        extraCode += skinning?.code ?? "" + '\n';
+
         const inputs: VertexInputField[] = plan.slots.map((s) => ({
             name: s.name,
             id: toWgslIdentifier(s.name),
@@ -163,7 +172,7 @@ export class VertexShaderProducer {
             inputs,
             componentDataMap,
             bindings: [...sceneBindings(), ...nodeBindings(skinning)],
-            skinning: skinning?.shaderParts(),
+            extraCode
         };
     }
 }
@@ -178,8 +187,10 @@ function materialBindings(bindingPlan: MaterialBindingPlan, factorPlan: Material
 
     const entries: BindGroupEntry[] = [{
         kind: "uniform", group: 1, binding: FACTORS_BINDING,
-        name: "material", structName: "MaterialUniforms",
-        fields: FactorFields, size: FactorSize,
+        name: "material", struct: {
+            structName: "MaterialUniforms",
+            fields: FactorFields
+        }, size: FactorSize,
     }];
 
     const owner = new Map<number, { componentName: string; texCoord: string }>();
@@ -229,7 +240,7 @@ function fragmentComponentDataMap(
     const map = new Map<string, FragmentComponentData>();
     const touch = (name: string) => {
         let entry = map.get(name);
-        if (!entry) map.set(name, (entry = { hasFactor: false }));
+        if (!entry) map.set(name, (entry = {hasFactor: false}));
         return entry;
     };
 
@@ -237,7 +248,7 @@ function fragmentComponentDataMap(
         touch(name).hasFactor = true;
     }
 
-    for (const [name, { texture, sampler, texCoord }] of bindingPlan.byComponent) {
+    for (const [name, {texture, sampler, texCoord}] of bindingPlan.byComponent) {
         const entry = touch(name);
         entry.textureBindingName = `texture${texture}`;
         entry.samplerBindingName = `sampler${sampler}`;

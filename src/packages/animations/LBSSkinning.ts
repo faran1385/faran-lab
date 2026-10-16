@@ -1,5 +1,5 @@
 import {mat4} from "../math/matrix/mat4.ts";
-import {BaseSkinningMethod, type SkinContext, type SkinningShaderParts} from "../../engine/skinning/SkinningMethod.ts";
+import {BaseSkinningMethod, type SkinContext} from "../../engine/skinning/SkinningMethod.ts";
 
 const MAT4_BYTES = 64;
 
@@ -13,7 +13,26 @@ export class LBSSkinning extends BaseSkinningMethod {
     readonly paletteElement = {
         structName: "JointMatrix",
         fields: [{name: "matrix", type: "mat4x4f" as const, offset: 0}],
-    };
+    }
+
+    readonly code = `
+        struct SkinnedVertex {
+          position: vec3f,
+          normal: vec3f,
+        }
+    
+        fn skin(pos: vec3f, nrm: vec3f, joints: vec4u, weights: vec4f) -> SkinnedVertex {
+            let m = palette[joints.x].matrix * weights.x
+                  + palette[joints.y].matrix * weights.y
+                  + palette[joints.z].matrix * weights.z
+                  + palette[joints.w].matrix * weights.w;
+            var out: SkinnedVertex;
+            out.position = (m * vec4f(pos, 1.0)).xyz;
+            // upper 3x3 of the blended matrix; exact for rotation + uniform scale
+            out.normal = normalize((m * vec4f(nrm, 0.0)).xyz);
+            return out;
+        }
+       `
 
     // Write state. All of it is invalidated by a different palette buffer, see update().
     private lastBuffer?: GPUBuffer;
@@ -21,25 +40,6 @@ export class LBSSkinning extends BaseSkinningMethod {
     private lastJointsVersion = -1;
     private palette?: Float32Array<ArrayBuffer>;
     private readonly scratch = mat4.create();
-
-    shaderParts(): SkinningShaderParts {
-        return {
-            structs: "",
-            skinFn: "lbsSkin",
-            functions: `
-            fn lbsSkin(pos: vec3f, nrm: vec3f, joints: vec4u, weights: vec4f) -> SkinnedVertex {
-                let m = palette[joints.x].matrix * weights.x
-                      + palette[joints.y].matrix * weights.y
-                      + palette[joints.z].matrix * weights.z
-                      + palette[joints.w].matrix * weights.w;
-                var out: SkinnedVertex;
-                out.position = (m * vec4f(pos, 1.0)).xyz;
-                // upper 3x3 of the blended matrix; exact for rotation + uniform scale
-                out.normal = normalize((m * vec4f(nrm, 0.0)).xyz);
-                return out;
-            }`,
-        };
-    }
 
     initialPalette(jointCount: number): ArrayBuffer {
         const data = new Float32Array(jointCount * 16);
