@@ -113,6 +113,12 @@ export class NodeWrapper {
         this.markSubtreeDirty();
     }
 
+    /** Sets the rotation from a quaternion directly (setRotation takes Euler angles). Used by animation. */
+    setRotationQuat(x: number, y: number, z: number, w: number) {
+        quat.set(this.rotation, x, y, z, w);
+        this.markSubtreeDirty();
+    }
+
     getScale() {
         return this.scale;
     }
