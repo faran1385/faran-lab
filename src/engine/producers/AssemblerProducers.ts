@@ -83,7 +83,7 @@ export interface FragmentShaderDescriptor {
 }
 
 
-function toWgslIdentifier(name: string): string {
+export function toWgslIdentifier(name: string): string {
     const id = name.replace(/[^A-Za-z0-9_]/g, "_");
     return /^[A-Za-z]/.test(id) ? id : `a_${id}`;
 }
