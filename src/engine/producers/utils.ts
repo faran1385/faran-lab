@@ -25,6 +25,14 @@ export type WGSLType =
     | 'u32'
     | 'vec2u'
     | 'vec3u'
+    | "mat2x2f"
+    | "mat2x3f"
+    | "mat2x4f"
+    | "mat3x2f"
+    | "mat3x3f"
+    | "mat3x4f"
+    | "mat4x2f"
+    | "mat4x3f"
     | "mat4x4f"
     | 'vec4u';
 

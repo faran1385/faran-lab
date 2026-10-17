@@ -2,6 +2,8 @@ import {v4 as uuidv4} from 'uuid';
 import {ImageHashProvider} from "../hashing/ImageHashProvider.ts";
 
 export class ImageWrapper {
+    /** What this is as a bind group entry (see BindableWrapper). */
+    readonly bindingKind = "texture-2d" as const;
     readonly uuid: string;
 
     private data: ArrayBuffer;

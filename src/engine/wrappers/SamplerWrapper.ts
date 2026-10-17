@@ -3,6 +3,8 @@ import type {Sampler} from "../importers/utils/IR.ts";
 import {SamplerHashProvider} from "../hashing/SamplerHashProvider.ts";
 
 export class SamplerWrapper {
+    /** What this is as a bind group entry (see BindableWrapper). */
+    readonly bindingKind = "sampler" as const;
     private minFilter: Sampler["minFilter"];
     private magFilter: Sampler["magFilter"];
     private mipFilter: Sampler["mipFilter"];
