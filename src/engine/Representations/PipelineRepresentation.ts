@@ -1,5 +1,6 @@
 import type {PipelineLayoutRepresentation} from "./PipelineLayoutRepresentation.ts";
 import {v4 as uuidv4} from "uuid";
+import {PipelineRepresentationHashProvider} from "../hashing/PipelineRepresentationHashProvider.ts";
 import type {ShaderStageRepresentation} from "./ShaderStageRepresentation.ts";
 import type {AttributeWrapper} from "../wrappers/AttributeWrapper.ts";
 
@@ -19,8 +20,19 @@ export class PipelineRepresentation {
     private primitive!: GPUPrimitiveState
     private depthStencil!: GPUDepthStencilState
 
+    readonly hashProvider: PipelineRepresentationHashProvider;
+
     constructor() {
         this.uuid = uuidv4();
+        this.hashProvider = new PipelineRepresentationHashProvider({
+            getVertexBuffers: () => this.vertexBuffers,
+            getFragmentTargets: () => this.fragmentTargets,
+            getLayout: () => this.layout,
+            getVertexShader: () => this.vertexShader,
+            getFragmentShader: () => this.fragmentShader,
+            getPrimitive: () => this.primitive,
+            getDepthStencil: () => this.depthStencil,
+        });
     }
 
     getVertexBuffers() {
@@ -54,33 +66,41 @@ export class PipelineRepresentation {
 
     setLayout(layout: PipelineLayoutRepresentation) {
         this.layout = layout;
+        this.hashProvider.markChanged();
     }
 
     setVertexShader(vertexShader: ShaderStageRepresentation) {
         this.vertexShader = vertexShader;
+        this.hashProvider.markChanged();
     }
 
     setFragmentShader(fragmentShader: ShaderStageRepresentation) {
         this.fragmentShader = fragmentShader;
+        this.hashProvider.markChanged();
     }
 
     setBuffers(buffers: VertexBufferEntry[]) {
         this.vertexBuffers = buffers;
+        this.hashProvider.markChanged();
     }
 
     setPrimitive(primitive: GPUPrimitiveState) {
         this.primitive = primitive;
+        this.hashProvider.markChanged();
     }
 
     setFragmentTarget(location: number, target: FrameTarget) {
         this.fragmentTargets.set(location, target);
+        this.hashProvider.markChanged();
     }
 
     removeFragmentTarget(location: number) {
         this.fragmentTargets.delete(location);
+        this.hashProvider.markChanged();
     }
 
     setDepthStencil(depthStencil: GPUDepthStencilState) {
         this.depthStencil = depthStencil;
+        this.hashProvider.markChanged();
     }
 }
