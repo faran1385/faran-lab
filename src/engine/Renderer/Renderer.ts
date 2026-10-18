@@ -61,7 +61,7 @@ export class Renderer {
 
         this._bufferUploadFunction = this.managers.bufferManager.upload.bind(this.managers.bufferManager)
 
-        // scene bindgroup initialization since the only binding is camera witch is static
+        // scene bindgroupLayout initialization since the only binding is camera witch is static
         this.managers.bindgroupManager.ensure(this.uuid, () => this.producer.produceSceneBindgroup({
             layouts: this.managers.bindgroupLayoutManager,
             rendererUUID: this.uuid,
