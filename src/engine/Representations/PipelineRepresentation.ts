@@ -11,7 +11,7 @@ export type VertexBufferEntry = AttributeWrapper;
 
 export class PipelineRepresentation {
     readonly uuid: string;
-    private vertexBuffers = new Map<string, VertexBufferEntry>();
+    private vertexBuffers: VertexBufferEntry[] = [];
     private fragmentTargets = new Map<number, FrameTarget>;
     private layout!: PipelineLayoutRepresentation;
     private vertexShader!: ShaderStageRepresentation
@@ -21,6 +21,34 @@ export class PipelineRepresentation {
 
     constructor() {
         this.uuid = uuidv4();
+    }
+
+    getVertexBuffers() {
+        return this.vertexBuffers;
+    }
+
+    getFragmentTargets() {
+        return this.fragmentTargets;
+    }
+
+    getLayout() {
+        return this.layout;
+    }
+
+    getFragmentShader() {
+        return this.fragmentShader;
+    }
+
+    getVertexShader() {
+        return this.vertexShader;
+    }
+
+    getPrimitive() {
+        return this.primitive;
+    }
+
+    getDepthStencil() {
+        return this.depthStencil;
     }
 
 
@@ -36,12 +64,8 @@ export class PipelineRepresentation {
         this.fragmentShader = fragmentShader;
     }
 
-    setVertexBuffer(vertexBuffer: VertexBufferEntry) {
-        this.vertexBuffers.set(vertexBuffer.uuid, vertexBuffer);
-    }
-
-    removeVertexBuffer(vertexBuffer: VertexBufferEntry) {
-        this.vertexBuffers.delete(vertexBuffer.uuid);
+    setBuffers(buffers: VertexBufferEntry[]) {
+        this.vertexBuffers = buffers;
     }
 
     setPrimitive(primitive: GPUPrimitiveState) {
