@@ -11,7 +11,6 @@ import {MeshWrapper} from "./engine/wrappers/MeshWrapper.ts";
 import {PrimitiveWrapper} from "./engine/wrappers/PrimitiveWrapper.ts";
 import {MaterialWrapper} from "./engine/wrappers/MaterialWrapper.ts";
 import {NodeWrapper} from "./engine/wrappers/NodeWrapper.ts";
-import type {GeometryModel} from "./tests/sim.ts";
 import {AttributeWrapper} from "./engine/wrappers/AttributeWrapper.ts";
 
 const canvas = document.getElementById("gpu-canvas") as HTMLCanvasElement;
