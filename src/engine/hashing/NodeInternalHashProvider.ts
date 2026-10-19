@@ -1,24 +1,24 @@
-import {RepresentationHashProvider} from "./RepresentationHashProvider.ts";
-import type {BindgroupRepresentation} from "../Representations/BindgroupRepresentation.ts";
-import type {PipelineRepresentation} from "../Representations/PipelineRepresentation.ts";
-import type {MeshInternal} from "../internals/MeshInternal.ts";
+import { RepresentationHashProvider } from "./RepresentationHashProvider.ts";
+import type { BindgroupInteractor } from "../Representations/BindgroupInteractor.ts";
+import type { PipelineInteractor } from "../Representations/PipelineInteractor.ts";
+import type { MeshInternal } from "../internals/MeshInternal.ts";
 
 type InputFunctions = {
-    getGroup: () => number,
-    getBindgroup: () => BindgroupRepresentation,
-    getPipeline: () => PipelineRepresentation,
-    getMesh: () => MeshInternal | null,
-}
+    getGroup: () => number;
+    getBindgroup: () => BindgroupInteractor;
+    getPipeline: () => PipelineInteractor;
+    getMesh: () => MeshInternal | null;
+};
 
-/** The node's own bind group and pipeline plus the mesh below it (and through it every primitive). */
+/** Combines the node's own bindings/pipeline with its attached mesh and all descendant primitive state. */
 export class NodeInternalHashProvider extends RepresentationHashProvider {
     constructor(T: InputFunctions) {
         super({
             buildKey: (hasher) => [
-                `g=${T.getGroup()}`,
-                `b=${T.getBindgroup().hashProvider.convertToHash(hasher)}`,
-                `p=${T.getPipeline().hashProvider.convertToHash(hasher)}`,
-                `m=${T.getMesh()?.hashProvider.convertToHash(hasher) ?? "none"}`,
+                `group=${T.getGroup()}`,
+                `bindings=${T.getBindgroup().hashProvider.convertToHash(hasher)}`,
+                `pipeline=${T.getPipeline().hashProvider.convertToHash(hasher)}`,
+                `mesh=${T.getMesh()?.hashProvider.convertToHash(hasher) ?? "none"}`,
             ].join("#"),
             getChildrenChangedAt: () => Math.max(
                 T.getBindgroup().hashProvider.getChangedAt(),
