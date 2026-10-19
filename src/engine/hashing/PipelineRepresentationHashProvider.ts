@@ -1,22 +1,23 @@
-import {RepresentationHashProvider} from "./RepresentationHashProvider.ts";
-import {stableKey} from "./utils/stableKey.ts";
-import type {FrameTarget} from "../Representations/PipelineRepresentation.ts";
-import type {PipelineLayoutRepresentation} from "../Representations/PipelineLayoutRepresentation.ts";
-import type {ShaderStageRepresentation} from "../Representations/ShaderStageRepresentation.ts";
+import { RepresentationHashProvider } from "./RepresentationHashProvider.ts";
+import { stableKey } from "./utils/stableKey.ts";
+import type { FrameTarget } from "../Representations/PipelineRepresentation.ts";
+import type { PipelineLayoutRepresentation } from "../Representations/PipelineLayoutRepresentation.ts";
+
+type ShaderSource = { code: string; entryPoint: string };
 
 type InputFunctions = {
-    getVertexBuffers: () => GPUVertexBufferLayout[],
-    getFragmentTargets: () => Map<number, FrameTarget>,
-    getLayout: () => PipelineLayoutRepresentation | undefined,
-    getVertexShader: () => ShaderStageRepresentation | undefined,
-    getFragmentShader: () => ShaderStageRepresentation | undefined,
-    getPrimitive: () => GPUPrimitiveState | undefined,
-    getDepthStencil: () => GPUDepthStencilState | undefined,
-}
+    getVertexBuffers: () => GPUVertexBufferLayout[];
+    getFragmentTargets: () => Map<number, FrameTarget>;
+    getLayout: () => PipelineLayoutRepresentation | undefined;
+    getVertexShader: () => ShaderSource | undefined;
+    getFragmentShader: () => ShaderSource | undefined;
+    getPrimitive: () => GPUPrimitiveState | undefined;
+    getDepthStencil: () => GPUDepthStencilState | undefined;
+};
 
 /**
- * Composed from the other representations' hashes (layout, both shader stages) plus the pipeline's own state:
- * vertex buffer layouts (stride, step mode, attributes), render targets, primitive state, depth/stencil. Vertex buffer *data* is not part of it.
+ * Hashes pipeline-creation state: layout, shader source and entry points, vertex layouts,
+ * render-target formats, primitive state and depth/stencil state. Buffer contents are excluded.
  */
 export class PipelineRepresentationHashProvider extends RepresentationHashProvider {
     constructor(T: InputFunctions) {
@@ -25,7 +26,6 @@ export class PipelineRepresentationHashProvider extends RepresentationHashProvid
                 const layout = T.getLayout();
                 const vertex = T.getVertexShader();
                 const fragment = T.getFragmentShader();
-
                 const buffers = stableKey(T.getVertexBuffers());
                 const targets = Array.from(T.getFragmentTargets().entries())
                     .sort(([a], [b]) => a - b)
@@ -33,20 +33,16 @@ export class PipelineRepresentationHashProvider extends RepresentationHashProvid
                     .join(",");
 
                 return [
-                    `l=${layout?.hashProvider.convertToHash(hasher) ?? "none"}`,
-                    `v=${vertex?.hashProvider.convertToHash(hasher) ?? "none"}@${vertex?.getEntryPoint() ?? ""}`,
-                    `f=${fragment?.hashProvider.convertToHash(hasher) ?? "none"}@${fragment?.getEntryPoint() ?? ""}`,
-                    `vb=${buffers}`,
-                    `t=${targets}`,
-                    `p=${stableKey(T.getPrimitive())}`,
-                    `d=${stableKey(T.getDepthStencil())}`,
+                    `layout=${layout?.hashProvider.convertToHash(hasher) ?? "none"}`,
+                    `vertex=${vertex ? hasher.hashString(vertex.code) : "none"}@${vertex?.entryPoint ?? ""}`,
+                    `fragment=${fragment ? hasher.hashString(fragment.code) : "none"}@${fragment?.entryPoint ?? ""}`,
+                    `vertexBuffers=${buffers}`,
+                    `targets=${targets}`,
+                    `primitive=${stableKey(T.getPrimitive())}`,
+                    `depthStencil=${stableKey(T.getDepthStencil())}`,
                 ].join("#");
             },
-            getChildrenChangedAt: () => Math.max(
-                T.getLayout()?.hashProvider.getChangedAt() ?? 0,
-                T.getVertexShader()?.hashProvider.getChangedAt() ?? 0,
-                T.getFragmentShader()?.hashProvider.getChangedAt() ?? 0,
-            ),
+            getChildrenChangedAt: () => T.getLayout()?.hashProvider.getChangedAt() ?? 0,
         });
     }
 }
