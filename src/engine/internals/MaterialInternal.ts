@@ -1,9 +1,9 @@
-import {BindgroupRepresentation} from "../Representations/BindgroupRepresentation.ts";
 import {v4 as uuidv4} from "uuid";
 import {MaterialInternalHashProvider} from "../hashing/MaterialInternalHashProvider.ts";
+import {BindgroupInteractor} from "../Representations/BindgroupInteractor.ts";
 
 export class MaterialInternal {
-    private bindgroup = new BindgroupRepresentation();
+    private bindgroupInteractor = new BindgroupInteractor();
     private group: number
     readonly uuid: string;
     readonly hashProvider: MaterialInternalHashProvider;
@@ -13,15 +13,16 @@ export class MaterialInternal {
         this.uuid = uuidv4()
         this.hashProvider = new MaterialInternalHashProvider({
             getGroup: () => this.group,
-            getBindgroup: () => this.bindgroup,
+            getBindgroup: () => this.bindgroupInteractor.bindgroup,
         });
     }
 
-    getGroup(){
+    getGroup() {
         return this.group;
     }
 
-    getBindgroup(){
-        return this.bindgroup;
+    getBindgroupInteractor() {
+        return this.bindgroupInteractor;
     }
+
 }

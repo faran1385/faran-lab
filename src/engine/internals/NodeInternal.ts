@@ -1,11 +1,11 @@
-import {BindgroupRepresentation} from "../Representations/BindgroupRepresentation.ts";
 import {PipelineRepresentation} from "../Representations/PipelineRepresentation.ts";
 import {v4 as uuidv4} from "uuid";
 import {NodeInternalHashProvider} from "../hashing/NodeInternalHashProvider.ts";
 import type {MeshInternal} from "./MeshInternal.ts";
+import {BindgroupInteractor} from "../Representations/BindgroupInteractor.ts";
 
 export class NodeInternal {
-    private bindgroup = new BindgroupRepresentation();
+    private bindgroupInteractor = new BindgroupInteractor();
     private pipeline = new PipelineRepresentation();
     private group: number
     readonly uuid: string
@@ -17,7 +17,7 @@ export class NodeInternal {
         this.uuid = uuidv4()
         this.hashProvider = new NodeInternalHashProvider({
             getGroup: () => this.group,
-            getBindgroup: () => this.bindgroup,
+            getBindgroup: () => this.bindgroupInteractor.bindgroup,
             getPipeline: () => this.pipeline,
             getMesh: () => this.mesh,
         });
@@ -32,8 +32,8 @@ export class NodeInternal {
         this.hashProvider.markChanged();
     }
 
-    getBindgroup() {
-        return this.bindgroup;
+    getBindgroupInteractor() {
+        return this.bindgroupInteractor;
     }
 
     getPipeline() {
