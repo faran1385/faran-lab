@@ -11,7 +11,7 @@ type InputFunctions = {
 }
 
 function resourceHash(resource: BindgroupEntry["resource"], hasher: Hasher): string {
-    if (resource instanceof BufferWrapper) return `b:${resource.hashProvider.convertToHash()}|${resource.getData().byteLength}`;
+    if (resource instanceof BufferWrapper) return `b:${resource.hashProvider.convertToHash()}`;
     if (resource instanceof ImageWrapper) return `i:${resource.hashProvider.convertToHash(hasher)}`;
     return `s:${resource.hashProvider.convertToHash(hasher)}`;
 }

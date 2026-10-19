@@ -2,17 +2,14 @@ import type {PipelineLayoutRepresentation} from "./PipelineLayoutRepresentation.
 import {v4 as uuidv4} from "uuid";
 import {PipelineRepresentationHashProvider} from "../hashing/PipelineRepresentationHashProvider.ts";
 import type {ShaderStageRepresentation} from "./ShaderStageRepresentation.ts";
-import type {AttributeWrapper} from "../wrappers/AttributeWrapper.ts";
 
 export type FrameTarget = {
     format: GPUTextureFormat
 }
-export type VertexBufferEntry = AttributeWrapper;
-
 
 export class PipelineRepresentation {
     readonly uuid: string;
-    private vertexBuffers: VertexBufferEntry[] = [];
+    private vertexBuffers: GPUVertexBufferLayout[] = [];
     private fragmentTargets = new Map<number, FrameTarget>;
     private layout!: PipelineLayoutRepresentation;
     private vertexShader!: ShaderStageRepresentation
@@ -79,7 +76,7 @@ export class PipelineRepresentation {
         this.hashProvider.markChanged();
     }
 
-    setBuffers(buffers: VertexBufferEntry[]) {
+    setBuffers(buffers: GPUVertexBufferLayout[]) {
         this.vertexBuffers = buffers;
         this.hashProvider.markChanged();
     }

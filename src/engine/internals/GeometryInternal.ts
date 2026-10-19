@@ -1,14 +1,11 @@
-import type {VertexBufferEntry} from "../Representations/PipelineRepresentation.ts";
-
 export class GeometryInternal {
-    private vertexBuffers = new Map<string, VertexBufferEntry>()
-    
-    setVertexBuffer(vertexBuffer: VertexBufferEntry) {
-        this.vertexBuffers.set(vertexBuffer.uuid, vertexBuffer);
+    private vertexLayouts = new Map<number, GPUVertexBufferLayout>();
+
+    setVertexLayout(index: number, layout: GPUVertexBufferLayout) {
+        this.vertexLayouts.set(index, layout);
     }
 
-    removeVertexBuffer(vertexBuffer: VertexBufferEntry) {
-        this.vertexBuffers.delete(vertexBuffer.uuid);
+    removeVertexLayout(index: number) {
+        this.vertexLayouts.delete(index);
     }
-
 }
