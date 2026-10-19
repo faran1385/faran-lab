@@ -1,33 +1,36 @@
-import {v4 as uuidv4} from "uuid";
-import {GeometryInternalHashProvider} from "../hashing/GeometryInternalHashProvider.ts";
-import {AttributeInternal} from "./AttributeInternal.ts";
-import type {BufferWrapper} from "../wrappers/BufferWrapper.ts";
+import { v4 as uuidv4 } from "uuid";
+import { GeometryInternalHashProvider } from "../hashing/GeometryInternalHashProvider.ts";
+import { AttributeInternal } from "./AttributeInternal.ts";
+import type { BufferWrapper } from "../wrappers/BufferWrapper.ts";
 
 export type Draw = {
-    vertexCount: number,
-    instanceCount?: number,  // default 1
-    firstVertex?: number,    // default 0
-    firstInstance?: number // default 0
-}
+    vertexCount: number;
+    instanceCount?: number;
+    firstVertex?: number;
+    firstInstance?: number;
+};
 
 export type DrawIndexed = {
-    indexCount: number,
-    instanceCount?: number,
-    firstIndex?: number,
-    baseVertex?: number,
-    firstInstance?: number,
-    indexBuffer: BufferWrapper
-}
+    indexCount: number;
+    instanceCount?: number;
+    firstIndex?: number;
+    baseVertex?: number;
+    firstInstance?: number;
+    indexBuffer: BufferWrapper;
+};
 
 export class GeometryInternal {
     readonly uuid: string;
     private vertexAttributes = new Map<number, AttributeInternal>();
-    readonly hashProvider!: GeometryInternalHashProvider;
-    private drawInfo!: Draw | DrawIndexed
-
+    readonly hashProvider: GeometryInternalHashProvider;
+    private drawInfo!: Draw | DrawIndexed;
 
     constructor() {
-        this.uuid = uuidv4()
+        this.uuid = uuidv4();
+        this.hashProvider = new GeometryInternalHashProvider({
+            getVertexAttributes: () => this.vertexAttributes,
+            getDrawInfo: () => this.drawInfo,
+        });
     }
 
     getVertexAttributes() {
@@ -36,6 +39,7 @@ export class GeometryInternal {
 
     setDrawInfo(info: Draw | DrawIndexed) {
         this.drawInfo = info;
+        this.hashProvider.markChanged();
     }
 
     getDrawInfo() {
@@ -44,9 +48,10 @@ export class GeometryInternal {
 
     setVertexAttribute(slot: number, attribute: AttributeInternal) {
         this.vertexAttributes.set(slot, attribute);
+        this.hashProvider.markChanged();
     }
 
     removeVertexAttribute(slot: number) {
-        this.vertexAttributes.delete(slot);
+        if (this.vertexAttributes.delete(slot)) this.hashProvider.markChanged();
     }
 }
