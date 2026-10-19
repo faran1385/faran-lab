@@ -29,12 +29,12 @@ export class BindgroupRepresentationHashProvider extends RepresentationHashProvi
         super({
             buildKey: (hasher) => {
                 const layout = T.getLayout();
-                layout.hashProvider.update(hasher);
+                const layoutHash = layout.hashProvider.convertToHash(hasher);
                 const entries = Array.from(T.getEntries().entries())
                     .sort(([a], [b]) => a - b)
                     .map(([binding, entry]) => `${binding}=${resourceHash(entry.resource, hasher)}`)
                     .join("|");
-                return `${layout.hashProvider.current}#${entries}`;
+                return `${layoutHash}#${entries}`;
             },
             getChildrenChangedAt: () => {
                 let at = T.getLayout().hashProvider.getChangedAt();

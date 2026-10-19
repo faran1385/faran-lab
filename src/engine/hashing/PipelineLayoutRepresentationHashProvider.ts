@@ -12,8 +12,7 @@ export class PipelineLayoutRepresentationHashProvider extends RepresentationHash
             buildKey: (hasher) => Array.from(T.getLayouts().entries())
                 .sort(([a], [b]) => a - b)
                 .map(([group, layout]) => {
-                    layout.hashProvider.update(hasher);
-                    return `${group}:${layout.hashProvider.current}`;
+                    return `${group}:${layout.hashProvider.convertToHash(hasher)}`;
                 })
                 .join("|"),
             getChildrenChangedAt: () => {

@@ -25,9 +25,6 @@ export class PipelineRepresentationHashProvider extends RepresentationHashProvid
                 const layout = T.getLayout();
                 const vertex = T.getVertexShader();
                 const fragment = T.getFragmentShader();
-                layout?.hashProvider.update(hasher);
-                vertex?.hashProvider.update(hasher);
-                fragment?.hashProvider.update(hasher);
 
                 const buffers = stableKey(T.getVertexBuffers());
                 const targets = Array.from(T.getFragmentTargets().entries())
@@ -36,9 +33,9 @@ export class PipelineRepresentationHashProvider extends RepresentationHashProvid
                     .join(",");
 
                 return [
-                    `l=${layout?.hashProvider.current ?? "none"}`,
-                    `v=${vertex?.hashProvider.current ?? "none"}@${vertex?.getEntryPoint() ?? ""}`,
-                    `f=${fragment?.hashProvider.current ?? "none"}@${fragment?.getEntryPoint() ?? ""}`,
+                    `l=${layout?.hashProvider.convertToHash(hasher) ?? "none"}`,
+                    `v=${vertex?.hashProvider.convertToHash(hasher) ?? "none"}@${vertex?.getEntryPoint() ?? ""}`,
+                    `f=${fragment?.hashProvider.convertToHash(hasher) ?? "none"}@${fragment?.getEntryPoint() ?? ""}`,
                     `vb=${buffers}`,
                     `t=${targets}`,
                     `p=${stableKey(T.getPrimitive())}`,
