@@ -1,7 +1,6 @@
 import {PipelineLayoutRepresentation} from "./PipelineLayoutRepresentation.ts";
 import {v4 as uuidv4} from "uuid";
 import {PipelineRepresentationHashProvider} from "../hashing/PipelineRepresentationHashProvider.ts";
-import {ShaderStageRepresentation} from "./ShaderStageRepresentation.ts";
 import type {BindgroupInteractor} from "./BindgroupInteractor.ts";
 
 export type FrameTarget = {
@@ -28,8 +27,8 @@ export class PipelineRepresentation {
             getVertexBuffers: () => this.vertexBuffers,
             getFragmentTargets: () => this.frameTargets,
             getLayout: () => this.layout,
-            getVertexShader: () => new ShaderStageRepresentation(),
-            getFragmentShader: () => new ShaderStageRepresentation(),
+            getVertexShader: () => this.vertexShader,
+            getFragmentShader: () => this.fragmentShader,
             getPrimitive: () => this.primitive,
             getDepthStencil: () => this.depthStencil,
         });
