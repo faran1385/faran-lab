@@ -1,19 +1,22 @@
-import type {PipelineLayoutRepresentation} from "./PipelineLayoutRepresentation.ts";
+import {PipelineLayoutRepresentation} from "./PipelineLayoutRepresentation.ts";
 import {v4 as uuidv4} from "uuid";
 import {PipelineRepresentationHashProvider} from "../hashing/PipelineRepresentationHashProvider.ts";
-import type {ShaderStageRepresentation} from "./ShaderStageRepresentation.ts";
+import {ShaderStageRepresentation} from "./ShaderStageRepresentation.ts";
+import type {BindgroupInteractor} from "./BindgroupInteractor.ts";
 
 export type FrameTarget = {
-    format: GPUTextureFormat
+    format: GPUTextureFormat,
+    location: number
 }
 
 export class PipelineRepresentation {
     readonly uuid: string;
+    readonly bindgroups = new Map<number, BindgroupInteractor>();
     private vertexBuffers: GPUVertexBufferLayout[] = [];
-    private fragmentTargets = new Map<number, FrameTarget>;
-    private layout!: PipelineLayoutRepresentation;
-    private vertexShader!: ShaderStageRepresentation
-    private fragmentShader!: ShaderStageRepresentation
+    private frameTargets = new Map<number, FrameTarget>;
+    protected layout: PipelineLayoutRepresentation = new PipelineLayoutRepresentation();
+    private vertexShader = {code: "", entryPoint: ""}
+    private fragmentShader = {code: "", entryPoint: ""}
     private primitive!: GPUPrimitiveState
     private depthStencil!: GPUDepthStencilState
 
@@ -23,80 +26,76 @@ export class PipelineRepresentation {
         this.uuid = uuidv4();
         this.hashProvider = new PipelineRepresentationHashProvider({
             getVertexBuffers: () => this.vertexBuffers,
-            getFragmentTargets: () => this.fragmentTargets,
+            getFragmentTargets: () => this.frameTargets,
             getLayout: () => this.layout,
-            getVertexShader: () => this.vertexShader,
-            getFragmentShader: () => this.fragmentShader,
+            getVertexShader: () => new ShaderStageRepresentation(),
+            getFragmentShader: () => new ShaderStageRepresentation(),
             getPrimitive: () => this.primitive,
             getDepthStencil: () => this.depthStencil,
         });
     }
 
-    getVertexBuffers() {
+    protected getVertexBuffers() {
         return this.vertexBuffers;
     }
 
-    getFragmentTargets() {
-        return this.fragmentTargets;
+    protected getFragmentTargets() {
+        return this.frameTargets;
     }
 
-    getLayout() {
-        return this.layout;
-    }
 
-    getFragmentShader() {
+    protected getFragmentShader() {
         return this.fragmentShader;
     }
 
-    getVertexShader() {
+    protected getVertexShader() {
         return this.vertexShader;
     }
 
-    getPrimitive() {
+    protected getPrimitive() {
         return this.primitive;
     }
 
-    getDepthStencil() {
+    protected getDepthStencil() {
         return this.depthStencil;
     }
 
-
-    setLayout(layout: PipelineLayoutRepresentation) {
-        this.layout = layout;
-        this.hashProvider.markChanged();
-    }
-
-    setVertexShader(vertexShader: ShaderStageRepresentation) {
+    protected setVertexShader(vertexShader: PipelineRepresentation["vertexShader"]) {
         this.vertexShader = vertexShader;
         this.hashProvider.markChanged();
     }
 
-    setFragmentShader(fragmentShader: ShaderStageRepresentation) {
+    protected setFragmentShader(fragmentShader: PipelineRepresentation["fragmentShader"]) {
         this.fragmentShader = fragmentShader;
         this.hashProvider.markChanged();
     }
 
-    setBuffers(buffers: GPUVertexBufferLayout[]) {
+    protected setBuffers(buffers: GPUVertexBufferLayout[]) {
         this.vertexBuffers = buffers;
         this.hashProvider.markChanged();
     }
 
-    setPrimitive(primitive: GPUPrimitiveState) {
+    protected setPrimitive(primitive: GPUPrimitiveState) {
         this.primitive = primitive;
         this.hashProvider.markChanged();
     }
 
-    setFragmentTarget(location: number, target: FrameTarget) {
-        this.fragmentTargets.set(location, target);
+    protected setFrameTarget(target: FrameTarget) {
+        this.frameTargets.set(target.location, target);
         this.hashProvider.markChanged();
     }
 
-    removeFragmentTarget(location: number) {
-        this.fragmentTargets.delete(location);
+    protected removeFrameTarget(location: number) {
+        this.frameTargets.delete(location);
         this.hashProvider.markChanged();
     }
 
-    setDepthStencil(depthStencil: GPUDepthStencilState) {
+    protected clearFrameTargets() {
+        this.frameTargets.clear();
+        this.hashProvider.markChanged();
+    }
+
+    protected setDepthStencil(depthStencil: GPUDepthStencilState) {
         this.depthStencil = depthStencil;
         this.hashProvider.markChanged();
     }

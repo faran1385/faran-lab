@@ -14,7 +14,7 @@ export type BindgroupEntry = {
 export class BindgroupRepresentation {
     readonly uuid: string;
     private entries = new Map<number, BindgroupEntry>()
-    private layout = new BindgroupLayoutRepresentation();
+    readonly layout = new BindgroupLayoutRepresentation();
     readonly hashProvider: BindgroupRepresentationHashProvider;
 
     constructor() {
@@ -25,16 +25,16 @@ export class BindgroupRepresentation {
         });
     }
 
-    getLayout() {
-        return this.layout
+    getEntries() {
+        return this.entries.values()
     }
 
-    setEntry(binding: number, entry: BindgroupEntry): void {
+    protected setEntry(binding: number, entry: BindgroupEntry): void {
         this.entries.set(binding, entry);
         this.hashProvider.markChanged();
     }
 
-    removeEntry(binding: number): void {
+    protected removeEntry(binding: number): void {
         this.entries.delete(binding);
         this.hashProvider.markChanged();
     }

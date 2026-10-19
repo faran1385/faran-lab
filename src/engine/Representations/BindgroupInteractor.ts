@@ -4,16 +4,19 @@ import type {BufferWrapper} from "../wrappers/BufferWrapper.ts";
 import type {SamplerWrapper} from "../wrappers/SamplerWrapper.ts";
 
 
-export class BindgroupInteractor {
-    readonly bindgroup = new BindgroupRepresentation();
+export class BindgroupInteractor extends BindgroupRepresentation{
+
+    constructor() {
+        super();
+    }
 
     setTexture(binding: number, resource: ImageWrapper, visibility: GPUShaderStageFlags) {
-        this.bindgroup.setEntry(binding, {
+        this.setEntry(binding, {
             binding,
             resource,
         })
 
-        this.bindgroup.getLayout().setEntry(binding, {
+        this.layout.setEntry(binding, {
             binding: binding,
             texture: resource,
             visibility
@@ -21,12 +24,12 @@ export class BindgroupInteractor {
     }
 
     setUniform(binding: number, resource: BufferWrapper, visibility: GPUShaderStageFlags) {
-        this.bindgroup.setEntry(binding, {
+        this.setEntry(binding, {
             binding,
             resource,
         })
 
-        this.bindgroup.getLayout().setEntry(binding, {
+        this.layout.setEntry(binding, {
             binding: binding,
             buffer: resource,
             visibility
@@ -34,12 +37,12 @@ export class BindgroupInteractor {
     }
 
     setSampler(binding: number, resource: SamplerWrapper, visibility: GPUShaderStageFlags) {
-        this.bindgroup.setEntry(binding, {
+        this.setEntry(binding, {
             binding,
             resource,
         })
 
-        this.bindgroup.getLayout().setEntry(binding, {
+        this.layout.setEntry(binding, {
             binding: binding,
             sampler: resource,
             visibility

@@ -5,17 +5,16 @@ import type {MaterialInternal} from "./MaterialInternal.ts";
 import type {GeometryInternal} from "./GeometryInternal.ts";
 
 export class PrimitiveInternal {
-    private fragment = new ShaderStageRepresentation();
-    private vertex = new ShaderStageRepresentation();
+    readonly fragment = new ShaderStageRepresentation();
+    readonly vertex = new ShaderStageRepresentation();
     readonly uuid: string;
-    private mat: MaterialInternal;
-    private geo: GeometryInternal;
+
+    private mat!: MaterialInternal;
+    private geo!: GeometryInternal;
     readonly hashProvider: PrimitiveInternalHashProvider;
 
-    constructor(mat: MaterialInternal, geo: GeometryInternal) {
+    constructor() {
         this.uuid = uuidv4()
-        this.mat = mat;
-        this.geo = geo;
         this.hashProvider = new PrimitiveInternalHashProvider({
             getMat: () => this.mat,
             getGeo: () => this.geo,

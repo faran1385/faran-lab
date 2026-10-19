@@ -6,15 +6,11 @@ export class MaterialInternal {
     private bindgroupInteractor = new BindgroupInteractor();
     private group: number
     readonly uuid: string;
-    readonly hashProvider: MaterialInternalHashProvider;
+    readonly hashProvider!: MaterialInternalHashProvider;
 
     constructor(group: number = 1) {
         this.group = group;
         this.uuid = uuidv4()
-        this.hashProvider = new MaterialInternalHashProvider({
-            getGroup: () => this.group,
-            getBindgroup: () => this.bindgroupInteractor.bindgroup,
-        });
     }
 
     getGroup() {

@@ -5,12 +5,16 @@ import {PipelineLayoutRepresentationHashProvider} from "../hashing/PipelineLayou
 export class PipelineLayoutRepresentation {
     readonly uuid: string;
     private layouts = new Map<number, BindgroupLayoutRepresentation>()
-
     readonly hashProvider: PipelineLayoutRepresentationHashProvider;
 
     constructor() {
         this.uuid = uuidv4();
         this.hashProvider = new PipelineLayoutRepresentationHashProvider({getLayouts: () => this.layouts});
+    }
+
+    clearLayouts(): void {
+        this.layouts.clear();
+        this.hashProvider.markChanged();
     }
 
     setLayout(group: number, layout: BindgroupLayoutRepresentation): void {
