@@ -1,16 +1,17 @@
-import {RepresentationHashProvider} from "./RepresentationHashProvider.ts";
-import type {BindgroupRepresentation} from "../Representations/BindgroupRepresentation.ts";
+import { RepresentationHashProvider } from "./RepresentationHashProvider.ts";
+import type { BindgroupInteractor } from "../Representations/BindgroupInteractor.ts";
 
 type InputFunctions = {
-    getGroup: () => number,
-    getBindgroup: () => BindgroupRepresentation,
-}
+    getGroup: () => number;
+    getBindgroup: () => BindgroupInteractor;
+};
 
-/** The material's bind group (and so its layout) and the group index it is bound at. */
+/** A material internal is defined by its bind-group slot and the bindings/layout it exposes. */
 export class MaterialInternalHashProvider extends RepresentationHashProvider {
     constructor(T: InputFunctions) {
         super({
-            buildKey: (hasher) => `${T.getGroup()}#${T.getBindgroup().hashProvider.convertToHash(hasher)}`,
+            buildKey: (hasher) =>
+                `group=${T.getGroup()}#bindgroup=${T.getBindgroup().hashProvider.convertToHash(hasher)}`,
             getChildrenChangedAt: () => T.getBindgroup().hashProvider.getChangedAt(),
         });
     }
