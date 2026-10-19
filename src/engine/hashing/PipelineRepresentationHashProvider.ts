@@ -1,11 +1,11 @@
 import {RepresentationHashProvider} from "./RepresentationHashProvider.ts";
 import {stableKey} from "./utils/stableKey.ts";
-import type {FrameTarget, VertexBufferEntry} from "../Representations/PipelineRepresentation.ts";
+import type {FrameTarget} from "../Representations/PipelineRepresentation.ts";
 import type {PipelineLayoutRepresentation} from "../Representations/PipelineLayoutRepresentation.ts";
 import type {ShaderStageRepresentation} from "../Representations/ShaderStageRepresentation.ts";
 
 type InputFunctions = {
-    getVertexBuffers: () => VertexBufferEntry[],
+    getVertexBuffers: () => GPUVertexBufferLayout[],
     getFragmentTargets: () => Map<number, FrameTarget>,
     getLayout: () => PipelineLayoutRepresentation | undefined,
     getVertexShader: () => ShaderStageRepresentation | undefined,
@@ -16,7 +16,7 @@ type InputFunctions = {
 
 /**
  * Composed from the other representations' hashes (layout, both shader stages) plus the pipeline's own state:
- * vertex layout, render targets, primitive state, depth/stencil. Vertex buffer *data* is not part of it.
+ * vertex buffer layouts (stride, step mode, attributes), render targets, primitive state, depth/stencil. Vertex buffer *data* is not part of it.
  */
 export class PipelineRepresentationHashProvider extends RepresentationHashProvider {
     constructor(T: InputFunctions) {
@@ -29,7 +29,7 @@ export class PipelineRepresentationHashProvider extends RepresentationHashProvid
                 vertex?.hashProvider.update(hasher);
                 fragment?.hashProvider.update(hasher);
 
-                const buffers = T.getVertexBuffers().map((a) => `${a.name}:${a.format}:${a.stride}`).join(",");
+                const buffers = stableKey(T.getVertexBuffers());
                 const targets = Array.from(T.getFragmentTargets().entries())
                     .sort(([a], [b]) => a - b)
                     .map(([location, target]) => `${location}:${target.format}`)
