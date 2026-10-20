@@ -11,7 +11,7 @@ export type MaterialComponentTextureSlot = {
 export class MaterialComponentWrapper {
     readonly uuid: string;
     readonly name: string;
-    readonly adaptor = new MaterialComponentAdaptor();
+    readonly adaptor: MaterialComponentAdaptor;
 
     private factors: number[];
     private texture?: MaterialComponentTextureSlot;
@@ -21,6 +21,7 @@ export class MaterialComponentWrapper {
         this.uuid = uuidv4();
         this.name = name;
         this.factors = factors;
+        this.adaptor = new MaterialComponentAdaptor(name);
 
         this.hashProvider = new MaterialComponentHashProvider({
             getTexture: this.getTexture.bind(this),

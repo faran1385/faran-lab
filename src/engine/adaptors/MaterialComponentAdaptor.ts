@@ -1,7 +1,13 @@
 export class MaterialComponentAdaptor {
-    private connectedAdaptors = new Map<string, () => void>();
+    private connectedAdaptors = new Map<string, (name: string) => void>();
+    private name: string;
 
-    connectAdaptor(uuid: string, adaptorFn: () => void) {
+    constructor(name: string) {
+        this.name = name;
+    }
+
+
+    connectAdaptor(uuid: string, adaptorFn: (name: string) => void) {
         this.connectedAdaptors.set(uuid, adaptorFn);
     }
 
@@ -10,6 +16,6 @@ export class MaterialComponentAdaptor {
     }
 
     onChange() {
-        this.connectedAdaptors.forEach(fn => fn())
+        this.connectedAdaptors.forEach(fn => fn(this.name))
     }
 }
