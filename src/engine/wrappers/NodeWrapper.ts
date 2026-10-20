@@ -5,11 +5,13 @@ import {v4 as uuidv4} from "uuid";
 import {vec3} from "../../packages/math/vector/vec3.ts";
 import {quat} from "../../packages/math/quat/quat.ts";
 import {NodeHashProvider} from "../hashing/NodeHashProvider.ts";
+import {NodeAdaptor} from "../adaptors/NodeAdaptor.ts";
 
 export class NodeWrapper {
+    private adaptor: NodeAdaptor;
     readonly uuid: string;
     private name?: string;
-    private mesh?: MeshWrapper;
+    private mesh: MeshWrapper | null = null;
     private children = new Map<string, NodeWrapper>();
     private parent?: NodeWrapper;
 
@@ -17,18 +19,19 @@ export class NodeWrapper {
     private rotation: Float32Array;
     private scale: Float32Array;
 
-    private worldMatrix = mat4.create();
     private localMatrix = mat4.create();
     readonly hashProvider: NodeHashProvider;
     private _cachedChildrenArray: NodeWrapper[] = []
 
 
     constructor(
+        adaptor?: NodeAdaptor,
         translation?: Node["translation"],
         rotation?: Node["rotation"],
         scale?: Node["scale"],
         name?: string,
     ) {
+        this.adaptor = adaptor ?? new NodeAdaptor();
         const t = translation ?? [0, 0, 0] as any;
         const r = rotation ?? [0, 0, 0, 1] as any;
         const s = scale ?? [1, 1, 1] as any;
@@ -52,16 +55,11 @@ export class NodeWrapper {
         return this.mesh;
     }
 
-    setMesh(mesh: MeshWrapper | undefined) {
+    setMesh(mesh: MeshWrapper | null) {
         this.mesh = mesh;
+        this.adaptor.setMesh(mesh)
         this.hashProvider.markMesh();
     }
-
-    /**
-     * Stamp of what this node draws: the mesh assignment or the mesh's primitive list. Transforms are deliberately
-     * not part of it, they are uploaded through the world-matrix path and never invalidate render items.
-     */
-
 
     setName(name: string | undefined) {
         this.name = name;
@@ -131,22 +129,22 @@ export class NodeWrapper {
     }
 
     getWorldMatrix() {
-        return this.worldMatrix;
+        return this.adaptor.buffer.getData();
     }
 
     buildWorldMatrix(parentMatrix: Float32Array | null, uploadToGPUBuffer: (hash: string, data: GPUAllowSharedBufferSource, offset: number) => void) {
         mat4.compose(this.localMatrix, this.translation as any, this.rotation as any, this.scale as any);
         if (parentMatrix) {
-            mat4.mul(this.worldMatrix, parentMatrix, this.localMatrix);
+            mat4.mul(new Float32Array(this.adaptor.buffer.getData()), parentMatrix, this.localMatrix);
         } else {
-            this.worldMatrix.set(this.localMatrix);
+            this.adaptor.buffer.setData(this.localMatrix.buffer)
         }
 
         this.hashProvider.syncTransformUpdate()
-        if (this.mesh && this.mesh.getPrimitivesCount() > 0) uploadToGPUBuffer(this.uuid, this.worldMatrix, 0);
+        if (this.mesh && this.mesh.getAllPrimitives().length > 0) uploadToGPUBuffer(this.uuid, this.getWorldMatrix(), 0);
 
         this.children.forEach((child: NodeWrapper) => {
-            child.buildWorldMatrix(this.worldMatrix, uploadToGPUBuffer);
+            child.buildWorldMatrix(new Float32Array(this.getWorldMatrix()), uploadToGPUBuffer);
         });
     }
 }

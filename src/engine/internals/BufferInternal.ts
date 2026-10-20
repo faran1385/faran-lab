@@ -1,7 +1,7 @@
 import {v4 as uuidv4} from 'uuid';
 import {BufferHashProvider} from "../hashing/BufferHashProvider.ts";
 
-export class BufferWrapper<TUsage extends GPUBufferUsageFlags = GPUBufferUsageFlags> {
+export class BufferInternal<TUsage extends GPUBufferUsageFlags = GPUBufferUsageFlags> {
     readonly uuid: string;
 
     protected usage: TUsage;

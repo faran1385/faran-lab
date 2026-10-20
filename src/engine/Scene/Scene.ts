@@ -40,7 +40,7 @@ export class Scene {
             return; // invariant: descendants are already dirty, buildWorldMatrix handles them
         }
         for (const child of node.getChildren()) {
-            this.walkWorldMatrices(child, node.getWorldMatrix(), uploadToGPUBuffer);
+            this.walkWorldMatrices(child, new Float32Array(node.getWorldMatrix()), uploadToGPUBuffer);
         }
     };
 

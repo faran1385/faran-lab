@@ -2,6 +2,7 @@ import type {Material} from "../importers/utils/IR.ts";
 import {MaterialComponentWrapper} from "./MaterialComponentWrapper.ts";
 import {v4 as uuidv4} from "uuid";
 import {MaterialHashProvider} from "../hashing/MaterialHashProvider.ts";
+import {MaterialAdaptor} from "../adaptors/MaterialAdaptor.ts";
 
 type MaterialArgs = {
     alphaMode?: Material["alphaMode"],
@@ -11,6 +12,7 @@ type MaterialArgs = {
 
 export class MaterialWrapper {
     readonly uuid: string;
+    readonly adaptor = new MaterialAdaptor();
 
     private components = new Map<string, MaterialComponentWrapper>();
     private sortedComponents: MaterialComponentWrapper[] = [];
@@ -53,6 +55,7 @@ export class MaterialWrapper {
         this.components.set(wrapper.name, wrapper);
         this.sortComponents();
         this.hashProvider.markChangeStamp()
+
     }
 
     removeComponent(name: string): void {

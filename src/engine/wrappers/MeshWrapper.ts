@@ -1,9 +1,11 @@
 import type {PrimitiveWrapper} from "./PrimitiveWrapper.ts";
 import {v4 as uuidv4} from "uuid";
 import {MeshHashProvider} from "../hashing/MeshHashProvider.ts";
+import {MeshAdaptor} from "../adaptors/MeshAdaptor.ts";
 
 export class MeshWrapper {
     readonly uuid: string;
+    readonly adaptor = new MeshAdaptor();
 
     private primitives = new Map<string, PrimitiveWrapper>();
     private _cachedPrimitiveArray: PrimitiveWrapper[] = []
@@ -25,22 +27,22 @@ export class MeshWrapper {
 
     setPrimitive(wrapper: PrimitiveWrapper): void {
         this.primitives.set(wrapper.uuid, wrapper);
+        this.adaptor.setPrimitive(wrapper);
+
         this.hashProvider.markStamp();
         this.updateCachedPrimitiveArray()
     }
 
     removePrimitive(uuid: string): void {
+        const primitive=this.primitives.get(uuid)!;
         this.primitives.delete(uuid);
+
+        this.adaptor.removePrimitive(primitive.adaptor.internal.uuid);
         this.hashProvider.markStamp();
         this.updateCachedPrimitiveArray()
     }
 
-
     getAllPrimitives() {
         return this._cachedPrimitiveArray
-    }
-
-    getPrimitivesCount() {
-        return this.primitives.size;
     }
 }

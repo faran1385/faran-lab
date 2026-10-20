@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 import { GeometryInternalHashProvider } from "../hashing/GeometryInternalHashProvider.ts";
 import { AttributeInternal } from "./AttributeInternal.ts";
-import type { BufferWrapper } from "../wrappers/BufferWrapper.ts";
+import type { BufferInternal } from "./BufferInternal.ts";
 
 export type Draw = {
     vertexCount: number;
@@ -16,7 +16,7 @@ export type DrawIndexed = {
     firstIndex?: number;
     baseVertex?: number;
     firstInstance?: number;
-    indexBuffer: BufferWrapper;
+    indexBuffer: BufferInternal;
 };
 
 export class GeometryInternal {

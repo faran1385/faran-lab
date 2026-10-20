@@ -1,6 +1,5 @@
 import { RepresentationHashProvider } from "./RepresentationHashProvider.ts";
 import { stableKey } from "./utils/stableKey.ts";
-import type { Hasher } from "./utils/Hasher.ts";
 import type { AttributeInternal } from "../internals/AttributeInternal.ts";
 import type { Draw, DrawIndexed } from "../internals/GeometryInternal.ts";
 
@@ -13,7 +12,7 @@ type InputFunctions = {
 export class GeometryInternalHashProvider extends RepresentationHashProvider {
     constructor(T: InputFunctions) {
         super({
-            buildKey: (hasher: Hasher) => {
+            buildKey: () => {
                 const attributes = Array.from(T.getVertexAttributes().entries())
                     .sort(([a], [b]) => a - b)
                     .map(([slot, attribute]) =>

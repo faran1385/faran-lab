@@ -5,7 +5,6 @@ type InputFunctions = {
     getLayouts: () => Map<number, BindgroupLayoutRepresentation>,
 }
 
-/** Which bind group layout sits at which group index. */
 export class PipelineLayoutRepresentationHashProvider extends RepresentationHashProvider {
     constructor(T: InputFunctions) {
         super({

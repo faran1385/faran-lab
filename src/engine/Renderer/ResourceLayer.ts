@@ -25,7 +25,7 @@ export class ResourceLayer {
 
     static node(node: NodeWrapper, ctx: RenderContext) {
         const nodeMesh = node.getMesh();
-        if (nodeMesh && nodeMesh.getPrimitivesCount() > 0) {
+        if (nodeMesh && nodeMesh.getAllPrimitives().length > 0) {
             ctx.managers.bufferManager.ensure(node.uuid, () => ctx.producer.produceBufferFromNodeMatrix(node));
             ctx.managers.bindgroupManager.ensure(node.uuid, () => ctx.producer.produceBindgroupFromNode({
                 layouts: ctx.managers.bindgroupLayoutManager,

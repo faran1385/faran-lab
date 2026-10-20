@@ -4,20 +4,32 @@ import {v4 as uuidv4} from "uuid";
 import {BasicFragmentAssembler, BasicVertexAssembler} from "../Assemblers/BasicAssembler/BasicAssembler.ts";
 import {PipelineWrapper} from "./PipelineWrapper.ts";
 import {FragmentAssemblerBase, type VertexAssemblerBase} from "../Assemblers/BaseAssembler.ts";
+import {PrimitiveAdaptor} from "../adaptors/PrimitiveAdaptor.ts";
 
 export class PrimitiveWrapper {
     readonly uuid: string;
+    readonly adaptor = new PrimitiveAdaptor();
 
     private geometry: GeometryWrapper;
     private material: MaterialWrapper;
 
-    private vertexAssembler: VertexAssemblerBase = new BasicVertexAssembler();
-    private fragmentAssembler: FragmentAssemblerBase = new BasicFragmentAssembler();
+    private vertexAssembler: VertexAssemblerBase;
+    private fragmentAssembler: FragmentAssemblerBase;
     private pipelineWrapper = new PipelineWrapper();
 
-    constructor(mat: MaterialWrapper, geo: GeometryWrapper) {
+    constructor(
+        mat: MaterialWrapper,
+        geo: GeometryWrapper,
+        vertexAssembler?: VertexAssemblerBase,
+        fragmentAssembler?: FragmentAssemblerBase
+    ) {
         this.uuid = uuidv4();
 
+        this.vertexAssembler = vertexAssembler ?? new BasicVertexAssembler();
+        this.fragmentAssembler = fragmentAssembler ?? new BasicFragmentAssembler();
+
+        this.adaptor.setMaterial(mat);
+        this.adaptor.setGeometry(geo);
         this.geometry = geo;
         this.material = mat;
     }
@@ -39,18 +51,8 @@ export class PrimitiveWrapper {
         );
     }
 
-    setVertexAssembler(a: VertexAssemblerBase): void {
-        this.vertexAssembler = a;
-        this.pipelineWrapper.markVertexShaderDirty()
-    }
-
     getVertexAssembler(): VertexAssemblerBase {
         return this.vertexAssembler;
-    }
-
-    setFragmentAssembler(a: FragmentAssemblerBase): void {
-        this.fragmentAssembler = a;
-        this.pipelineWrapper.markFragmentShaderDirty()
     }
 
     getFragmentAssembler(): FragmentAssemblerBase {
@@ -63,6 +65,7 @@ export class PrimitiveWrapper {
 
     setGeometry(geometry: GeometryWrapper): void {
         this.geometry = geometry;
+        this.adaptor.setGeometry(geometry);
         this.pipelineWrapper.markFragmentShaderDirty()
         this.pipelineWrapper.markVertexShaderDirty()
     }
@@ -73,6 +76,7 @@ export class PrimitiveWrapper {
 
     setMaterial(material: MaterialWrapper): void {
         this.material = material;
+        this.adaptor.setMaterial(material);
         this.pipelineWrapper.markFragmentShaderDirty()
         this.pipelineWrapper.markVertexShaderDirty()
     }

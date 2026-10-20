@@ -1,14 +1,14 @@
 import {v4 as uuidv4} from "uuid";
 import {BindgroupLayoutRepresentation} from "./BindgroupLayoutRepresentation.ts";
 import {BindgroupRepresentationHashProvider} from "../hashing/BindgroupRepresentationHashProvider.ts";
-import type {BufferWrapper} from "../wrappers/BufferWrapper.ts";
+import type {BufferInternal} from "../internals/BufferInternal.ts";
 import type {SamplerWrapper} from "../wrappers/SamplerWrapper.ts";
 import type {ImageWrapper} from "../wrappers/ImageWrapper.ts";
 
 
 export type BindgroupEntry = {
     binding: number,
-    resource: BufferWrapper | SamplerWrapper | ImageWrapper
+    resource: BufferInternal | SamplerWrapper | ImageWrapper
 }
 
 export class BindgroupRepresentation {

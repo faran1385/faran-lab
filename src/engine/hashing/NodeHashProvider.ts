@@ -3,7 +3,7 @@ import {ChangeStamp} from "./utils/ChangeStamp.ts";
 import type {MeshWrapper} from "../wrappers/MeshWrapper.ts";
 
 type InputFunctions = {
-    getMesh: () => MeshWrapper | undefined,
+    getMesh: () => MeshWrapper | null,
 }
 
 export class NodeHashProvider {

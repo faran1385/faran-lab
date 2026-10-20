@@ -1,7 +1,7 @@
-import {BufferWrapper} from "../wrappers/BufferWrapper.ts";
+import {BufferInternal} from "./BufferInternal.ts";
 
 
-export class AttributeInternal extends BufferWrapper<GPUBufferUsage["VERTEX"] | GPUBufferUsage["COPY_DST"]> {
+export class AttributeInternal extends BufferInternal<GPUBufferUsage["VERTEX"] | GPUBufferUsage["COPY_DST"]> {
     private layout: GPUVertexBufferLayout
 
     constructor(data: ArrayBuffer, layout: GPUVertexBufferLayout) {

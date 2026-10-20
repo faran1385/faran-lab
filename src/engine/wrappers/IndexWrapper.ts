@@ -1,8 +1,8 @@
-import {BufferWrapper} from "./BufferWrapper.ts";
+import {BufferInternal} from "../internals/BufferInternal.ts";
 
 export type IndexFormat = "uint16" | "uint32";
 
-export class IndexAttributeWrapper extends BufferWrapper<GPUBufferUsage["INDEX"]> {
+export class IndexAttributeWrapper extends BufferInternal<GPUBufferUsage["INDEX"]> {
     readonly format: IndexFormat;
 
     constructor(data: ArrayBuffer, format: IndexFormat) {

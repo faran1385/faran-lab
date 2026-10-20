@@ -2,7 +2,7 @@ import {RepresentationHashProvider} from "./RepresentationHashProvider.ts";
 import type {BindgroupEntry} from "../Representations/BindgroupRepresentation.ts";
 import type {BindgroupLayoutRepresentation} from "../Representations/BindgroupLayoutRepresentation.ts";
 import type {Hasher} from "./utils/Hasher.ts";
-import {BufferWrapper} from "../wrappers/BufferWrapper.ts";
+import {BufferInternal} from "../internals/BufferInternal.ts";
 import {ImageWrapper} from "../wrappers/ImageWrapper.ts";
 
 type InputFunctions = {
@@ -11,7 +11,7 @@ type InputFunctions = {
 }
 
 function resourceHash(resource: BindgroupEntry["resource"], hasher: Hasher): string {
-    if (resource instanceof BufferWrapper) return `b:${resource.hashProvider.convertToHash()}`;
+    if (resource instanceof BufferInternal) return `b:${resource.hashProvider.convertToHash()}`;
     if (resource instanceof ImageWrapper) return `i:${resource.hashProvider.convertToHash(hasher)}`;
     return `s:${resource.hashProvider.convertToHash(hasher)}`;
 }

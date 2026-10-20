@@ -2,9 +2,11 @@ import {v4 as uuidv4} from "uuid";
 import type {AttributeWrapper} from "./AttributeWrapper.ts";
 import type {IndexAttributeWrapper} from "./IndexWrapper.ts";
 import {GeometryHashProvider} from "../hashing/GeometryHashProvider.ts";
+import {GeometryAdaptor} from "../adaptors/GeometryAdaptor.ts";
 
 export class GeometryWrapper {
     readonly uuid: string;
+    readonly adaptor = new GeometryAdaptor();
 
     private attributes: Map<string, AttributeWrapper> = new Map();
     private indices?: IndexAttributeWrapper;

@@ -1,4 +1,4 @@
-import {BufferWrapper} from "../wrappers/BufferWrapper.ts";
+import {BufferInternal} from "../internals/BufferInternal.ts";
 import {
     type BufferDescriptor,
     BufferProducer,
@@ -42,7 +42,7 @@ export class CentralProducer {
     private materialFactorPlans = new Map<string, MaterialFactorsPlan>();
     private geometryAttributePlans = new Map<string, GeometryAttributePlan>();
 
-    produceBuffer(wrapper: BufferWrapper): BufferDescriptor {
+    produceBuffer(wrapper: BufferInternal): BufferDescriptor {
         return BufferProducer.produce(wrapper);
     }
 
@@ -69,7 +69,7 @@ export class CentralProducer {
     }
 
     produceCameraBuffer(camera: Camera) {
-        return this.produceBuffer(new BufferWrapper(new Float32Array([...camera.getViewMatrix(), ...camera.getProjectionMatrix()]).buffer, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST))
+        return this.produceBuffer(new BufferInternal(new Float32Array([...camera.getViewMatrix(), ...camera.getProjectionMatrix()]).buffer, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST))
     }
 
     produceSceneBindgroup(args: SceneBindgroupProduceArgs) {

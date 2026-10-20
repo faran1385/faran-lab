@@ -1,8 +1,8 @@
 import type {VertexFormat} from "../importers/utils/IR.ts";
-import {BufferWrapper} from "./BufferWrapper.ts";
+import {BufferInternal} from "../internals/BufferInternal.ts";
 import {getVertexFormatSize} from "../producers/utils.ts";
 
-export class AttributeWrapper extends BufferWrapper<GPUBufferUsage["VERTEX"] | GPUBufferUsage["COPY_DST"]> {
+export class AttributeWrapper extends BufferInternal<GPUBufferUsage["VERTEX"] | GPUBufferUsage["COPY_DST"]> {
     readonly name: string;
     readonly format: VertexFormat;
     readonly stride: number

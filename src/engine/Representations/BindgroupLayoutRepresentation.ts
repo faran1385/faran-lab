@@ -2,7 +2,7 @@ import {v4 as uuidv4} from "uuid";
 import type {SamplerWrapper} from "../wrappers/SamplerWrapper.ts";
 import {ImageWrapper} from "../wrappers/ImageWrapper.ts";
 import {BindgroupLayoutRepresentationHashProvider} from "../hashing/BindgroupLayoutRepresentationHashProvider.ts";
-import {BufferWrapper} from "../wrappers/BufferWrapper.ts";
+import {BufferInternal} from "../internals/BufferInternal.ts";
 
 
 type LayoutBinding = LayoutTextureEntry | LayoutSamplerEntry | LayoutBufferEntry
@@ -15,7 +15,7 @@ export type BindgroupLayoutEntry<T extends LayoutBinding> =
     & T
 
 export type LayoutBufferEntry = {
-    buffer: BufferWrapper
+    buffer: BufferInternal
 }
 
 export type LayoutSamplerEntry = {

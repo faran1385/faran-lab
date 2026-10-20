@@ -1,6 +1,7 @@
 import type {TextureWrapper} from "./TextureWrapper.ts";
 import {v4 as uuidv4} from "uuid";
 import {MaterialComponentHashProvider} from "../hashing/MaterialComponentHashProvider.ts";
+import {MaterialComponentAdaptor} from "../adaptors/MaterialComponentAdaptor.ts";
 
 export type MaterialComponentTextureSlot = {
     wrapper: TextureWrapper,
@@ -10,6 +11,7 @@ export type MaterialComponentTextureSlot = {
 export class MaterialComponentWrapper {
     readonly uuid: string;
     readonly name: string;
+    readonly adaptor = new MaterialComponentAdaptor();
 
     private factors: number[];
     private texture?: MaterialComponentTextureSlot;
@@ -30,6 +32,7 @@ export class MaterialComponentWrapper {
         this.hashProvider.markShapeHash();
         this.hashProvider.markShaderHash();
         this.hashProvider.markChangeStamp()
+        this.adaptor.onChange()
     }
 
     removeTexture(): void {
@@ -37,6 +40,7 @@ export class MaterialComponentWrapper {
         this.hashProvider.markShapeHash();
         this.hashProvider.markShaderHash();
         this.hashProvider.markChangeStamp()
+        this.adaptor.onChange()
     }
 
     getTexture() {
@@ -51,6 +55,7 @@ export class MaterialComponentWrapper {
         this.factors = factors;
         this.hashProvider.markFactorUpdate();
         this.hashProvider.markChangeStamp()
+        this.adaptor.onChange()
     }
 
 
