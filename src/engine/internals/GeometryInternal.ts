@@ -17,6 +17,8 @@ export type DrawIndexed = {
     baseVertex?: number;
     firstInstance?: number;
     indexBuffer: BufferInternal;
+    /** Needed by setIndexBuffer; the buffer alone does not say whether it holds 16 or 32 bit indices. */
+    indexFormat: GPUIndexFormat;
 };
 
 export class GeometryInternal {

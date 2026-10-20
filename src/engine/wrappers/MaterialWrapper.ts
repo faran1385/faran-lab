@@ -12,7 +12,7 @@ type MaterialArgs = {
 
 export class MaterialWrapper {
     readonly uuid: string;
-    readonly adaptor = new MaterialAdaptor();
+    readonly adaptor = new MaterialAdaptor(this);
 
     private components = new Map<string, MaterialComponentWrapper>();
     private sortedComponents: MaterialComponentWrapper[] = [];
@@ -52,16 +52,20 @@ export class MaterialWrapper {
     }
 
     setComponent(wrapper: MaterialComponentWrapper): void {
+        const replaced = this.components.get(wrapper.name);
+        if (replaced && replaced !== wrapper) this.adaptor.removeMaterialComponent(replaced);
         this.components.set(wrapper.name, wrapper);
         this.sortComponents();
         this.hashProvider.markChangeStamp()
-
+        this.adaptor.setMaterialComponent(wrapper);
     }
 
     removeComponent(name: string): void {
+        const removed = this.components.get(name);
         this.components.delete(name);
         this.sortComponents();
         this.hashProvider.markChangeStamp()
+        if (removed) this.adaptor.removeMaterialComponent(removed);
     }
 
     getAlphaMode(): Material["alphaMode"] {
@@ -72,6 +76,7 @@ export class MaterialWrapper {
         this.alphaMode = alphaMode;
         this.hashProvider.markPipelineSettingsHash()
         this.hashProvider.markChangeStamp()
+        this.adaptor.invalidateSettings();
     }
 
     getAlphaCutoff() {
@@ -82,6 +87,7 @@ export class MaterialWrapper {
         this.alphaCutoff = alphaCutoff;
         this.hashProvider.markFactorUpdate()
         this.hashProvider.markChangeStamp()
+        this.adaptor.invalidateFactors();
     }
 
     getDoubleSided(): Material["doubleSided"] {
@@ -92,6 +98,7 @@ export class MaterialWrapper {
         this.doubleSided = doubleSided;
         this.hashProvider.markPipelineSettingsHash()
         this.hashProvider.markChangeStamp()
+        this.adaptor.invalidateSettings();
     }
 
 

@@ -6,7 +6,7 @@ import {GeometryAdaptor} from "../adaptors/GeometryAdaptor.ts";
 
 export class GeometryWrapper {
     readonly uuid: string;
-    readonly adaptor = new GeometryAdaptor();
+    readonly adaptor = new GeometryAdaptor(this);
 
     private attributes: Map<string, AttributeWrapper> = new Map();
     private indices?: IndexAttributeWrapper;
@@ -25,22 +25,26 @@ export class GeometryWrapper {
         this.attributes.set(attribute.name, attribute);
         this.hashProvider.sortAttributes(this.attributes)
         this.hashProvider.markChangeStamp()
+        this.adaptor.invalidate();
     }
 
     removeAttribute(name: string) {
         this.attributes.delete(name)
         this.hashProvider.sortAttributes(this.attributes)
         this.hashProvider.markChangeStamp()
+        this.adaptor.invalidate();
     }
 
     setIndices(indices: IndexAttributeWrapper) {
         this.indices = indices;
         this.hashProvider.markChangeStamp()
+        this.adaptor.invalidate();
     }
 
     clearIndices() {
         this.indices = undefined;
         this.hashProvider.markChangeStamp()
+        this.adaptor.invalidate();
     }
 
     getIndices() {

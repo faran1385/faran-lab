@@ -36,6 +36,12 @@ export class BindgroupInteractor extends BindgroupRepresentation{
         })
     }
 
+    /** Removes the entry and its layout entry together, so the two never disagree. */
+    removeBinding(binding: number) {
+        this.removeEntry(binding);
+        this.layout.removeEntry(binding);
+    }
+
     setSampler(binding: number, resource: SamplerWrapper, visibility: GPUShaderStageFlags) {
         this.setEntry(binding, {
             binding,

@@ -1,15 +1,31 @@
-export class MaterialComponentAdaptor {
-    private connectedAdaptors = new Map<string, () => void>();
+import {Source} from "./Source.ts";
 
-    connectAdaptor(uuid: string, adaptorFn: () => void) {
-        this.connectedAdaptors.set(uuid, adaptorFn);
+/**
+ * "structure": a texture was set or removed, so the owning material's binding plan is stale.
+ * "factors": only the factor values changed, so the owning material only has to repack its factors buffer.
+ */
+export type ComponentChange = "structure" | "factors";
+
+/**
+ * A component can be shared by several materials, so it only broadcasts. Each material adaptor connects itself with
+ * its own uuid and decides what the change means for it.
+ */
+export class MaterialComponentAdaptor {
+    readonly changed = new Source<ComponentChange>();
+
+    connectAdaptor(uuid: string, adaptorFn: (change: ComponentChange) => void) {
+        this.changed.subscribe(uuid, adaptorFn);
     }
 
     disconnectAdaptor(uuid: string) {
-        this.connectedAdaptors.delete(uuid);
+        this.changed.unsubscribe(uuid);
     }
 
-    onChange() {
-        this.connectedAdaptors.forEach(fn => fn())
+    onStructureChange() {
+        this.changed.notify("structure");
+    }
+
+    onFactorsChange() {
+        this.changed.notify("factors");
     }
 }

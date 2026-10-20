@@ -29,7 +29,7 @@ export class PipelineRepresentationHashProvider extends RepresentationHashProvid
                 const buffers = stableKey(T.getVertexBuffers());
                 const targets = Array.from(T.getFragmentTargets().entries())
                     .sort(([a], [b]) => a - b)
-                    .map(([location, target]) => `${location}:${target.format}`)
+                    .map(([location, target]) => `${location}:${target.format}:${stableKey(target.blend)}`)
                     .join(",");
 
                 return [

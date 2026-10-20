@@ -5,7 +5,8 @@ import type {BindgroupInteractor} from "./BindgroupInteractor.ts";
 
 export type FrameTarget = {
     format: GPUTextureFormat,
-    location: number
+    location: number,
+    blend?: GPUBlendState
 }
 
 export class PipelineRepresentation {

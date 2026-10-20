@@ -32,7 +32,7 @@ export class MaterialComponentWrapper {
         this.hashProvider.markShapeHash();
         this.hashProvider.markShaderHash();
         this.hashProvider.markChangeStamp()
-        this.adaptor.onChange()
+        this.adaptor.onStructureChange()
     }
 
     removeTexture(): void {
@@ -40,7 +40,7 @@ export class MaterialComponentWrapper {
         this.hashProvider.markShapeHash();
         this.hashProvider.markShaderHash();
         this.hashProvider.markChangeStamp()
-        this.adaptor.onChange()
+        this.adaptor.onStructureChange()
     }
 
     getTexture() {
@@ -55,7 +55,7 @@ export class MaterialComponentWrapper {
         this.factors = factors;
         this.hashProvider.markFactorUpdate();
         this.hashProvider.markChangeStamp()
-        this.adaptor.onChange()
+        this.adaptor.onFactorsChange()
     }
 
 
