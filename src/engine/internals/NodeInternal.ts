@@ -2,14 +2,20 @@ import {v4 as uuidv4} from "uuid";
 import {NodeInternalHashProvider} from "../hashing/NodeInternalHashProvider.ts";
 import type {MeshInternal} from "./MeshInternal.ts";
 import {BindgroupInteractor} from "../Representations/BindgroupInteractor.ts";
-import {PipelineInteractor} from "../Representations/PipelineInteractor.ts";
+import {PipelineInteractor, type PipelineFrame} from "../Representations/PipelineInteractor.ts";
 
 export class NodeInternal {
     readonly bindgroupInteractor = new BindgroupInteractor();
-    readonly pipeline = new PipelineInteractor();
     readonly group: number;
     readonly uuid: string;
     private mesh: MeshInternal | null = null;
+    /**
+     * Keyed by primitive uuid. The value is an array because one primitive can need several pipelines (a double-sided
+     * blended material draws two cull variants) and, later, skinning can change the node's layout.
+     */
+    private pipelines = new Map<string, PipelineInteractor[]>();
+    private frame: PipelineFrame | null = null;
+    private sceneBindgroup: BindgroupInteractor | null = null;
     readonly hashProvider: NodeInternalHashProvider;
 
     constructor(group: number = 2) {
@@ -18,7 +24,7 @@ export class NodeInternal {
         this.hashProvider = new NodeInternalHashProvider({
             getGroup: () => this.group,
             getBindgroup: () => this.bindgroupInteractor,
-            getPipeline: () => this.pipeline,
+            getPipelines: () => this.pipelines,
             getMesh: () => this.mesh,
         });
     }
@@ -33,4 +39,40 @@ export class NodeInternal {
         this.hashProvider.markChanged();
     }
 
+    getPipelines() {
+        return this.pipelines;
+    }
+
+    setPipelines(primitiveUuid: string, pipelines: PipelineInteractor[]) {
+        this.pipelines.set(primitiveUuid, pipelines);
+        this.hashProvider.markChanged();
+    }
+
+    removePipelines(primitiveUuid: string) {
+        if (this.pipelines.delete(primitiveUuid)) this.hashProvider.markChanged();
+    }
+
+    getFrame() {
+        return this.frame;
+    }
+
+    /** Render-side input: target formats. Applied to every pipeline of this node, and to pipelines created later. */
+    setFrame(frame: PipelineFrame) {
+        if (this.frame && this.frame.colorFormat === frame.colorFormat && this.frame.depthFormat === frame.depthFormat) return;
+        this.frame = frame;
+        for (const list of this.pipelines.values()) for (const pipeline of list) pipeline.setFrame(frame);
+        this.hashProvider.markChanged();
+    }
+
+    getSceneBindgroup() {
+        return this.sceneBindgroup;
+    }
+
+    /** Render-side input: the group 0 bind group. Applied like the frame. */
+    setSceneBindgroup(bindgroup: BindgroupInteractor) {
+        if (this.sceneBindgroup === bindgroup) return;
+        this.sceneBindgroup = bindgroup;
+        for (const list of this.pipelines.values()) for (const pipeline of list) pipeline.setBindgroup(0, bindgroup);
+        this.hashProvider.markChanged();
+    }
 }

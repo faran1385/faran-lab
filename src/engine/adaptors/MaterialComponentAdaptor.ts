@@ -1,21 +1,31 @@
+import {Source} from "./Source.ts";
+
+/**
+ * "structure": a texture was set or removed, so the owning material's binding plan is stale.
+ * "factors": only the factor values changed, so the owning material only has to repack its factors buffer.
+ */
+export type ComponentChange = "structure" | "factors";
+
+/**
+ * A component can be shared by several materials, so it only broadcasts. Each material adaptor connects itself with
+ * its own uuid and decides what the change means for it.
+ */
 export class MaterialComponentAdaptor {
-    private connectedAdaptors = new Map<string, (name: string) => void>();
-    private name: string;
+    readonly changed = new Source<ComponentChange>();
 
-    constructor(name: string) {
-        this.name = name;
-    }
-
-
-    connectAdaptor(uuid: string, adaptorFn: (name: string) => void) {
-        this.connectedAdaptors.set(uuid, adaptorFn);
+    connectAdaptor(uuid: string, adaptorFn: (change: ComponentChange) => void) {
+        this.changed.subscribe(uuid, adaptorFn);
     }
 
     disconnectAdaptor(uuid: string) {
-        this.connectedAdaptors.delete(uuid);
+        this.changed.unsubscribe(uuid);
     }
 
-    onChange() {
-        this.connectedAdaptors.forEach(fn => fn(this.name))
+    onStructureChange() {
+        this.changed.notify("structure");
+    }
+
+    onFactorsChange() {
+        this.changed.notify("factors");
     }
 }

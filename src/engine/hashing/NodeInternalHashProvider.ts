@@ -6,25 +6,33 @@ import type { MeshInternal } from "../internals/MeshInternal.ts";
 type InputFunctions = {
     getGroup: () => number;
     getBindgroup: () => BindgroupInteractor;
-    getPipeline: () => PipelineInteractor;
+    getPipelines: () => Map<string, PipelineInteractor[]>;
     getMesh: () => MeshInternal | null;
 };
 
-/** Combines the node's own bindings/pipeline with its attached mesh and all descendant primitive state. */
+/** Combines the node's own bindings/pipelines with its attached mesh and all descendant primitive state. */
 export class NodeInternalHashProvider extends RepresentationHashProvider {
     constructor(T: InputFunctions) {
         super({
             buildKey: (hasher) => [
                 `group=${T.getGroup()}`,
                 `bindings=${T.getBindgroup().hashProvider.convertToHash(hasher)}`,
-                `pipeline=${T.getPipeline().hashProvider.convertToHash(hasher)}`,
+                // Content only: the primitive uuid keys the map but is not part of what the node looks like.
+                `pipelines=${Array.from(T.getPipelines().values())
+                    .map((list) => list.map((p) => p.hashProvider.convertToHash(hasher)).join(","))
+                    .join("|")}`,
                 `mesh=${T.getMesh()?.hashProvider.convertToHash(hasher) ?? "none"}`,
             ].join("#"),
-            getChildrenChangedAt: () => Math.max(
-                T.getBindgroup().hashProvider.getChangedAt(),
-                T.getPipeline().hashProvider.getChangedAt(),
-                T.getMesh()?.hashProvider.getChangedAt() ?? 0,
-            ),
+            getChildrenChangedAt: () => {
+                let at = Math.max(
+                    T.getBindgroup().hashProvider.getChangedAt(),
+                    T.getMesh()?.hashProvider.getChangedAt() ?? 0,
+                );
+                for (const list of T.getPipelines().values()) {
+                    for (const pipeline of list) at = Math.max(at, pipeline.hashProvider.getChangedAt());
+                }
+                return at;
+            },
         });
     }
 }

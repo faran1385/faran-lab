@@ -28,10 +28,23 @@ export class PrimitiveWrapper {
         this.vertexAssembler = vertexAssembler ?? new BasicVertexAssembler();
         this.fragmentAssembler = fragmentAssembler ?? new BasicFragmentAssembler();
 
+        this.adaptor.setAssemblers(this.vertexAssembler, this.fragmentAssembler);
         this.adaptor.setMaterial(mat);
         this.adaptor.setGeometry(geo);
         this.geometry = geo;
         this.material = mat;
+    }
+
+    setVertexAssembler(assembler: VertexAssemblerBase): void {
+        this.vertexAssembler = assembler;
+        this.adaptor.setVertexAssembler(assembler);
+        this.pipelineWrapper.markVertexShaderDirty()
+    }
+
+    setFragmentAssembler(assembler: FragmentAssemblerBase): void {
+        this.fragmentAssembler = assembler;
+        this.adaptor.setFragmentAssembler(assembler);
+        this.pipelineWrapper.markFragmentShaderDirty()
     }
 
 

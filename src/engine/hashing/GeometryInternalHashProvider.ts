@@ -23,6 +23,7 @@ export class GeometryInternalHashProvider extends RepresentationHashProvider {
                 const drawKey = !draw ? "none" : "indexBuffer" in draw
                     ? stableKey({
                         kind: "indexed",
+                        indexFormat: draw.indexFormat,
                         indexCount: draw.indexCount,
                         instanceCount: draw.instanceCount ?? 1,
                         firstIndex: draw.firstIndex ?? 0,
