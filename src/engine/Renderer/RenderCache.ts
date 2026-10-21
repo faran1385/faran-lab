@@ -1,21 +1,20 @@
-import type {NodeWrapper} from "../wrappers/NodeWrapper.ts";
-import type {PrimitiveWrapper} from "../wrappers/PrimitiveWrapper.ts";
+import type {NodeInternal} from "../internals/NodeInternal.ts";
 import type {RenderItem} from "./RenderItem.ts";
 import type {RenderContext} from "./RenderContext.ts";
+import {type HeldKeys, releaseHeld} from "./HeldKeys.ts";
 
 /**
  * Render items last built for one node.
  *
  * Items are cached per node (not per primitive) because a render item holds the node's bind group, and a mesh may
- * be shared by several nodes. Items also hold the camera's bind group, hence cameraUuid.
+ * be shared by several nodes.
  */
 export interface NodeRenderEntry {
     items: RenderItem[];
-    primitives: PrimitiveWrapper[];
-    /** Epoch at which items[i] was (re)built. items[i] is stale once primitives[i].getChangedAt() is newer. */
-    builtAt: number[];
-    /** Epoch at which the list of primitives itself was last read (mesh swap / primitive added). */
-    structureBuiltAt: number;
+    /** The resources the items hold; released when the entry is replaced or the node leaves the scene. */
+    held: HeldKeys;
+    /** Epoch at which the items were (re)built. They are stale once the node's change stamp is newer. */
+    builtAt: number;
 }
 
 /**
@@ -24,41 +23,44 @@ export interface NodeRenderEntry {
  * invalidate the items that use it.
  */
 export class RenderCache {
-    private readonly entries = new WeakMap<NodeWrapper, NodeRenderEntry>();
-    private currentNodeHolder = new Set<NodeWrapper>();
-    private previousNodeHolder = new Set<NodeWrapper>();
+    private readonly entries = new WeakMap<NodeInternal, NodeRenderEntry>();
+    private currentNodeHolder = new Set<NodeInternal>();
+    private previousNodeHolder = new Set<NodeInternal>();
 
     /**
      * The global epoch at the end of the previous frame. If it still equals getEpoch(), nothing that can affect
-     * a render item has changed anywhere, and every cached item can be reused without looking at any wrapper.
+     * a render item has changed anywhere, and every cached item can be reused without looking at any node.
      */
     lastFrameEpoch = -1;
     lastCameraUUID = ""
 
+    /** Forces the next frame to check every node, whatever the epoch says (the frame formats changed, say). */
+    invalidateAll() {
+        this.lastFrameEpoch = -1;
+    }
 
-    delete(node: NodeWrapper) { this.entries.delete(node); }
+    delete(node: NodeInternal) { this.entries.delete(node); }
 
     endFrame(ctx: RenderContext) {
         for (const node of this.previousNodeHolder) {          // used last frame, not touched this frame
             const entry = this.entries.get(node);
-            if (entry) ctx.hashes.releaseEntry(node, entry, ctx);
+            if (entry) releaseHeld(ctx.managers, entry.held);
             this.entries.delete(node);                         // so a re-added node rebuilds from scratch
         }
         this.previousNodeHolder.clear();
         [this.currentNodeHolder, this.previousNodeHolder] = [this.previousNodeHolder, this.currentNodeHolder];
     }
 
-
-    touch(node: NodeWrapper) {
+    touch(node: NodeInternal) {
         this.currentNodeHolder.add(node);
         this.previousNodeHolder.delete(node);
     }
 
-    get(node: NodeWrapper): NodeRenderEntry | undefined {
+    get(node: NodeInternal): NodeRenderEntry | undefined {
         return this.entries.get(node);
     }
 
-    set(node: NodeWrapper, entry: NodeRenderEntry): void {
+    set(node: NodeInternal, entry: NodeRenderEntry): void {
         this.entries.set(node, entry);
     }
 }

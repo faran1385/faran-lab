@@ -1,112 +1,80 @@
-import type {NodeWrapper} from "../wrappers/NodeWrapper.ts";
-import type {PrimitiveWrapper} from "../wrappers/PrimitiveWrapper.ts";
-import type {HashData} from "../hashing/utils/HashData.ts";
+import type {NodeInternal} from "../internals/NodeInternal.ts";
+import type {PrimitiveInternal} from "../internals/PrimitiveInternal.ts";
 import {getEpoch} from "../hashing/utils/epoch.ts";
 import type {RenderItem} from "./RenderItem.ts";
 import type {RenderContext} from "./RenderContext.ts";
-import {UpdateLayer} from "./UpdateLayer.ts";
-import {ShaderCodeLayer} from "./ShaderCodeLayer.ts";
 import {ResourceLayer} from "./ResourceLayer.ts";
 import {RenderItemAssembler} from "./RenderItemAssembler.ts";
-import type {NodeRenderEntry} from "./RenderCache.ts";
+import {acquireHeld, emptyHeldKeys, type HeldKeys, releaseHeld} from "./HeldKeys.ts";
 
-export type {RenderItem, DrawInfo, VertexBufferBinding, BindGroupBinding} from "./RenderItem.ts";
+export type {RenderItem, DrawCall, VertexBufferBinding, BindGroupBinding} from "./RenderItem.ts";
 export type {RenderContext, FrameInfo} from "./RenderContext.ts";
 
 /**
- * Orchestrates the render layers for one node. It owns no logic of its own besides deciding which primitives need
- * rebuilding; each step is a layer with a single responsibility:
+ * Orchestrates the render layers for one node. It works on internals only: the node adapter already turned the
+ * wrappers into pipeline representations before the frame, so there is nothing left to translate or generate here.
  *
- *   HashResolver       wrappers -> hashes            (hash layer, cached by change stamp)
- *   UpdateLayer        hashes/flags -> what to redo  (shader inputs, factor uploads)
- *   ShaderCodeLayer    run the assemblers
- *   ResourceLayer      ensure GPU resources          (only for hashes that were computed)
- *   RenderItemAssembler hashes -> RenderItem         (pure lookup)
+ *   ResourceLayer       representations -> GPU resources   (keys are the representations' content hashes)
+ *   RenderItemAssembler keys -> RenderItem                 (pure lookup)
  */
 export class RenderItemBuilder {
-    static build(node: NodeWrapper, ctx: RenderContext): RenderItem[] {
-        const {cache, hashes, managers} = ctx;
+    static build(node: NodeInternal, ctx: RenderContext): RenderItem[] {
+        const {cache, managers} = ctx;
 
-            // every frame, quiet or not: the presence sets must see every node that is still in the scene
+        // every frame, quiet or not: the presence sets must see every node that is still in the scene
         cache.touch(node);
 
         const entry = cache.get(node);
 
+        // The render side's own inputs. They stamp the node, so this comes before the staleness checks and a first
+        // build sees them.
+        if (!entry) {
+            node.setFrame(ctx.frame);
+            node.setSceneBindgroup(ctx.sceneBindgroup);
+        }
+
         // Quiet frame: nothing anywhere changed since the last frame
         if (entry && cache.lastFrameEpoch === getEpoch()) return entry.items;
 
-        // Structure path: first time we see the node, or its mesh / primitive list changed
-        if (!entry || node.hashProvider.getStructureChangedAt() > entry.structureBuiltAt) {
-            const primitives = node.getMesh()?.getAllPrimitives() ?? [];
+        // One comparison tells whether anything this node draws with changed (mesh, primitives, materials, geometry,
+        // shader code, pipelines): the node's stamp covers all of it.
+        if (entry && node.hashProvider.getChangedAt() <= entry.builtAt) return entry.items;
 
-            ResourceLayer.node(node, ctx);
-            const items: RenderItem[] = new Array(primitives.length);
-            for (let i = 0; i < primitives.length; i++) {
-                items[i] = RenderItemBuilder.buildPrimitive(node, primitives[i], ctx);
-            }
-
-            // after building: building itself may stamp wrappers (shader dirty marks)
-            const builtAt = getEpoch();
-            const newEntry: NodeRenderEntry = {
-                items,
-                primitives,
-                builtAt: primitives.map(() => builtAt),
-                structureBuiltAt: builtAt,
-            };
-
-            hashes.acquireEntry(node, newEntry, ctx);              // acquire the new first...
-            if (entry) hashes.releaseEntry(node, entry, ctx);      // ...then release the old, shared keys net out
-            cache.set(node, newEntry);
-            return items;
+        const held = emptyHeldKeys();
+        const items: RenderItem[] = [];
+        for (const primitive of node.getMesh()?.getAllPrimitives() ?? []) {
+            const item = RenderItemBuilder.buildPrimitive(node, primitive, ctx, held);
+            if (item) items.push(item);
         }
 
-        // Incremental path: rebuild only primitives whose own stamp is newer than when their item was built.
-        // In place, no new entry: unchanged items keep their counts untouched.
-        for (let i = 0; i < entry.primitives.length; i++) {
-            if (entry.primitives[i].getChangedAt() <= entry.builtAt[i]) continue;
+        // acquire the new first, then release the old: keys the two share net out and never touch zero
+        acquireHeld(managers, held);
+        if (entry) releaseHeld(managers, entry.held);
 
-            const next = RenderItemBuilder.buildPrimitive(node, entry.primitives[i], ctx);
-            hashes.swapData(managers, next.hashData, entry.items[i].hashData);   // acquire new, release old, per key
-            entry.items[i] = next;
-            entry.builtAt[i] = getEpoch();                                       // after building
-        }
-        return entry.items;
+        // after building: building itself may stamp the node
+        cache.set(node, {items, held, builtAt: getEpoch()});
+        return items;
     }
-    // ---- primitive-level ----
 
-    private static buildPrimitive(node: NodeWrapper, p: PrimitiveWrapper, ctx: RenderContext): RenderItem {
-        const material = p.getMaterial();
-        const geometry = p.getGeometry();
-        const {hashes, producer} = ctx;
+    private static buildPrimitive(node: NodeInternal, primitive: PrimitiveInternal, ctx: RenderContext, held: HeldKeys): RenderItem | null {
+        const pipelines = node.getPipelines().get(primitive.uuid);
+        const geometry = primitive.getGeo();
+        if (!pipelines || pipelines.length === 0 || !geometry || !geometry.getDrawInfo()) return null;
 
-        const materialHashes = hashes.resolveMaterial(material, (m) => producer.getBindingPlan(m));
-        const geometryHashes = hashes.resolveGeometry(geometry);
+        // All variants of one primitive share their bind groups: take them from the first.
+        const bindgroupKeys = Array.from(pipelines[0].bindgroups.entries())
+            .sort(([a], [b]) => a - b)
+            .map(([slot, bindgroup]) => ({slot, key: ResourceLayer.bindgroup(bindgroup, ctx, held)}));
 
-        UpdateLayer.syncShaderInputs(p, materialHashes.hashes, geometryHashes.hashes);
-        ShaderCodeLayer.generate(p, ctx);                       // return value no longer needed
+        ResourceLayer.geometry(geometry, ctx, held);
 
-        const pipelineHashes = hashes.resolvePipeline(p.getPipeline(), material, materialHashes.hashes, geometryHashes.hashes);
-        const data: HashData = {
-            material: materialHashes.hashes,
-            geometry: geometryHashes.hashes,
-            pipeline: pipelineHashes.hashes,
-        };
-
-        // Resources: always ensure. computed:false only means "the hashes didn't change",
-        // not "the resources still exist". They may have been destroyed after a release.
-        // Order matters: pipeline needs the shader modules and layouts before it.
-        ResourceLayer.geometry(geometry, data.geometry, ctx);
-        ResourceLayer.material(material, data.material, ctx);
-        ResourceLayer.shaders(p, data.pipeline, ctx);
-        ResourceLayer.pipeline(p, data, ctx);
-
-        // Data uploads: only when the hashes were recomputed (a freshly created resource already has current data)
-        if (geometryHashes.computed) UpdateLayer.updateAttributeBuffers(geometry, geometryHashes.hashes, ctx);
-        if (materialHashes.computed) {
-            UpdateLayer.uploadFactors(material, data.material, ctx);
-            UpdateLayer.uploadTextures(material, ctx);
+        const pipelineKeys: string[] = [];
+        for (const pipeline of pipelines) {
+            const key = ResourceLayer.pipeline(pipeline, ctx, held);
+            if (key === null) return null;       // not complete yet: not drawn until it is
+            pipelineKeys.push(key);
         }
 
-        return RenderItemAssembler.assemble(node, p, data, ctx);
+        return RenderItemAssembler.assemble(pipelineKeys, bindgroupKeys, geometry, ctx);
     }
 }

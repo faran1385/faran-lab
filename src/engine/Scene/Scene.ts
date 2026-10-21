@@ -1,12 +1,19 @@
 import {NodeWrapper} from "../wrappers/NodeWrapper.ts";
+import {SceneAdaptor} from "../adaptors/SceneAdaptor.ts";
 import {v4 as uuidv4} from "uuid";
 
+/**
+ * The friendly scene API. The renderer does not take this: it takes `scene.adaptor.internal` (a SceneInternal, the
+ * flat list of nodes to draw), exactly like every other wrapper hands its internal to the engine.
+ */
 export class Scene {
     private readonly worldRoot = new NodeWrapper();
     readonly uuid: string;
+    readonly adaptor: SceneAdaptor;
 
     constructor() {
         this.uuid = uuidv4();
+        this.adaptor = new SceneAdaptor(this.worldRoot.adaptor);
     }
 
     addNode(node: NodeWrapper): void {
@@ -31,22 +38,6 @@ export class Scene {
 
         for (const root of this.worldRoot.getChildren()) {
             walk(root);
-        }
-    }
-
-    private walkWorldMatrices(node: NodeWrapper, parentMatrix: Float32Array | null, uploadToGPUBuffer: (hash: string, data: GPUAllowSharedBufferSource, offset: number) => void) {
-        if (node.hashProvider.transformNeedsUpdate()) {
-            node.buildWorldMatrix(parentMatrix, uploadToGPUBuffer);
-            return; // invariant: descendants are already dirty, buildWorldMatrix handles them
-        }
-        for (const child of node.getChildren()) {
-            this.walkWorldMatrices(child, new Float32Array(node.getWorldMatrix()), uploadToGPUBuffer);
-        }
-    };
-
-    updateWorldMatrices(uploadToGPUBuffer: (hash: string, data: GPUAllowSharedBufferSource, offset: number) => void): void {
-        for (const root of this.worldRoot.getChildren()) {
-            this.walkWorldMatrices(root, null, uploadToGPUBuffer);
         }
     }
 }

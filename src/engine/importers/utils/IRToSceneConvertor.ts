@@ -182,7 +182,7 @@ export class IRToSceneConvertor {
     // -- node graph ------------------------------------------------------
 
     private static createNodeWrapper(node: Node, meshes: MeshWrapper[]): NodeWrapper {
-        const wrapper = new NodeWrapper(node.translation, node.rotation, node.scale, node.name);
+        const wrapper = new NodeWrapper(undefined, node.translation, node.rotation, node.scale, node.name);
 
         if (node.mesh !== undefined) {
             wrapper.setMesh(meshes[node.mesh]);
@@ -196,7 +196,7 @@ export class IRToSceneConvertor {
     }
 
     private static createSceneRoot(roots: Node[], meshes: MeshWrapper[]): NodeWrapper {
-        const root = new NodeWrapper(undefined, undefined, undefined, "RendererSceneRoot");
+        const root = new NodeWrapper(undefined, undefined, undefined, undefined, "RendererSceneRoot");
 
         for (const node of roots) {
             root.addChild(this.createNodeWrapper(node, meshes));

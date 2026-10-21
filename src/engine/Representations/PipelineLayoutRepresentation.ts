@@ -12,6 +12,10 @@ export class PipelineLayoutRepresentation {
         this.hashProvider = new PipelineLayoutRepresentationHashProvider({getLayouts: () => this.layouts});
     }
 
+    getLayouts(): ReadonlyMap<number, BindgroupLayoutRepresentation> {
+        return this.layouts;
+    }
+
     clearLayouts(): void {
         this.layouts.clear();
         this.hashProvider.markChanged();

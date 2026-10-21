@@ -23,9 +23,10 @@ export class PrimitiveInternalHashProvider extends RepresentationHashProvider {
                 `vertex=${stageKey(T.getVertex(), hasher)}`,
                 `fragment=${stageKey(T.getFragment(), hasher)}`,
             ].join("#"),
+            // material/geometry are assigned right after construction; a primitive without them yet is just "unchanged"
             getChildrenChangedAt: () => Math.max(
-                T.getMat().hashProvider.getChangedAt(),
-                T.getGeo().hashProvider.getChangedAt(),
+                T.getMat()?.hashProvider.getChangedAt() ?? 0,
+                T.getGeo()?.hashProvider.getChangedAt() ?? 0,
                 T.getVertex().hashProvider.getChangedAt(),
                 T.getFragment().hashProvider.getChangedAt(),
             ),

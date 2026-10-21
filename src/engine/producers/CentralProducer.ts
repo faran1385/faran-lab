@@ -1,89 +1,24 @@
-import {BufferInternal} from "../internals/BufferInternal.ts";
-import {
-    type BufferDescriptor,
-    BufferProducer,
-    MaterialFactorBufferProducer,
-    NodeMatrixBufferProducer
-} from "./BufferProducer.ts";
-import {BindGroupLayoutProducer, type MaterialBindingPlan} from "./BindGroupLayoutProducer.ts";
+import type {BufferInternal} from "../internals/BufferInternal.ts";
+import {type BufferDescriptor, BufferProducer} from "./BufferProducer.ts";
+import {BindGroupLayoutProducer} from "./BindGroupLayoutProducer.ts";
 import type {ImageWrapper} from "../wrappers/ImageWrapper.ts";
 import {type TextureDescriptor, TextureProducer, type TextureUpdateDescriptor} from "./TextureDescriptorProducer.ts";
 import type {SamplerWrapper} from "../wrappers/SamplerWrapper.ts";
 import {SamplerProducer} from "./SamplerProducer.ts";
-import type {ShaderModuleWrapper} from "../wrappers/ShaderModuleWrapper.ts";
 import {ShaderModuleProducer} from "./ShaderProducer.ts";
-import type {MaterialWrapper} from "../wrappers/MaterialWrapper.ts";
-import {
-    type BindGroupProduceArgs,
-    BindGroupProducer,
-    type NodeBindgroupProduceArgs,
-    NodeBindGroupProducer, type SceneBindgroupProduceArgs, SceneBindGroupProducer
-} from "./BindGroupProducer.ts";
-import {
-    type MaterialFactorsPlan,
-    type GeometryAttributePlan,
-    planGeometryAttributes,
-    planMaterialBindings,
-    planMaterialFactors
-} from "./utils.ts";
+import {type BindGroupProduceArgs, BindGroupProducer} from "./BindGroupProducer.ts";
 import {type PipelineLayoutProduceArgs, PipelineLayoutProducer} from "./PipelineLayoutProducer.ts";
-import type {GeometryWrapper} from "../wrappers/GeometryWrapper.ts";
 import {type PipelineProduceArgs, PipelineProducer} from "./PipelineProducer.ts";
-import {
-    type FragmentShaderDescriptor,
-    FragmentShaderProducer,
-    type VertexShaderDescriptor, VertexShaderProducer
-} from "./AssemblerProducers.ts";
-import type {NodeWrapper} from "../wrappers/NodeWrapper.ts";
-import type {Camera} from "../Camera/Camera.ts";
+import type {BindgroupLayoutRepresentation} from "../Representations/BindgroupLayoutRepresentation.ts";
 
+/**
+ * One entry point for every descriptor the managers need. Stateless: the plans that used to be cached here (binding,
+ * factors, attributes) are computed by the adapters, before the frame, and live on the internals.
+ */
 export class CentralProducer {
-    private materialBindingPlans = new Map<string, MaterialBindingPlan>();
-    private materialFactorPlans = new Map<string, MaterialFactorsPlan>();
-    private geometryAttributePlans = new Map<string, GeometryAttributePlan>();
-
-    produceBuffer(wrapper: BufferInternal): BufferDescriptor {
-        return BufferProducer.produce(wrapper);
+    produceBuffer(buffer: BufferInternal): BufferDescriptor {
+        return BufferProducer.produce(buffer);
     }
-
-
-    produceFragmentShader(
-        {material}: {
-            material: MaterialWrapper;
-            vertexShader: ShaderModuleWrapper;
-            geometry: GeometryWrapper
-        },
-    ): FragmentShaderDescriptor {
-        return FragmentShaderProducer.produce(
-            () => this.getBindingPlan(material),
-            () => this.getFactorPlan(material),
-        );
-    }
-
-    produceBufferFromMatFactors(mat: MaterialWrapper) {
-        return this.produceBuffer(MaterialFactorBufferProducer.produce(this.getFactorPlan(mat)))
-    }
-
-    produceBufferFromNodeMatrix(node: NodeWrapper) {
-        return this.produceBuffer(NodeMatrixBufferProducer.produce(node))
-    }
-
-    produceCameraBuffer(camera: Camera) {
-        return this.produceBuffer(new BufferInternal(new Float32Array([...camera.getViewMatrix(), ...camera.getProjectionMatrix()]).buffer, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST))
-    }
-
-    produceSceneBindgroup(args: SceneBindgroupProduceArgs) {
-        return SceneBindGroupProducer.produce(args)
-    }
-
-    produceBindgroupFromNode(args: NodeBindgroupProduceArgs) {
-        return NodeBindGroupProducer.produce(args)
-    }
-
-    produceVertexShader(T: { geometry: GeometryWrapper, material: MaterialWrapper }): VertexShaderDescriptor {
-        return VertexShaderProducer.produce(() => this.getBindingPlan(T.material), () => this.getAttributePlan(T.geometry));
-    }
-
 
     produceTexture(image: ImageWrapper): TextureDescriptor {
         return TextureProducer.produce(image);
@@ -93,20 +28,20 @@ export class CentralProducer {
         return TextureProducer.produceUpdate(image);
     }
 
-    produceSampler(wrapper: SamplerWrapper): GPUSamplerDescriptor {
-        return SamplerProducer.produce(wrapper);
+    produceSampler(sampler: SamplerWrapper): GPUSamplerDescriptor {
+        return SamplerProducer.produce(sampler);
     }
 
-    produceShaderModule(wrapper: ShaderModuleWrapper): GPUShaderModuleDescriptor {
-        return ShaderModuleProducer.produce(wrapper);
+    produceShaderModule(code: string, label: string): GPUShaderModuleDescriptor {
+        return ShaderModuleProducer.produce(code, label);
     }
 
-    produceBindGroupLayout(material: MaterialWrapper): GPUBindGroupLayoutDescriptor {
-        return BindGroupLayoutProducer.produce(material, () => this.getBindingPlan(material));
+    produceBindGroupLayout(layout: BindgroupLayoutRepresentation, label: string): GPUBindGroupLayoutDescriptor {
+        return BindGroupLayoutProducer.produce(layout, label);
     }
 
     produceBindGroup(args: BindGroupProduceArgs): GPUBindGroupDescriptor {
-        return BindGroupProducer.produce(args, () => this.getBindingPlan(args.material));
+        return BindGroupProducer.produce(args);
     }
 
     producePipelineLayout(args: PipelineLayoutProduceArgs): GPUPipelineLayoutDescriptor {
@@ -114,39 +49,6 @@ export class CentralProducer {
     }
 
     producePipeline(args: PipelineProduceArgs): GPURenderPipelineDescriptor {
-        return PipelineProducer.produce(args, () => this.getAttributePlan(args.geometry));
-    }
-
-    clear(): void {
-        this.materialBindingPlans.clear();
-        this.geometryAttributePlans.clear()
-        this.materialFactorPlans.clear()
-    }
-
-    getBindingPlan(material: MaterialWrapper): MaterialBindingPlan {
-        let plan = this.materialBindingPlans.get(material.uuid);
-        if (!plan) {
-            plan = planMaterialBindings(material.getSortedComponents());
-            this.materialBindingPlans.set(material.uuid, plan);
-        }
-        return plan;
-    }
-
-    getAttributePlan(geometry: GeometryWrapper): GeometryAttributePlan {
-        let plan = this.geometryAttributePlans.get(geometry.uuid);
-        if (!plan) {
-            plan = planGeometryAttributes(geometry);
-            this.geometryAttributePlans.set(geometry.uuid, plan);
-        }
-        return plan;
-    }
-
-    getFactorPlan(material: MaterialWrapper) {
-        let plan = this.materialFactorPlans.get(material.uuid);
-        if (!plan) {
-            plan = planMaterialFactors(material);
-            this.materialFactorPlans.set(material.uuid, plan);
-        }
-        return plan;
+        return PipelineProducer.produce(args);
     }
 }

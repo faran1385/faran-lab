@@ -1,22 +1,27 @@
-import {BindGroupLayoutManager, GLOBAL_LAYOUT_KEY, NODE_LAYOUT_KEY} from "../managers/BindGroupLayoutManager.ts";
-import type {MaterialHashes} from "../hashing/utils/HashData.ts";
-import type {MaterialWrapper} from "../wrappers/MaterialWrapper.ts";
+import type {PipelineLayoutRepresentation} from "../Representations/PipelineLayoutRepresentation.ts";
+import type {Hasher} from "../hashing/utils/Hasher.ts";
+import type {CentralManager} from "../managers/CentralManager.ts";
 
 export interface PipelineLayoutProduceArgs {
-    material: MaterialWrapper;
-    hashes: MaterialHashes;
-    layouts: BindGroupLayoutManager;
+    layout: PipelineLayoutRepresentation;
+    hasher: Hasher;
+    managers: CentralManager;
+    label: string;
 }
 
 export class PipelineLayoutProducer {
-    static produce({material, hashes, layouts}: PipelineLayoutProduceArgs): GPUPipelineLayoutDescriptor {
-        return {
-            label: material.uuid,
-            bindGroupLayouts: [
-                layouts.getRaw(GLOBAL_LAYOUT_KEY),                              // group 0: scene
-                layouts.getRaw(hashes.layout),                                  // group 1: material
-                layouts.getRaw(NODE_LAYOUT_KEY),                                // group 2: node
-            ],
-        };
+    /** Groups must be contiguous from 0: a pipeline layout is an array indexed by group. */
+    static produce({layout, hasher, managers, label}: PipelineLayoutProduceArgs): GPUPipelineLayoutDescriptor {
+        const layouts = layout.getLayouts();
+        const groupCount = layouts.size === 0 ? 0 : Math.max(...layouts.keys()) + 1;
+
+        const bindGroupLayouts: GPUBindGroupLayout[] = [];
+        for (let group = 0; group < groupCount; group++) {
+            const groupLayout = layouts.get(group);
+            if (!groupLayout) throw new Error(`PipelineLayoutProducer: no bind group layout for group ${group} (groups must be contiguous from 0)`);
+            bindGroupLayouts.push(managers.bindgroupLayoutManager.getRaw(groupLayout.hashProvider.convertToHash(hasher)));
+        }
+
+        return {label, bindGroupLayouts};
     }
 }
