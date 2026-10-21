@@ -45,8 +45,9 @@ function factorsShape(plan: MaterialFactorsPlan): string {
 }
 
 /**
- * Translates a MaterialWrapper into its MaterialInternal: the binding plan, the factors buffer, the bind group
- * entries/layout and the pipeline settings. The renderer only ever sees the internal.
+ * Translates a MaterialWrapper into its MaterialInternal: the binding plan, factors buffer, and bind-group
+ * entries/layout. Pipeline state is kept on this adapter and pushed to dependent node adapters through the pre-frame
+ * queue; it is deliberately not part of MaterialInternal.
  *
  * Nothing is computed when a setter runs. Setters call `invalidate*()`, which sets a flag and schedules `task` on the
  * pre-frame queue; `ensure()` then rebuilds once from the final state, so a half-built material (a texture set before

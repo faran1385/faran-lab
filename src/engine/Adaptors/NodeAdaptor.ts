@@ -1,7 +1,6 @@
 import {NodeInternal} from "../internals/NodeInternal.ts";
 import {BufferInternal} from "../internals/BufferInternal.ts";
 import {PipelineInteractor} from "../Representations/PipelineInteractor.ts";
-import type {BindgroupInteractor} from "../Representations/BindgroupInteractor.ts";
 import {mat4} from "../../packages/math/matrix/mat4.ts";
 import {schedulePreFrame} from "./PreFrameQueue.ts";
 import {Source} from "./Source.ts";
@@ -195,10 +194,12 @@ export class NodeAdaptor {
         pipeline: PipelineInteractor,
         source: "scene" | "node",
         group: number,
-        binding: BindgroupInteractor,
     ): void {
-        // Keep the semantic source explicit at the call site rather than inferring it from the group number.
-        if (source !== "scene" && source !== "node") return;
+        // Resolve the semantic source here; callers state what the binding represents, not which object to guess.
+        const binding = source === "scene"
+            ? this.internal.getSceneBindgroup()
+            : this.internal.bindgroupInteractor;
+        if (!binding) return;
         pipeline.setBindgroup(group, binding);
     }
 
@@ -233,9 +234,9 @@ export class NodeAdaptor {
                 pipeline.setPrimitiveState({topology: "triangle-list", cullMode});
                 pipeline.setMaterialState({blend: settings.blend, depthWriteEnabled: settings.depthWriteEnabled});
                 if (frame) pipeline.setFrame(frame);
-                if (scene) this.setBindingGroup(pipeline, "scene", 0, scene);
+                if (scene) this.setBindingGroup(pipeline, "scene", 0);
                 pipeline.setBindgroup(material.getGroup(), material.getBindgroupInteractor());
-                this.setBindingGroup(pipeline, "node", this.internal.group, this.internal.bindgroupInteractor);
+                this.setBindingGroup(pipeline, "node", this.internal.group);
             });
 
             this.internal.setPipelines(primitive.uuid, pipelines);
