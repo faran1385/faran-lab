@@ -1,4 +1,4 @@
-import {MaterialInternal, type MaterialPipelineSettings} from "../internals/MaterialInternal.ts";
+import {MaterialInternal} from "../internals/MaterialInternal.ts";
 import {BufferInternal} from "../internals/BufferInternal.ts";
 import {
     type MaterialFactorsPlan,
@@ -12,6 +12,13 @@ import {Source} from "./Source.ts";
 import type {ComponentChange} from "./MaterialComponentAdaptor.ts";
 import type {MaterialWrapper} from "../wrappers/MaterialWrapper.ts";
 import type {MaterialComponentWrapper} from "../wrappers/MaterialComponentWrapper.ts";
+
+export interface MaterialPipelineSettings {
+    /** One pipeline per entry, in draw order. */
+    cullModes: GPUCullMode[];
+    blend?: GPUBlendState;
+    depthWriteEnabled: boolean;
+}
 
 const BLEND: GPUBlendState = {
     color: {srcFactor: "src-alpha", dstFactor: "one-minus-src-alpha", operation: "add"},
@@ -50,11 +57,10 @@ function factorsShape(plan: MaterialFactorsPlan): string {
 export class MaterialAdaptor {
     readonly internal: MaterialInternal;
 
-    /**
-     * Fires when something that dependents (primitives) derive from changes: the binding plan or the pipeline
-     * settings. Factor values alone never fire it.
-     */
+    /** Binding-plan changes invalidate generated shader code. Factor values alone never fire this. */
     readonly changed = new Source<void>();
+    /** Pipeline-state changes are applied by node adapters to existing pipeline representations in the frame queue. */
+    readonly pipelineChanged = new Source<void>();
 
     private readonly owner: MaterialWrapper;
     /** One stable function reference, so the pre-frame queue dedupes. */
@@ -76,6 +82,11 @@ export class MaterialAdaptor {
     private factorsBuffer: BufferInternal | null = null;
     private boundBindings = new Set<number>();
     private settingsKey = "";
+    private pipelineSettings: MaterialPipelineSettings = {
+        cullModes: ["back"],
+        blend: undefined,
+        depthWriteEnabled: true,
+    };
 
     constructor(owner: MaterialWrapper) {
         this.owner = owner;
@@ -113,13 +124,15 @@ export class MaterialAdaptor {
         schedulePreFrame(this.task);
     }
 
-    /** alphaMode or doubleSided changed: pipeline settings are stale, the bind group is not. */
+    /** alphaMode or doubleSided changed: schedule a pipeline-only update, never a shader/bind-group rebuild. */
     invalidateSettings() {
-        if (!this.settingsDirty) {
-            this.settingsDirty = true;
-            this.changed.notify();
-        }
+        this.settingsDirty = true;
         schedulePreFrame(this.task);
+    }
+
+    /** Pipeline state is adapter output; it is deliberately absent from MaterialInternal. */
+    getPipelineSettings(): MaterialPipelineSettings {
+        return this.pipelineSettings;
     }
 
     // -- what dependents read after ensure() ------------------------------
@@ -226,6 +239,7 @@ export class MaterialAdaptor {
         const key = stableKey(settings);
         if (key === this.settingsKey) return;
         this.settingsKey = key;
-        this.internal.setPipelineSettings(settings);
+        this.pipelineSettings = settings;
+        this.pipelineChanged.notify();
     }
 }

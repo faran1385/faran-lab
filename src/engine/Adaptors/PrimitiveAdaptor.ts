@@ -33,6 +33,8 @@ export class PrimitiveAdaptor {
 
     private readonly task = () => this.ensure();
     private readonly onDependencyChange = () => this.invalidate();
+    /** Pipeline-only material changes must reach nodes but must not trigger shader assembly. */
+    private readonly onPipelineChange = () => this.changed.notify();
     private dirty = true;
     private codeDirty = true;
     private seenPlanVersion = -1;
@@ -44,8 +46,10 @@ export class PrimitiveAdaptor {
 
     setMaterial(material: MaterialWrapper): void {
         this.material?.changed.unsubscribe(this.internal.uuid);
+        this.material?.pipelineChanged.unsubscribe(this.internal.uuid);
         this.material = material.adaptor;
         this.material.changed.subscribe(this.internal.uuid, this.onDependencyChange);
+        this.material.pipelineChanged.subscribe(this.internal.uuid, this.onPipelineChange);
         this.internal.setMat(this.material.internal);
         this.codeDirty = true;
         this.invalidate();
@@ -58,6 +62,10 @@ export class PrimitiveAdaptor {
         this.internal.setGeo(this.geometry.internal);
         this.codeDirty = true;
         this.invalidate();
+    }
+
+    getPipelineSettings() {
+        return this.material?.getPipelineSettings();
     }
 
     setAssemblers(vertex: VertexAssemblerBase, fragment: FragmentAssemblerBase): void {

@@ -1,6 +1,7 @@
 import {NodeInternal} from "../internals/NodeInternal.ts";
 import {BufferInternal} from "../internals/BufferInternal.ts";
 import {PipelineInteractor} from "../Representations/PipelineInteractor.ts";
+import type {BindgroupInteractor} from "../Representations/BindgroupInteractor.ts";
 import {mat4} from "../../packages/math/matrix/mat4.ts";
 import {schedulePreFrame} from "./PreFrameQueue.ts";
 import {Source} from "./Source.ts";
@@ -186,6 +187,21 @@ export class NodeAdaptor {
         }
     }
 
+    /**
+     * Applies an explicitly named scene/node binding to a pipeline representation.
+     * Material bindings are primitive-specific and are supplied separately.
+     */
+    setBindingGroup(
+        pipeline: PipelineInteractor,
+        source: "scene" | "node",
+        group: number,
+        binding: BindgroupInteractor,
+    ): void {
+        // Keep the semantic source explicit at the call site rather than inferring it from the group number.
+        if (source !== "scene" && source !== "node") return;
+        pipeline.setBindgroup(group, binding);
+    }
+
     private rebuildPipelines(primitives: readonly PrimitiveAdaptor[]): void {
         const frame = this.internal.getFrame();
         const scene = this.internal.getSceneBindgroup();
@@ -198,7 +214,8 @@ export class NodeAdaptor {
             if (!material || !geometry) continue;
             live.add(primitive.uuid);
 
-            const settings = material.getPipelineSettings();
+            const settings = adaptor.getPipelineSettings();
+            if (!settings) continue;
             const buffers = Array.from(geometry.getVertexAttributes().entries())
                 .sort(([a], [b]) => a - b)
                 .map(([, attribute]) => attribute.getLayout());
@@ -216,9 +233,9 @@ export class NodeAdaptor {
                 pipeline.setPrimitiveState({topology: "triangle-list", cullMode});
                 pipeline.setMaterialState({blend: settings.blend, depthWriteEnabled: settings.depthWriteEnabled});
                 if (frame) pipeline.setFrame(frame);
-                if (scene) pipeline.setBindgroup(0, scene);
-                pipeline.setBindgroup(1, material.getBindgroupInteractor());
-                pipeline.setBindgroup(2, this.internal.bindgroupInteractor);
+                if (scene) this.setBindingGroup(pipeline, "scene", 0, scene);
+                pipeline.setBindgroup(material.getGroup(), material.getBindgroupInteractor());
+                this.setBindingGroup(pipeline, "node", this.internal.group, this.internal.bindgroupInteractor);
             });
 
             this.internal.setPipelines(primitive.uuid, pipelines);
