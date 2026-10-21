@@ -23,8 +23,10 @@ const FRAGMENT_ENTRY_POINT = "main";
 export class PrimitiveAdaptor {
     readonly internal: PrimitiveInternal;
 
-    /** Fires when this primitive (or its material/geometry) is stale. Nodes drawing it rebuild their pipelines. */
+    /** Shader, geometry, or structure changes require a full pipeline representation sync. */
     readonly changed = new Source<void>();
+    /** Material pipeline-state changes can update only this primitive's existing pipeline representations. */
+    readonly pipelineChanged = new Source<void>();
 
     private material: MaterialAdaptor | null = null;
     private geometry: GeometryAdaptor | null = null;
@@ -34,7 +36,7 @@ export class PrimitiveAdaptor {
     private readonly task = () => this.ensure();
     private readonly onDependencyChange = () => this.invalidate();
     /** Pipeline-only material changes must reach nodes but must not trigger shader assembly. */
-    private readonly onPipelineChange = () => this.changed.notify();
+    private readonly onPipelineChange = () => this.pipelineChanged.notify();
     private dirty = true;
     private codeDirty = true;
     private seenPlanVersion = -1;
