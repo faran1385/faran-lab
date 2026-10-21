@@ -29,7 +29,6 @@ export class RenderItemBuilder {
         // The render side's own inputs. They stamp the node, so this comes before the staleness checks and a first
         // build sees them.
         if (!entry) {
-            console.log(entry)
             node.setFrame(ctx.frame);
             node.setSceneBindgroup(ctx.sceneBindgroup);
         }
@@ -47,7 +46,6 @@ export class RenderItemBuilder {
             const item = RenderItemBuilder.buildPrimitive(node, primitive, ctx, held);
             if (item) items.push(item);
         }
-
         // acquire the new first, then release the old: keys the two share net out and never touch zero
         acquireHeld(managers, held);
         if (entry) releaseHeld(managers, entry.held);

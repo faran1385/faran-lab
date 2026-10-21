@@ -1,6 +1,6 @@
 import type {PrimitiveWrapper} from "./PrimitiveWrapper.ts";
 import {v4 as uuidv4} from "uuid";
-import {MeshAdaptor} from "../adaptors/MeshAdaptor.ts";
+import {MeshAdaptor} from "../Adaptors/MeshAdaptor.ts";
 
 export class MeshWrapper {
     readonly uuid: string;

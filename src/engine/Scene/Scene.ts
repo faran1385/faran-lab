@@ -1,5 +1,5 @@
 import {NodeWrapper} from "../wrappers/NodeWrapper.ts";
-import {SceneAdaptor} from "../adaptors/SceneAdaptor.ts";
+import {SceneAdaptor} from "../Adaptors/SceneAdaptor.ts";
 import {v4 as uuidv4} from "uuid";
 
 /**

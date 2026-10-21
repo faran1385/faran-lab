@@ -58,7 +58,7 @@ export class NodeInternal {
 
     /** Render-side input: target formats. Applied to every pipeline of this node, and to pipelines created later. */
     setFrame(frame: PipelineFrame) {
-        if (this.frame && this.frame.colorFormat === frame.colorFormat && this.frame.depthFormat === frame.depthFormat) return;
+        if (this.frame?.colorFormat === frame.colorFormat && this.frame.depthFormat === frame.depthFormat) return;
         this.frame = frame;
         for (const list of this.pipelines.values()) for (const pipeline of list) pipeline.setFrame(frame);
         this.hashProvider.markChanged();

@@ -1,7 +1,7 @@
 import {v4 as uuidv4} from "uuid";
 import type {AttributeWrapper} from "./AttributeWrapper.ts";
 import type {IndexAttributeWrapper} from "./IndexWrapper.ts";
-import {GeometryAdaptor} from "../adaptors/GeometryAdaptor.ts";
+import {GeometryAdaptor} from "../Adaptors/GeometryAdaptor.ts";
 
 export class GeometryWrapper {
     readonly uuid: string;

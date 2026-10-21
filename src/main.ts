@@ -7,14 +7,14 @@ import {SamplerWrapper} from "./engine/wrappers/SamplerWrapper.ts";
 import {NodeWrapper} from "./engine/wrappers/NodeWrapper.ts";
 import {GLBLoader} from "./engine/loaders/GLBLoader.ts";
 import {OrbitControls} from "./engine/Controls/OrbitControls.ts";
-import {type Draw, GeometryInternal} from "./engine/internals/GeometryInternal.ts";
+import {GeometryInternal} from "./engine/internals/GeometryInternal.ts";
 import {AttributeInternal} from "./engine/internals/AttributeInternal.ts";
 import {MaterialInternal} from "./engine/internals/MaterialInternal.ts";
 import {PrimitiveInternal} from "./engine/internals/PrimitiveInternal.ts";
 import {NodeInternal} from "./engine/internals/NodeInternal.ts";
 import {MeshInternal} from "./engine/internals/MeshInternal.ts";
-import {NodeAdaptor} from "./engine/adaptors/NodeAdaptor.ts";
-import {MeshWrapper} from "./engine/wrappers/MeshWrapper.ts";
+import {NodeAdaptor} from "./engine/Adaptors/NodeAdaptor.ts";
+import {PipelineInteractor} from "./engine/Representations/PipelineInteractor.ts";
 
 const canvas = document.getElementById("gpu-canvas") as HTMLCanvasElement;
 let stats = new Stats.default();
@@ -23,7 +23,7 @@ document.body.appendChild(stats.dom);
 
 const loader = new GLBLoader();
 
-const {root} = await loader.load("/test.glb")
+// const {root} = await loader.load("/test.glb")
 
 const camera = new PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
 camera.setPosition(0, 0, 10)
@@ -71,14 +71,29 @@ const image = new ImageWrapper(new Uint8Array([
     255, 0, 0, 255
 ]).buffer, 1, 1)
 const sampler = new SamplerWrapper();
+window.addEventListener("click", () => {
+    materialInternal.getBindgroupInteractor().removeBinding(0);
+    materialInternal.getBindgroupInteractor().removeBinding(1);
 
+    materialInternal.getBindgroupInteractor().setSampler(1, sampler, GPUShaderStage.FRAGMENT);
+    materialInternal.getBindgroupInteractor().setTexture(0, image, GPUShaderStage.FRAGMENT);
+    primitive.getFragment().setCode(`
+    @group(1) @binding(1) var samp: sampler;
+    @group(1) @binding(0) var tex: texture_2d<f32>;
+    
+    @fragment
+    fn main(@location(0) uv: vec2f) -> @location(0) vec4f {
+        return textureSample(tex, samp, uv);
+    }
+    `)
 
+})
 const g = new GeometryInternal()
 g.setVertexAttribute(0, position)
 g.setDrawInfo({
     vertexCount: 3,
 })
-const materialInternal = new MaterialInternal(0);
+const materialInternal = new MaterialInternal(1);
 materialInternal.getBindgroupInteractor().setSampler(0, sampler, GPUShaderStage.FRAGMENT);
 materialInternal.getBindgroupInteractor().setTexture(1, image, GPUShaderStage.FRAGMENT);
 
@@ -103,8 +118,8 @@ fn main(
 }
 `)
 primitive.getFragment().setCode(`
-@group(0) @binding(0) var samp: sampler;
-@group(0) @binding(1) var tex: texture_2d<f32>;
+@group(1) @binding(0) var samp: sampler;
+@group(1) @binding(1) var tex: texture_2d<f32>;
 
 @fragment
 fn main(@location(0) uv: vec2f) -> @location(0) vec4f {
@@ -120,8 +135,17 @@ node.setMesh(mesh);
 const nodeAdaptor = new NodeAdaptor(node);
 const nodeWrapper = new NodeWrapper(nodeAdaptor);
 
+const YT = new PipelineInteractor();
+YT.setBindgroup(materialInternal.getGroup(), materialInternal.getBindgroupInteractor());
+YT.setVertex(primitive.getVertex())
+YT.setFragment(primitive.getFragment())
+YT.setPrimitiveState({
+    topology: "triangle-list"
+})
+YT.setVertexBuffers([position.getLayout()])
 
-scene.addNode(root)
+node.setPipelines(primitive.uuid, [YT])
+scene.addNode(nodeWrapper)
 
 let dt = 0;
 let last = performance.now() / 1000;

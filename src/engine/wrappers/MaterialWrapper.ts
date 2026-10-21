@@ -1,7 +1,7 @@
 import type {Material} from "../importers/utils/IR.ts";
 import {MaterialComponentWrapper} from "./MaterialComponentWrapper.ts";
 import {v4 as uuidv4} from "uuid";
-import {MaterialAdaptor} from "../adaptors/MaterialAdaptor.ts";
+import {MaterialAdaptor} from "../Adaptors/MaterialAdaptor.ts";
 
 type MaterialArgs = {
     alphaMode?: Material["alphaMode"],

@@ -11,7 +11,7 @@ import {RenderItemBuilder} from "./RenderItemBuilder.ts";
 import {RenderCache} from "./RenderCache.ts";
 import {getEpoch} from "../hashing/utils/epoch.ts";
 import {UploadLayer} from "./UploadLayer.ts";
-import {flushPreFrame} from "../adaptors/PreFrameQueue.ts";
+import {flushPreFrame} from "../Adaptors/PreFrameQueue.ts";
 import type {FrameInfo, RenderContext} from "./RenderContext.ts";
 import type {RenderItem} from "./RenderItem.ts";
 

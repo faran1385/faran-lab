@@ -3,7 +3,7 @@ import type {MaterialWrapper} from "./MaterialWrapper.ts";
 import {v4 as uuidv4} from "uuid";
 import {BasicFragmentAssembler, BasicVertexAssembler} from "../Assemblers/BasicAssembler/BasicAssembler.ts";
 import {FragmentAssemblerBase, type VertexAssemblerBase} from "../Assemblers/BaseAssembler.ts";
-import {PrimitiveAdaptor} from "../adaptors/PrimitiveAdaptor.ts";
+import {PrimitiveAdaptor} from "../Adaptors/PrimitiveAdaptor.ts";
 
 export class PrimitiveWrapper {
     readonly uuid: string;

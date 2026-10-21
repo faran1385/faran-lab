@@ -3,7 +3,7 @@ import type {Node} from "../importers/utils/IR.ts";
 import {v4 as uuidv4} from "uuid";
 import {vec3} from "../../packages/math/vector/vec3.ts";
 import {quat} from "../../packages/math/quat/quat.ts";
-import {NodeAdaptor} from "../adaptors/NodeAdaptor.ts";
+import {NodeAdaptor} from "../Adaptors/NodeAdaptor.ts";
 
 export class NodeWrapper {
     readonly adaptor: NodeAdaptor;

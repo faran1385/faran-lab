@@ -1,6 +1,6 @@
 import type {TextureWrapper} from "./TextureWrapper.ts";
 import {v4 as uuidv4} from "uuid";
-import {MaterialComponentAdaptor} from "../adaptors/MaterialComponentAdaptor.ts";
+import {MaterialComponentAdaptor} from "../Adaptors/MaterialComponentAdaptor.ts";
 
 export type MaterialComponentTextureSlot = {
     wrapper: TextureWrapper,
