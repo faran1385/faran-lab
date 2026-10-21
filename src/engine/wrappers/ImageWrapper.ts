@@ -1,5 +1,6 @@
 import {v4 as uuidv4} from 'uuid';
 import {ImageHashProvider} from "../hashing/ImageHashProvider.ts";
+import {queueImageUpload} from "../internals/UploadQueue.ts";
 
 export class ImageWrapper {
     readonly uuid: string;
@@ -53,6 +54,7 @@ export class ImageWrapper {
         this.data = data;
         this.hashProvider.markNeedsUpdate()
         this.hashProvider.markChangeStamp()
+        queueImageUpload(this);
     }
 
 }

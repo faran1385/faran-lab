@@ -1,6 +1,4 @@
 import {BufferInternal} from "../internals/BufferInternal.ts";
-import type {MaterialFactorsPlan} from "./utils.ts";
-import type {NodeWrapper} from "../wrappers/NodeWrapper.ts";
 
 export interface BufferDescriptor {
     label: string;
@@ -10,28 +8,13 @@ export interface BufferDescriptor {
 }
 
 export class BufferProducer {
-    static produce(wrapper: BufferInternal): BufferDescriptor {
-        const data = wrapper.getData();
+    static produce(buffer: BufferInternal): BufferDescriptor {
+        const data = buffer.getData();
         return {
-            label: wrapper.uuid,
+            label: buffer.uuid,
             size: Math.ceil(data.byteLength / 4) * 4,
-            usage: wrapper.getUsage(),
+            usage: buffer.getUsage(),
             data,
         };
     }
 }
-
-export class MaterialFactorBufferProducer {
-    static produce(factorPlan: MaterialFactorsPlan) {
-        return new BufferInternal(new Float32Array(Array.from(factorPlan).map(([_, item]) => item.factor).flat()).buffer, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST)
-    }
-}
-
-
-export class NodeMatrixBufferProducer {
-    static produce(node: NodeWrapper) {
-        return new BufferInternal(node.getWorldMatrix(), GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST)
-    }
-}
-
-

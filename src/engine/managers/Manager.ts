@@ -47,6 +47,10 @@ export abstract class ResourceManager<TDescriptor, TTracker extends Tracker<unkn
         this.cache.set(hash, this.build(getDescriptor));
     }
 
+    has(hash: string): boolean {
+        return this.cache.has(hash);
+    }
+
     get(hash: string): TTracker {
         const tracker = this.cache.get(hash);
         if (!tracker) throw new Error(`No resource for hash ${hash}, did you forget ensure()?`);

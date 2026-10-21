@@ -1,5 +1,4 @@
 import type {MeshWrapper} from "./MeshWrapper.ts";
-import {mat4} from "../../packages/math/matrix/mat4.ts";
 import type {Node} from "../importers/utils/IR.ts";
 import {v4 as uuidv4} from "uuid";
 import {vec3} from "../../packages/math/vector/vec3.ts";
@@ -8,7 +7,7 @@ import {NodeHashProvider} from "../hashing/NodeHashProvider.ts";
 import {NodeAdaptor} from "../adaptors/NodeAdaptor.ts";
 
 export class NodeWrapper {
-    private adaptor: NodeAdaptor;
+    readonly adaptor: NodeAdaptor;
     readonly uuid: string;
     private name?: string;
     private mesh: MeshWrapper | null = null;
@@ -19,11 +18,14 @@ export class NodeWrapper {
     private rotation: Float32Array;
     private scale: Float32Array;
 
-    private localMatrix = mat4.create();
     readonly hashProvider: NodeHashProvider;
     private _cachedChildrenArray: NodeWrapper[] = []
 
 
+    /**
+     * @param adaptor pass one to customise the node's internal. The default exposes the world matrix at group 2,
+     * binding 0 (vertex stage), which is what the built-in assemblers declare.
+     */
     constructor(
         adaptor?: NodeAdaptor,
         translation?: Node["translation"],
@@ -31,7 +33,7 @@ export class NodeWrapper {
         scale?: Node["scale"],
         name?: string,
     ) {
-        this.adaptor = adaptor ?? new NodeAdaptor();
+        this.adaptor = adaptor ?? new NodeAdaptor(undefined, {binding: 0, visibility: GPUShaderStage.VERTEX});
         const t = translation ?? [0, 0, 0] as any;
         const r = rotation ?? [0, 0, 0, 1] as any;
         const s = scale ?? [1, 1, 1] as any;
@@ -44,7 +46,7 @@ export class NodeWrapper {
         this.scale = vec3.fromValues(s[0], s[1], s[2]);
         this.translation = vec3.fromValues(t[0], t[1], t[2]);
         this.rotation = quat.fromValues(r[0], r[1], r[2], r[3]);
-        this.markSubtreeDirty();
+        this.adaptor.setSource(this);
     }
 
     private updateCachedChildren() {
@@ -75,7 +77,7 @@ export class NodeWrapper {
 
     setTranslation(tx: number, ty: number, tz: number) {
         vec3.set(this.translation, tx, ty, tz);
-        this.markSubtreeDirty();
+        this.adaptor.invalidateWorld();
     }
 
     getRotation() {
@@ -84,7 +86,7 @@ export class NodeWrapper {
 
     setRotation(x: number, y: number, z: number) {
         quat.fromEuler(this.rotation, x, y, z)
-        this.markSubtreeDirty();
+        this.adaptor.invalidateWorld();
     }
 
     getScale() {
@@ -93,7 +95,7 @@ export class NodeWrapper {
 
     setScale(sx: number, sy: number, sz: number) {
         vec3.set(this.scale, sx, sy, sz);
-        this.markSubtreeDirty();
+        this.adaptor.invalidateWorld();
     }
 
     addChild(child: NodeWrapper) {
@@ -102,14 +104,14 @@ export class NodeWrapper {
         }
         child.parent = this;
         this.children.set(child.uuid, child);
-        child.markSubtreeDirty();
+        this.adaptor.addChild(child.adaptor);
         this.updateCachedChildren();
     }
 
     removeChild(child: NodeWrapper) {
         if (this.children.delete(child.uuid)) {
             child.parent = undefined;
-            child.markSubtreeDirty()
+            this.adaptor.removeChild(child.adaptor);
             this.updateCachedChildren();
         }
     }
@@ -122,29 +124,8 @@ export class NodeWrapper {
         return this._cachedChildrenArray;
     }
 
-    private markSubtreeDirty(): void {
-        if (this.hashProvider.transformNeedsUpdate()) return;
-        this.hashProvider.markTransform();
-        this.children.forEach((child) => child.markSubtreeDirty());
-    }
-
+    /** The world matrix as of the last flush of the pre-frame queue. */
     getWorldMatrix() {
-        return this.adaptor.buffer.getData();
-    }
-
-    buildWorldMatrix(parentMatrix: Float32Array | null, uploadToGPUBuffer: (hash: string, data: GPUAllowSharedBufferSource, offset: number) => void) {
-        mat4.compose(this.localMatrix, this.translation as any, this.rotation as any, this.scale as any);
-        if (parentMatrix) {
-            mat4.mul(new Float32Array(this.adaptor.buffer.getData()), parentMatrix, this.localMatrix);
-        } else {
-            this.adaptor.buffer.setData(this.localMatrix.buffer)
-        }
-
-        this.hashProvider.syncTransformUpdate()
-        if (this.mesh && this.mesh.getAllPrimitives().length > 0) uploadToGPUBuffer(this.uuid, this.getWorldMatrix(), 0);
-
-        this.children.forEach((child: NodeWrapper) => {
-            child.buildWorldMatrix(new Float32Array(this.getWorldMatrix()), uploadToGPUBuffer);
-        });
+        return this.adaptor.getWorldMatrix();
     }
 }

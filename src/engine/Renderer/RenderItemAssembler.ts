@@ -1,69 +1,60 @@
-import type {NodeWrapper} from "../wrappers/NodeWrapper.ts";
-import type {PrimitiveWrapper} from "../wrappers/PrimitiveWrapper.ts";
-import type {GeometryHashes, HashData} from "../hashing/utils/HashData.ts";
-import type {DrawInfo, RenderItem, VertexBufferBinding} from "./RenderItem.ts";
+import type {GeometryInternal} from "../internals/GeometryInternal.ts";
+import type {BindGroupBinding, DrawCall, RenderItem, VertexBufferBinding} from "./RenderItem.ts";
 import type {RenderContext} from "./RenderContext.ts";
-import {PIPELINE_VARIANT_ORDER} from "../wrappers/PipelineWrapper.ts";
 
-/** The item layer: pure lookup. Reads resolved hashes and the managers' resources, creates and computes nothing. */
+/** The item layer: pure lookup. Reads keys and the managers' resources, creates and computes nothing. */
 export class RenderItemAssembler {
-    static assemble(node: NodeWrapper, p: PrimitiveWrapper, data: HashData, ctx: RenderContext): RenderItem {
-        const {managers, rendererUUID} = ctx;
+    static assemble(
+        pipelineKeys: readonly string[],
+        bindgroupKeys: readonly { slot: number, key: string }[],
+        geometry: GeometryInternal,
+        ctx: RenderContext,
+    ): RenderItem | null {
+        const draw = RenderItemAssembler.drawCall(geometry, ctx);
+        if (!draw) return null;
+
+        const {managers} = ctx;
+        const bindGroups: BindGroupBinding[] = bindgroupKeys.map(({slot, key}) => ({
+            slot,
+            bindGroup: managers.bindgroupManager.getRaw(key),
+        }));
+
+        const vertexBuffers: VertexBufferBinding[] = Array.from(geometry.getVertexAttributes().entries())
+            .sort(([a], [b]) => a - b)
+            .map(([slot, attribute]) => ({slot, buffer: managers.bufferManager.getRaw(attribute.hashProvider.convertToHash())}));
 
         return {
-            pipelines: RenderItemAssembler.pipelines(data, ctx),
-            bindGroups: [
-                {slot: 0, bindGroup: managers.bindgroupManager.getRaw(rendererUUID)},
-                {slot: 1, bindGroup: managers.bindgroupManager.getRaw(data.material.bindgroup)},
-                {slot: 2, bindGroup: managers.bindgroupManager.getRaw(node.uuid)},
-            ],
-            vertexBuffers: RenderItemAssembler.vertexBuffers(p, data.geometry, ctx),
-            draw: RenderItemAssembler.drawInfo(p, data.geometry, ctx),
-            hashData: data
+            // draw order is the order the node adapter built the pipelines in: never Map iteration order
+            pipelines: pipelineKeys.map((key) => managers.pipelineManager.getRaw(key)),
+            bindGroups,
+            vertexBuffers,
+            draw,
         };
     }
 
-    /** Fixed draw order, never Map iteration order: back faces (cullMode "front") must be drawn before front faces. */
-    private static pipelines(data: HashData, ctx: RenderContext): GPURenderPipeline[] {
-        const result: GPURenderPipeline[] = [];
-        for (const variant of PIPELINE_VARIANT_ORDER) {
-            const hash = data.pipeline.pipelines.get(variant);
-            if (hash !== undefined) result.push(ctx.managers.pipelineManager.getRaw(hash));
-        }
-        return result;
-    }
+    private static drawCall(geometry: GeometryInternal, ctx: RenderContext): DrawCall | null {
+        const draw = geometry.getDrawInfo();
+        if (!draw) return null;
 
-    private static vertexBuffers(p: PrimitiveWrapper, geometry: GeometryHashes, ctx: RenderContext): VertexBufferBinding[] {
-        const {producer, managers} = ctx;
-        const attrPlan = producer.getAttributePlan(p.getGeometry());
-
-        return attrPlan.slots.map((slot) => ({
-            slot: slot.slot,
-            buffer: managers.bufferManager.getRaw(geometry.attributeBuffers.get(slot.name)!),
-        }));
-    }
-
-    private static drawInfo(p: PrimitiveWrapper, geometryHashes: GeometryHashes, ctx: RenderContext): DrawInfo {
-        const {producer, managers} = ctx;
-        const geometry = p.getGeometry();
-        const indices = geometry.getIndices();
-        const attrPlan = producer.getAttributePlan(geometry);
-        const positionSlot = attrPlan.slots.find(s => s.name === "position")!;
-
-        if (indices) {
-            const bytesPerIndex = indices.format === "uint32" ? 4 : 2;
+        if ("indexBuffer" in draw) {
             return {
                 indexed: true,
-                count: indices.getData().byteLength / bytesPerIndex,
-                indexBuffer: managers.bufferManager.getRaw(geometryHashes.indices!),
-                indexFormat: indices.format as GPUIndexFormat,
+                indexBuffer: ctx.managers.bufferManager.getRaw(draw.indexBuffer.hashProvider.convertToHash()),
+                indexFormat: draw.indexFormat,
+                indexCount: draw.indexCount,
+                instanceCount: draw.instanceCount ?? 1,
+                firstIndex: draw.firstIndex ?? 0,
+                baseVertex: draw.baseVertex ?? 0,
+                firstInstance: draw.firstInstance ?? 0,
             };
         }
 
-        const position = geometry.getAttribute("position")!;
         return {
             indexed: false,
-            count: position.getData().byteLength / positionSlot.arrayStride,
+            vertexCount: draw.vertexCount,
+            instanceCount: draw.instanceCount ?? 1,
+            firstVertex: draw.firstVertex ?? 0,
+            firstInstance: draw.firstInstance ?? 0,
         };
     }
 }

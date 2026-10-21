@@ -1,11 +1,8 @@
-import type {ShaderModuleWrapper} from "../wrappers/ShaderModuleWrapper.ts";
-
 export class ShaderModuleProducer {
-    static produce(wrapper: ShaderModuleWrapper): GPUShaderModuleDescriptor {
-        const code = wrapper.getCode();
+    static produce(code: string, label: string): GPUShaderModuleDescriptor {
         if (code === "") {
-            throw new Error(`ShaderModuleProducer: wrapper ${wrapper.uuid} has no code, was the assembler run before ensure()?`);
+            throw new Error(`ShaderModuleProducer: "${label}" has no code, were the stages filled before the frame?`);
         }
-        return { label: wrapper.uuid, code };
+        return {label, code};
     }
 }

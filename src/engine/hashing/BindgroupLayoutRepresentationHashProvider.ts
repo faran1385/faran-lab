@@ -1,5 +1,6 @@
 import {RepresentationHashProvider} from "./RepresentationHashProvider.ts";
 import type {BindgroupLayoutEntry} from "../Representations/BindgroupLayoutRepresentation.ts";
+import {bufferBindingTypeOf} from "../Representations/bindingTypes.ts";
 
 type InputFunctions = {
     getEntries: () => Map<number, BindgroupLayoutEntry<any>>,
@@ -7,7 +8,7 @@ type InputFunctions = {
 
 function describeEntry(entry: BindgroupLayoutEntry<any>): string {
     // A layout depends on the kind of resource and, for textures, on the format (it decides the sample type).
-    if ("buffer" in entry) return `buffer`;
+    if ("buffer" in entry) return `buffer:${bufferBindingTypeOf(entry.buffer)}`;
     if ("sampler" in entry) return `sampler`;
     return `texture:${entry.texture.getFormat()}`;
 }

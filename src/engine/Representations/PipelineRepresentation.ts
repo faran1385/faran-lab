@@ -35,29 +35,33 @@ export class PipelineRepresentation {
         });
     }
 
-    protected getVertexBuffers() {
+    getVertexBuffers() {
         return this.vertexBuffers;
     }
 
-    protected getFragmentTargets() {
+    getFragmentTargets() {
         return this.frameTargets;
     }
 
 
-    protected getFragmentShader() {
+    getFragmentShader() {
         return this.fragmentShader;
     }
 
-    protected getVertexShader() {
+    getVertexShader() {
         return this.vertexShader;
     }
 
-    protected getPrimitive() {
+    getPrimitive() {
         return this.primitive;
     }
 
-    protected getDepthStencil() {
+    getDepthStencil() {
         return this.depthStencil;
+    }
+
+    getLayout() {
+        return this.layout;
     }
 
     protected setVertexShader(vertexShader: PipelineRepresentation["vertexShader"]) {

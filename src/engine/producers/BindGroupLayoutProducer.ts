@@ -1,4 +1,5 @@
-import type {MaterialWrapper} from "../wrappers/MaterialWrapper.ts";
+import type {BindgroupLayoutRepresentation} from "../Representations/BindgroupLayoutRepresentation.ts";
+import {bufferBindingTypeOf, textureSampleTypeOf} from "../Representations/bindingTypes.ts";
 
 export const FACTORS_BINDING = 0;
 
@@ -12,22 +13,33 @@ export interface MaterialBindingPlan {
 
 
 export class BindGroupLayoutProducer {
-    static produce(material: MaterialWrapper, getPlan: () => MaterialBindingPlan): GPUBindGroupLayoutDescriptor {
-        const plan = getPlan();
+    /** Pure translation of a layout representation into a descriptor. Entries are written in binding order. */
+    static produce(layout: BindgroupLayoutRepresentation, label: string): GPUBindGroupLayoutDescriptor {
+        const entries: GPUBindGroupLayoutEntry[] = [];
 
-        const entries: GPUBindGroupLayoutEntry[] = [
-            { binding: FACTORS_BINDING, visibility: GPUShaderStage.FRAGMENT, buffer: { type: "uniform" } },
-        ];
-
-        for (const slot of plan.slots) {
-            entries.push(
-                slot.kind === "texture"
-                    ? { binding: slot.binding, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: "float", viewDimension: "2d" } }
-                    : { binding: slot.binding, visibility: GPUShaderStage.FRAGMENT, sampler: { type: "filtering" } }
-            );
+        for (const entry of layout.getEntries()) {
+            if ("buffer" in entry) {
+                entries.push({
+                    binding: entry.binding,
+                    visibility: entry.visibility,
+                    buffer: {type: bufferBindingTypeOf(entry.buffer)},
+                });
+            } else if ("sampler" in entry) {
+                entries.push({
+                    binding: entry.binding,
+                    visibility: entry.visibility,
+                    sampler: {type: "filtering"},
+                });
+            } else {
+                entries.push({
+                    binding: entry.binding,
+                    visibility: entry.visibility,
+                    texture: {sampleType: textureSampleTypeOf(entry.texture.getFormat()), viewDimension: "2d"},
+                });
+            }
         }
 
-        return { label: material.uuid, entries };
+        entries.sort((a, b) => a.binding - b.binding);
+        return {label, entries};
     }
 }
-

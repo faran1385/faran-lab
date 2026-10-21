@@ -78,6 +78,11 @@ export class GeometryAdaptor {
             };
 
             let attribute = this.attributes.get(slot.name);
+            // A different byte size is a different GPU buffer: a new internal (new uuid), not an in-place update.
+            if (attribute && attribute.getData().byteLength !== source.getData().byteLength) {
+                this.attributes.delete(slot.name);
+                attribute = undefined;
+            }
             if (!attribute) {
                 attribute = new AttributeInternal(source.getData(), layout);
                 this.attributes.set(slot.name, attribute);

@@ -1,6 +1,7 @@
-import type {Scene} from "../Scene/Scene.ts";
+import type {SceneInternal} from "../internals/SceneInternal.ts";
+import {BufferInternal} from "../internals/BufferInternal.ts";
+import {BindgroupInteractor} from "../Representations/BindgroupInteractor.ts";
 import {Hasher} from "../hashing/utils/Hasher.ts";
-import {HashResolver} from "../hashing/utils/HashResolver.ts";
 import {CentralProducer} from "../producers/CentralProducer.ts";
 import type {Camera} from "../Camera/Camera.ts";
 import {v4 as uuidv4} from "uuid";
@@ -9,10 +10,19 @@ import {RenderTarget} from "./RenderTarget.ts";
 import {RenderItemBuilder} from "./RenderItemBuilder.ts";
 import {RenderCache} from "./RenderCache.ts";
 import {getEpoch} from "../hashing/utils/epoch.ts";
-import {UpdateLayer} from "./UpdateLayer.ts";
-import type {BufferManager} from "../managers/BufferManager.ts";
+import {UploadLayer} from "./UploadLayer.ts";
+import {flushPreFrame} from "../adaptors/PreFrameQueue.ts";
+import type {FrameInfo, RenderContext} from "./RenderContext.ts";
+import type {RenderItem} from "./RenderItem.ts";
 
 
+/**
+ * Draws a SceneInternal. Nothing in here reads a wrapper: the adapters turn wrappers into internals in the pre-frame
+ * queue, and the renderer only consumes the result.
+ *
+ * A frame is: flush the pre-frame queue, write changed data into existing GPU resources, build/refresh the render
+ * items of the nodes whose internals changed, draw every item, release what is no longer used.
+ */
 export class Renderer {
     private device!: GPUDevice;
     private ctx!: GPUCanvasContext;
@@ -27,10 +37,12 @@ export class Renderer {
     depthRenderTarget!: RenderTarget;
 
     hasher!: Hasher;
-    private hashResolver!: HashResolver;
     private readonly producer = new CentralProducer();
     private readonly renderCache = new RenderCache();
-    private _bufferUploadFunction!: BufferManager["upload"]
+
+    /** Group 0. The camera matrices are written straight into it, so it is not an adapter's business. */
+    private cameraBuffer!: BufferInternal;
+    private renderContext!: RenderContext;
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -51,25 +63,24 @@ export class Renderer {
             format: "depth32float",
         })
 
-        // renderer camera
-        this.managers.bufferManager.ensure(this.uuid, () => ({
-            size: 128,
-            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-            label: `${this.uuid} renderer camera buffer`,
-            data: new Float32Array(32).buffer
-        }))
-
-        this._bufferUploadFunction = this.managers.bufferManager.upload.bind(this.managers.bufferManager)
-
-        // scene bindgroupLayout initialization since the only binding is camera witch is static
-        this.managers.bindgroupManager.ensure(this.uuid, () => this.producer.produceSceneBindgroup({
-            layouts: this.managers.bindgroupLayoutManager,
-            rendererUUID: this.uuid,
-            buffers: this.managers.bufferManager
-        }))
-
         this.hasher = await Hasher.create();
-        this.hashResolver = new HashResolver(this.hasher);
+
+        // group 0: view + projection. The renderer keeps one reference for good, so the buffer outlives frames in
+        // which no node uses the scene bind group and uploads never find it missing.
+        this.cameraBuffer = new BufferInternal(new Float32Array(32).buffer, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
+        const sceneBindgroup = new BindgroupInteractor();
+        sceneBindgroup.setUniform(0, this.cameraBuffer, GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT);
+        this.managers.bufferManager.ensure(this.cameraBuffer.uuid, () => this.producer.produceBuffer(this.cameraBuffer));
+        this.managers.bufferManager.acquire(this.cameraBuffer.uuid);
+
+        this.renderContext = {
+            managers: this.managers,
+            producer: this.producer,
+            hasher: this.hasher,
+            frame: this.currentFrame(),
+            cache: this.renderCache,
+            sceneBindgroup,
+        };
     }
 
     setSize(width: number, height: number): void {
@@ -79,8 +90,30 @@ export class Renderer {
         this.depthRenderTarget.setSize(width, height);
     }
 
+    private currentFrame(): FrameInfo {
+        return {
+            colorFormat: this.colorRenderTarget ? this.colorRenderTarget.format : this.format,
+            depthFormat: this.depthRenderTarget.format,
+        };
+    }
 
-    render(scene: Scene, camera: Camera): void {
+    render(scene: SceneInternal, camera: Camera): void {
+        // 1. wrappers -> internals, once, from the final state of everything that was set since the last frame
+        flushPreFrame();
+
+        const ctx = this.renderContext;
+
+        // The target formats are part of every pipeline. A change reaches every node, then every node is re-checked.
+        const frame = this.currentFrame();
+        if (frame.colorFormat !== ctx.frame.colorFormat || frame.depthFormat !== ctx.frame.depthFormat) {
+            ctx.frame = frame;
+            for (const node of scene.getNodes()) node.setFrame(frame);
+            this.renderCache.invalidateAll();
+        }
+
+        // 2. data that changed in place goes into the GPU resources that already exist
+        UploadLayer.flush(ctx);
+        UploadLayer.updateCamera(camera, ctx, this.cameraBuffer.uuid);
 
         this.colorRenderTarget?.ensureTexture(this.device)
         this.depthRenderTarget?.ensureTexture(this.device)
@@ -102,50 +135,37 @@ export class Renderer {
             }
         });
 
-        const ctx = {
-            rendererUUID: this.uuid,
-            managers: this.managers,
-            producer: this.producer,
-            hashes: this.hashResolver,
-            frame: {colorFormat: this.format, depthFormat: this.depthRenderTarget.format},
-            cache: this.renderCache,
-        }
-
-        // global
-        UpdateLayer.updateCamera(camera, ctx)
-
-        scene.traverse((node) => {
+        // 3. + 4. refresh the render items of changed nodes, draw every item
+        for (const node of scene.getNodes()) {
             for (const item of RenderItemBuilder.build(node, ctx)) {
-                // bind groups and buffers are shared by every variant: set once, then one setPipeline + draw per variant
-                for (const bg of item.bindGroups) {
-                    pass.setBindGroup(bg.slot, bg.bindGroup)
-                }
-                for (const vb of item.vertexBuffers) {
-                    pass.setVertexBuffer(vb.slot, vb.buffer)
-                }
-                if (item.draw.indexed) {
-                    pass.setIndexBuffer(item.draw.indexBuffer!, item.draw.indexFormat!);
-                }
-
-                for (const pipeline of item.pipelines) {
-                    pass.setPipeline(pipeline);
-                    if (item.draw.indexed) {
-                        pass.drawIndexed(item.draw.count);
-                    } else {
-                        pass.draw(item.draw.count);
-                    }
-                }
+                Renderer.draw(pass, item);
             }
-        });
-
-        scene.updateWorldMatrices(this._bufferUploadFunction);
+        }
 
         this.renderCache.lastFrameEpoch = getEpoch();
         pass.end();
         this.device.queue.submit([encoder.finish()]);
+
+        // 5. nodes that left the scene release their resources, then unused resources are collected
         this.renderCache.endFrame(ctx)
         this.managers.endFrame()
-        console.log(this.managers.bufferManager.getCacheLength())
-        this.producer.clear()
+    }
+
+    /** Bind groups and buffers are shared by every variant: set once, then one setPipeline + draw per variant. */
+    private static draw(pass: GPURenderPassEncoder, item: RenderItem): void {
+        for (const bg of item.bindGroups) pass.setBindGroup(bg.slot, bg.bindGroup);
+        for (const vb of item.vertexBuffers) pass.setVertexBuffer(vb.slot, vb.buffer);
+
+        const draw = item.draw;
+        if (draw.indexed) pass.setIndexBuffer(draw.indexBuffer, draw.indexFormat);
+
+        for (const pipeline of item.pipelines) {
+            pass.setPipeline(pipeline);
+            if (draw.indexed) {
+                pass.drawIndexed(draw.indexCount, draw.instanceCount, draw.firstIndex, draw.baseVertex, draw.firstInstance);
+            } else {
+                pass.draw(draw.vertexCount, draw.instanceCount, draw.firstVertex, draw.firstInstance);
+            }
+        }
     }
 }
