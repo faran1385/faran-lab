@@ -1,7 +1,6 @@
 import type {Material} from "../importers/utils/IR.ts";
 import {MaterialComponentWrapper} from "./MaterialComponentWrapper.ts";
 import {v4 as uuidv4} from "uuid";
-import {MaterialHashProvider} from "../hashing/MaterialHashProvider.ts";
 import {MaterialAdaptor} from "../adaptors/MaterialAdaptor.ts";
 
 type MaterialArgs = {
@@ -21,7 +20,6 @@ export class MaterialWrapper {
     private alphaCutoff = 0;
     private doubleSided: Material["doubleSided"];
 
-    readonly hashProvider: MaterialHashProvider;
 
 
     constructor(args: MaterialArgs = {}) {
@@ -30,11 +28,6 @@ export class MaterialWrapper {
         this.alphaCutoff = args?.alphaCutoff ?? 0;
         this.doubleSided = args?.doubleSided ?? false;
 
-        this.hashProvider = new MaterialHashProvider(this.uuid, {
-            getDoubleSided: this.getDoubleSided.bind(this),
-            getAlphaMode: this.getAlphaMode.bind(this),
-            getSortedComponents: this.getSortedComponents.bind(this),
-        })
     }
 
     private sortComponents(): void {
@@ -56,7 +49,6 @@ export class MaterialWrapper {
         if (replaced && replaced !== wrapper) this.adaptor.removeMaterialComponent(replaced);
         this.components.set(wrapper.name, wrapper);
         this.sortComponents();
-        this.hashProvider.markChangeStamp()
         this.adaptor.setMaterialComponent(wrapper);
     }
 
@@ -64,7 +56,6 @@ export class MaterialWrapper {
         const removed = this.components.get(name);
         this.components.delete(name);
         this.sortComponents();
-        this.hashProvider.markChangeStamp()
         if (removed) this.adaptor.removeMaterialComponent(removed);
     }
 
@@ -74,8 +65,6 @@ export class MaterialWrapper {
 
     setAlphaMode(alphaMode: Material["alphaMode"]): void {
         this.alphaMode = alphaMode;
-        this.hashProvider.markPipelineSettingsHash()
-        this.hashProvider.markChangeStamp()
         this.adaptor.invalidateSettings();
     }
 
@@ -85,8 +74,6 @@ export class MaterialWrapper {
 
     setAlphaCutoff(alphaCutoff: number): void {
         this.alphaCutoff = alphaCutoff;
-        this.hashProvider.markFactorUpdate()
-        this.hashProvider.markChangeStamp()
         this.adaptor.invalidateFactors();
     }
 
@@ -96,8 +83,6 @@ export class MaterialWrapper {
 
     setDoubleSided(doubleSided: Material["doubleSided"]): void {
         this.doubleSided = doubleSided;
-        this.hashProvider.markPipelineSettingsHash()
-        this.hashProvider.markChangeStamp()
         this.adaptor.invalidateSettings();
     }
 

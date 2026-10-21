@@ -29,6 +29,7 @@ export class RenderItemBuilder {
         // The render side's own inputs. They stamp the node, so this comes before the staleness checks and a first
         // build sees them.
         if (!entry) {
+            console.log(entry)
             node.setFrame(ctx.frame);
             node.setSceneBindgroup(ctx.sceneBindgroup);
         }

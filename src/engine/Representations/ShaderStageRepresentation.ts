@@ -4,7 +4,7 @@ import {ShaderStageRepresentationHashProvider} from "../hashing/ShaderStageRepre
 
 export class ShaderStageRepresentation {
     readonly uuid: string;
-    private entryPoint!: string;
+    private entryPoint: string = "main";
     private code!: string
 
     readonly hashProvider: ShaderStageRepresentationHashProvider;

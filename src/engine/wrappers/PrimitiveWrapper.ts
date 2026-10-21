@@ -2,7 +2,6 @@ import type {GeometryWrapper} from "./GeometryWrapper.ts";
 import type {MaterialWrapper} from "./MaterialWrapper.ts";
 import {v4 as uuidv4} from "uuid";
 import {BasicFragmentAssembler, BasicVertexAssembler} from "../Assemblers/BasicAssembler/BasicAssembler.ts";
-import {PipelineWrapper} from "./PipelineWrapper.ts";
 import {FragmentAssemblerBase, type VertexAssemblerBase} from "../Assemblers/BaseAssembler.ts";
 import {PrimitiveAdaptor} from "../adaptors/PrimitiveAdaptor.ts";
 
@@ -15,7 +14,6 @@ export class PrimitiveWrapper {
 
     private vertexAssembler: VertexAssemblerBase;
     private fragmentAssembler: FragmentAssemblerBase;
-    private pipelineWrapper = new PipelineWrapper();
 
     constructor(
         mat: MaterialWrapper,
@@ -38,30 +36,11 @@ export class PrimitiveWrapper {
     setVertexAssembler(assembler: VertexAssemblerBase): void {
         this.vertexAssembler = assembler;
         this.adaptor.setVertexAssembler(assembler);
-        this.pipelineWrapper.markVertexShaderDirty()
     }
 
     setFragmentAssembler(assembler: FragmentAssemblerBase): void {
         this.fragmentAssembler = assembler;
         this.adaptor.setFragmentAssembler(assembler);
-        this.pipelineWrapper.markFragmentShaderDirty()
-    }
-
-
-    getPipeline() {
-        return this.pipelineWrapper;
-    }
-
-    /**
-     * Latest change stamp of anything this primitive renders with. Swapping the material, geometry or an assembler
-     * goes through the pipeline wrapper's mark*ShaderDirty(), so its stamp already covers those setters.
-     */
-    getChangedAt(): number {
-        return Math.max(
-            this.material.hashProvider.getChangedAt(),
-            this.geometry.hashProvider.getChangedAt(),
-            this.pipelineWrapper.hashProvider.getChangedAt(),
-        );
     }
 
     getVertexAssembler(): VertexAssemblerBase {
@@ -79,8 +58,6 @@ export class PrimitiveWrapper {
     setGeometry(geometry: GeometryWrapper): void {
         this.geometry = geometry;
         this.adaptor.setGeometry(geometry);
-        this.pipelineWrapper.markFragmentShaderDirty()
-        this.pipelineWrapper.markVertexShaderDirty()
     }
 
     getMaterial(): MaterialWrapper {
@@ -90,7 +67,5 @@ export class PrimitiveWrapper {
     setMaterial(material: MaterialWrapper): void {
         this.material = material;
         this.adaptor.setMaterial(material);
-        this.pipelineWrapper.markFragmentShaderDirty()
-        this.pipelineWrapper.markVertexShaderDirty()
     }
 }

@@ -3,7 +3,6 @@ import type {Node} from "../importers/utils/IR.ts";
 import {v4 as uuidv4} from "uuid";
 import {vec3} from "../../packages/math/vector/vec3.ts";
 import {quat} from "../../packages/math/quat/quat.ts";
-import {NodeHashProvider} from "../hashing/NodeHashProvider.ts";
 import {NodeAdaptor} from "../adaptors/NodeAdaptor.ts";
 
 export class NodeWrapper {
@@ -18,7 +17,6 @@ export class NodeWrapper {
     private rotation: Float32Array;
     private scale: Float32Array;
 
-    readonly hashProvider: NodeHashProvider;
     private _cachedChildrenArray: NodeWrapper[] = []
 
 
@@ -38,9 +36,6 @@ export class NodeWrapper {
         const r = rotation ?? [0, 0, 0, 1] as any;
         const s = scale ?? [1, 1, 1] as any;
 
-        this.hashProvider = new NodeHashProvider({
-            getMesh: this.getMesh.bind(this),
-        })
         this.uuid = uuidv4();
         this.name = name;
         this.scale = vec3.fromValues(s[0], s[1], s[2]);
@@ -60,7 +55,6 @@ export class NodeWrapper {
     setMesh(mesh: MeshWrapper | null) {
         this.mesh = mesh;
         this.adaptor.setMesh(mesh)
-        this.hashProvider.markMesh();
     }
 
     setName(name: string | undefined) {
