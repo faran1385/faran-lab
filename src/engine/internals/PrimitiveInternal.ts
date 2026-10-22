@@ -40,12 +40,4 @@ export class PrimitiveInternal {
         this.geo = geo;
         this.hashProvider.markChanged();
     }
-
-    getFragment() {
-        return this.fragment;
-    }
-
-    getVertex() {
-        return this.vertex;
-    }
 }

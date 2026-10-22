@@ -3,9 +3,9 @@ import {ImageWrapper} from "../wrappers/ImageWrapper.ts";
 import type {GeometryInternal} from "../internals/GeometryInternal.ts";
 import type {BindgroupRepresentation} from "../Representations/BindgroupRepresentation.ts";
 import type {BindgroupLayoutRepresentation} from "../Representations/BindgroupLayoutRepresentation.ts";
-import type {PipelineRepresentation} from "../Representations/PipelineRepresentation.ts";
 import type {RenderContext} from "./RenderContext.ts";
 import type {HeldKeys} from "./HeldKeys.ts";
+import type {PipelineRepresentation} from "../Representations/PipelineRepresentation.ts";
 
 /**
  * The resource layer: makes sure the GPU resources behind a representation exist, and records every key it touched in
@@ -73,13 +73,14 @@ export class ResourceLayer {
      */
     static pipeline(pipeline: PipelineRepresentation, ctx: RenderContext, held: HeldKeys): string | null {
         const {managers, producer, hasher} = ctx;
+
         const vertex = pipeline.getVertexShader();
         const fragment = pipeline.getFragmentShader();
+
 
         if (!vertex.code || !fragment.code
             || !pipeline.getPrimitive() || !pipeline.getDepthStencil()
             || pipeline.getFragmentTargets().size === 0) return null;
-
         for (const bindgroup of pipeline.bindgroups.values()) {
             ResourceLayer.bindgroupLayout(bindgroup.layout, ctx, held);
         }

@@ -29,6 +29,7 @@ export class PipelineInteractor extends PipelineRepresentation {
     }
 
     setFragment(stage: ShaderStageRepresentation) {
+
         this.setFragmentShader({
             entryPoint: stage.getEntryPoint(),
             code: stage.getCode()

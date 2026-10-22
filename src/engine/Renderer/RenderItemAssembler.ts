@@ -11,7 +11,6 @@ export class RenderItemAssembler {
         ctx: RenderContext,
     ): RenderItem | null {
         const draw = RenderItemAssembler.drawCall(geometry, ctx);
-        if (!draw) return null;
 
         const {managers} = ctx;
         const bindGroups: BindGroupBinding[] = bindgroupKeys.map(({slot, key}) => ({
@@ -21,7 +20,10 @@ export class RenderItemAssembler {
 
         const vertexBuffers: VertexBufferBinding[] = Array.from(geometry.getVertexAttributes().entries())
             .sort(([a], [b]) => a - b)
-            .map(([slot, attribute]) => ({slot, buffer: managers.bufferManager.getRaw(attribute.hashProvider.convertToHash())}));
+            .map(([slot, attribute]) => ({
+                slot,
+                buffer: managers.bufferManager.getRaw(attribute.hashProvider.convertToHash())
+            }));
 
         return {
             // draw order is the order the node adapter built the pipelines in: never Map iteration order
@@ -32,9 +34,9 @@ export class RenderItemAssembler {
         };
     }
 
-    private static drawCall(geometry: GeometryInternal, ctx: RenderContext): DrawCall | null {
+    private static drawCall(geometry: GeometryInternal, ctx: RenderContext): DrawCall {
         const draw = geometry.getDrawInfo();
-        if (!draw) return null;
+        if (!draw) throw new Error("RenderItem doesn't include a draw call");
 
         if ("indexBuffer" in draw) {
             return {

@@ -68,11 +68,8 @@ export class NodeInternal {
         return this.sceneBindgroup;
     }
 
-    /** Render-side input: the group 0 bind group. Applied like the frame. */
     setSceneBindgroup(bindgroup: BindgroupInteractor) {
         if (this.sceneBindgroup === bindgroup) return;
         this.sceneBindgroup = bindgroup;
-        for (const list of this.pipelines.values()) for (const pipeline of list) pipeline.setBindgroup(0, bindgroup);
-        this.hashProvider.markChanged();
     }
 }

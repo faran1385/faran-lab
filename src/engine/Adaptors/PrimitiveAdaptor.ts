@@ -131,8 +131,8 @@ export class PrimitiveAdaptor {
             FRAGMENT_ENTRY_POINT,
         );
 
-        this.fillStage(this.internal.getVertex(), vertexCode, VERTEX_ENTRY_POINT);
-        this.fillStage(this.internal.getFragment(), fragmentCode, FRAGMENT_ENTRY_POINT);
+        this.fillStage(this.internal.vertex, vertexCode, VERTEX_ENTRY_POINT);
+        this.fillStage(this.internal.fragment, fragmentCode, FRAGMENT_ENTRY_POINT);
     }
 
     /** setCode/setEntryPoint always mark the stage changed, so only call them when the value really differs. */

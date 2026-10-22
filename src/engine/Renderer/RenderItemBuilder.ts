@@ -25,7 +25,6 @@ export class RenderItemBuilder {
         cache.touch(node);
 
         const entry = cache.get(node);
-
         // The render side's own inputs. They stamp the node, so this comes before the staleness checks and a first
         // build sees them.
         if (!entry) {
@@ -58,17 +57,20 @@ export class RenderItemBuilder {
     private static buildPrimitive(node: NodeInternal, primitive: PrimitiveInternal, ctx: RenderContext, held: HeldKeys): RenderItem | null {
         const pipelines = node.getPipelines().get(primitive.uuid);
         const geometry = primitive.getGeo();
+        console.log(pipelines)
         if (!pipelines || pipelines.length === 0 || !geometry || !geometry.getDrawInfo()) return null;
 
         // All variants of one primitive share their bind groups: take them from the first.
         const bindgroupKeys = Array.from(pipelines[0].bindgroups.entries())
             .sort(([a], [b]) => a - b)
             .map(([slot, bindgroup]) => ({slot, key: ResourceLayer.bindgroup(bindgroup, ctx, held)}));
-
         ResourceLayer.geometry(geometry, ctx, held);
 
         const pipelineKeys: string[] = [];
         for (const pipeline of pipelines) {
+            pipeline.setVertex(primitive.vertex);
+            pipeline.setFragment(primitive.fragment);
+
             const key = ResourceLayer.pipeline(pipeline, ctx, held);
             if (key === null) return null;       // not complete yet: not drawn until it is
             pipelineKeys.push(key);

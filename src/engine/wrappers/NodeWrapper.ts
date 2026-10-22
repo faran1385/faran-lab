@@ -31,7 +31,13 @@ export class NodeWrapper {
         scale?: Node["scale"],
         name?: string,
     ) {
-        this.adaptor = adaptor ?? new NodeAdaptor(undefined, {binding: 0, visibility: GPUShaderStage.VERTEX});
+        this.adaptor = adaptor ?? new NodeAdaptor();
+
+        if (!adaptor) this.adaptor.internal.getPipelines().forEach(pipeline => pipeline.forEach((p) => {
+            this.adaptor.setBindingGroup(p, "scene", 0);
+            this.adaptor.setBindingGroup(p, "node", 1)
+        }))
+
         const t = translation ?? [0, 0, 0] as any;
         const r = rotation ?? [0, 0, 0, 1] as any;
         const s = scale ?? [1, 1, 1] as any;

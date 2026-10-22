@@ -58,18 +58,9 @@ export class NodeAdaptor {
     private readonly onDependencyChange = () => this.invalidate();
     private dirty = true;
 
-    constructor(internal?: NodeInternal, needNodeTransform?: {
-        binding: number,
-        visibility: GPUShaderStageFlags
-    }) {
+    constructor(internal?: NodeInternal) {
         this.internal = internal ?? new NodeInternal();
-        if (needNodeTransform) {
-            this.internal.bindgroupInteractor.setUniform(
-                needNodeTransform.binding,
-                this.buffer,
-                needNodeTransform.visibility
-            )
-        }
+
         schedulePreFrame(this.worldTask);
     }
 
@@ -161,6 +152,7 @@ export class NodeAdaptor {
     }
 
     ensure(): void {
+
         const primitives = this.mesh ? this.mesh.getPrimitiveAdaptors() : [];
         this.syncWatched(primitives);
         for (const primitive of primitives) primitive.ensure();
@@ -244,7 +236,6 @@ export class NodeAdaptor {
         const frame = this.internal.getFrame();
         const scene = this.internal.getSceneBindgroup();
         const live = new Set<string>();
-
         for (const adaptor of primitives) {
             const primitive = adaptor.internal;
             const material = primitive.getMat();
@@ -265,8 +256,8 @@ export class NodeAdaptor {
 
             settings.cullModes.forEach((cullMode, i) => {
                 const pipeline = pipelines[i];
-                pipeline.setVertex(primitive.getVertex());
-                pipeline.setFragment(primitive.getFragment());
+                pipeline.setVertex(primitive.vertex);
+                pipeline.setFragment(primitive.fragment);
                 pipeline.setVertexBuffers(buffers);
                 pipeline.setPrimitiveState({topology: "triangle-list", cullMode});
                 pipeline.setMaterialState({blend: settings.blend, depthWriteEnabled: settings.depthWriteEnabled});
