@@ -250,14 +250,14 @@ const tests: TestCase[] = [
             flushPreFrame();
             const internal = geometry.adaptor.internal;
             const attributeBefore = internal.getVertexAttributes().get(0)!;
-            const hashBefore = internal.hashProvider.convertToHash();
+            const changedAtBefore = internal.hashProvider.getChangedAt();
             geometry.getAttribute("position")!.setData(new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0, 0.5, 0]).buffer);
             flushPreFrame();
             equal(internal.getVertexAttributes().get(0), attributeBefore, "same-sized data update should reuse attribute identity");
-            equal(internal.hashProvider.convertToHash(), hashBefore, "buffer content update should not alter structural hash");
+            equal(internal.hashProvider.getChangedAt(), changedAtBefore, "buffer content update should not alter structural change stamp");
             geometry.setAttribute(new AttributeWrapper("normal", new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]).buffer, "float32x3"));
             flushPreFrame();
-            assert(internal.hashProvider.convertToHash() !== hashBefore, "adding an attribute should change geometry representation hash");
+            assert(internal.hashProvider.getChangedAt() > changedAtBefore, "adding an attribute should change geometry structural stamp");
         },
     },
     {
