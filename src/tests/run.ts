@@ -288,8 +288,8 @@ const tests: TestCase[] = [
             root.removeChild(drawable.node);
             renderer.render(scene.internal, camera);
             const removed = managerCacheSnapshot(renderer);
-            assert(totalCaches(removed) < totalCaches(added) + 4,
-                `resource cache should release most node-owned resources after removal; added=${JSON.stringify(added)}, removed=${JSON.stringify(removed)}`);
+            assert(totalCaches(removed) < totalCaches(added),
+                `removing the only drawable should release its node-owned cached resources; added=${JSON.stringify(added)}, removed=${JSON.stringify(removed)}`);
 
             root.addChild(drawable.node);
             renderer.render(scene.internal, camera);
