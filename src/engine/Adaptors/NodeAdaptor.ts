@@ -1,6 +1,7 @@
 import {NodeInternal} from "../internals/NodeInternal.ts";
 import {BufferInternal} from "../internals/BufferInternal.ts";
 import {PipelineInteractor} from "../Representations/PipelineInteractor.ts";
+import type {BindgroupInteractor} from "../Representations/BindgroupInteractor.ts";
 import {mat4} from "../../packages/math/matrix/mat4.ts";
 import {schedulePreFrame} from "./PreFrameQueue.ts";
 import {Source} from "./Source.ts";
@@ -52,8 +53,6 @@ export class NodeAdaptor {
 
     private mesh: MeshAdaptor | null = null;
     private readonly watchedPrimitives = new Map<string, PrimitiveAdaptor>();
-    /** One stable queued callback per primitive so pipeline-state changes only touch that primitive's variants. */
-    private readonly pipelineTasks = new Map<string, () => void>();
     private readonly task = () => this.ensure();
     private readonly onDependencyChange = () => this.invalidate();
     private dirty = true;
@@ -170,48 +169,13 @@ export class NodeAdaptor {
         for (const [uuid, primitive] of this.watchedPrimitives) {
             if (wanted.has(uuid)) continue;
             primitive.changed.unsubscribe(this.internal.uuid);
-            primitive.pipelineChanged.unsubscribe(this.internal.uuid);
-            this.pipelineTasks.delete(uuid);
             this.watchedPrimitives.delete(uuid);
         }
         for (const primitive of primitives) {
             const uuid = primitive.internal.uuid;
             if (this.watchedPrimitives.has(uuid)) continue;
             primitive.changed.subscribe(this.internal.uuid, this.onDependencyChange);
-            const pipelineTask = () => this.updatePipelineState(primitive);
-            this.pipelineTasks.set(uuid, pipelineTask);
-            primitive.pipelineChanged.subscribe(this.internal.uuid, pipelineTask);
             this.watchedPrimitives.set(uuid, primitive);
-        }
-    }
-
-    /**
-     * Applies pipeline-state changes for one primitive without regenerating shaders or reapplying unrelated bindings.
-     * If the number of cull variants changes, a structural pipeline sync is required instead.
-     */
-    private updatePipelineState(primitive: PrimitiveAdaptor): void {
-        const settings = primitive.getPipelineSettings();
-        if (!settings) return;
-
-        const pipelines = this.internal.getPipelines().get(primitive.internal.uuid);
-        if (!pipelines) {
-            this.invalidate();
-            return;
-        }
-        if (pipelines.length !== settings.cullModes.length) {
-            this.invalidate();
-            return;
-        }
-
-        for (let i = 0; i < pipelines.length; i++) {
-            pipelines[i].setPrimitiveState({
-                topology: "triangle-list",
-                cullMode: settings.cullModes[i],
-            });
-            pipelines[i].setMaterialState({
-                blend: settings.blend,
-                depthWriteEnabled: settings.depthWriteEnabled,
-            });
         }
     }
 
@@ -223,12 +187,10 @@ export class NodeAdaptor {
         pipeline: PipelineInteractor,
         source: "scene" | "node",
         group: number,
+        binding: BindgroupInteractor,
     ): void {
-        // Resolve the semantic source here; callers state what the binding represents, not which object to guess.
-        const binding = source === "scene"
-            ? this.internal.getSceneBindgroup()
-            : this.internal.bindgroupInteractor;
-        if (!binding) return;
+        // Keep the semantic source explicit at the call site rather than inferring it from the group number.
+        if (source !== "scene" && source !== "node") return;
         pipeline.setBindgroup(group, binding);
     }
 
@@ -262,9 +224,9 @@ export class NodeAdaptor {
                 pipeline.setPrimitiveState({topology: "triangle-list", cullMode});
                 pipeline.setMaterialState({blend: settings.blend, depthWriteEnabled: settings.depthWriteEnabled});
                 if (frame) pipeline.setFrame(frame);
-                if (scene) this.setBindingGroup(pipeline, "scene", 0);
+                if (scene) this.setBindingGroup(pipeline, "scene", 0, scene);
                 pipeline.setBindgroup(material.getGroup(), material.getBindgroupInteractor());
-                this.setBindingGroup(pipeline, "node", this.internal.group);
+                this.setBindingGroup(pipeline, "node", this.internal.group, this.internal.bindgroupInteractor);
             });
 
             this.internal.setPipelines(primitive.uuid, pipelines);
