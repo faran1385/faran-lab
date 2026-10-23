@@ -311,12 +311,21 @@ const highTextures: Scenario = {
         // a TextureWrapper that is already bound is edited. The bind group holds the image and the sampler, so these
         // only reach the GPU if the material hears about them.
         const replacementImage = new ImageWrapper(pixelBytes(2, [255, 0, 255, 255]), 2, 2);
-        await trigger(ctx, rig, "textureWrapper.setImage (a bound texture gets another image)", () => other.setImage(replacementImage), {
+        const vertexRunsBeforeImageSwap = counted.vertex.calls;
+        const fragmentRunsBeforeImageSwap = counted.fragment.calls;
+        await trigger(ctx, rig, "textureWrapper.setImage (resource-only swap on a bound texture)", () => other.setImage(replacementImage), {
             created: {texture: 1, bindgroup: 1},
         }, {sameAfter: true});
-        await trigger(ctx, rig, "textureWrapper.setSampler (a bound texture gets another sampler)", () => other.setSampler(new SamplerWrapper("nearest", "nearest", "nearest", "mirror-repeat", "mirror-repeat")), {
+        ctx.check(counted.vertex.calls === vertexRunsBeforeImageSwap && counted.fragment.calls === fragmentRunsBeforeImageSwap,
+            "replacing a bound texture's image re-ran shader assembly; a resource-only swap must not invalidate shader code");
+
+        const vertexRunsBeforeSamplerSwap = counted.vertex.calls;
+        const fragmentRunsBeforeSamplerSwap = counted.fragment.calls;
+        await trigger(ctx, rig, "textureWrapper.setSampler (resource-only swap on a bound texture)", () => other.setSampler(new SamplerWrapper("nearest", "nearest", "nearest", "mirror-repeat", "mirror-repeat")), {
             created: {sampler: 1, bindgroup: 1},
         }, {sameAfter: true});
+        ctx.check(counted.vertex.calls === vertexRunsBeforeSamplerSwap && counted.fragment.calls === fragmentRunsBeforeSamplerSwap,
+            "replacing a bound texture's sampler re-ran shader assembly; a resource-only swap must not invalidate shader code");
 
         // removing the texture: the bind group layout loses its bindings (layout, pipeline layout, pipeline) and both shaders stop reading uv
         await trigger(ctx, rig, "component.removeTexture", () => base.removeTexture(), {
