@@ -14,6 +14,6 @@ export class TextureAdaptor {
     }
 
     onTextureChange() {
-        this.changed.notify("structure");
+        this.changed.notify("resource");
     }
 }
