@@ -33,8 +33,8 @@ change the engine must be quiet again. `fail` = broken invariant, `warn` = effic
 - `low-level-managers`: ensure / acquire / release / collect / upload
 - `low-level-raw-scene`: scene built from internals with hand-written WGSL, no wrappers or adapters; frames are read back to prove each change reached the screen
 
-## Findings at this commit (2ce0a6b)
-1. `TextureWrapper.setImage` / `setSampler` on a texture that is already bound never reach the bind group (the bind group holds the image and sampler, nothing tells the material).
+## Findings at the redesign test baseline
+1. Fixed: `TextureWrapper.setImage` / `setSampler` on an already-bound texture now use a resource-only invalidation path. The material refreshes its bind-group resource references without invalidating the binding plan or rerunning shader assembly. `high-level-texture` asserts both swaps leave vertex/fragment assembler call counts unchanged.
 2. `AttributeWrapper.setData` on a wrapper that is already in a geometry never reaches the GPU (the GPU buffer is keyed by the AttributeInternal; `IndexAttributeWrapper.setData` works because the wrapper itself is the buffer).
 3. (warn) a data-only `geometry.setAttribute` re-stamps pipelines and hashes 6 times.
 4. (warn) toggling a material setting back recompiles the pipeline (destroyed one frame after last use).
