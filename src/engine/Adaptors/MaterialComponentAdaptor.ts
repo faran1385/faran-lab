@@ -1,8 +1,9 @@
 import {Source} from "./Source.ts";
 
 /**
- * "structure": a texture was set or removed, so the owning material's binding plan is stale.
- * "factors": only the factor values changed, so the owning material only has to repack its factors buffer.
+ * "structure": a texture slot/component was added or removed, so the binding plan and shader inputs are stale.
+ * "resource": an existing texture's image/sampler reference changed; refresh bindings without replanning.
+ * "factors": only factor values changed, so the owning material only has to repack its factors buffer.
  */
 export type ComponentChange = "structure" | "resource" | "factors";
 
