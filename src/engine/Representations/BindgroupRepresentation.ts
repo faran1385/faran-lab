@@ -29,6 +29,10 @@ export class BindgroupRepresentation {
         return this.entries.values()
     }
 
+    getEntry(binding: number): BindgroupEntry | undefined {
+        return this.entries.get(binding);
+    }
+
     protected setEntry(binding: number, entry: BindgroupEntry): void {
         this.entries.set(binding, entry);
         this.hashProvider.markChanged();
