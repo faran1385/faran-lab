@@ -86,7 +86,6 @@ export class ResourceLayer {
         }
 
         const layout = pipeline.getLayout();
-        console.log(layout.getLayouts().get(2))
         const layoutKey = layout.hashProvider.convertToHash(hasher);
         managers.pipelineLayoutManager.ensure(layoutKey, () => producer.producePipelineLayout({
             layout, hasher, managers, label: layout.uuid,

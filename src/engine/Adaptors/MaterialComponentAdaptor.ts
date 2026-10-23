@@ -28,4 +28,11 @@ export class MaterialComponentAdaptor {
     onFactorsChange() {
         this.changed.notify("factors");
     }
+
+    _onTextureChange() {
+        this.changed.notify("structure")
+    }
+
+    onTextureChange = this._onTextureChange.bind(this);
+
 }

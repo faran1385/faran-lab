@@ -1,23 +1,20 @@
 import type {ImageWrapper} from "./ImageWrapper.ts";
 import type {SamplerWrapper} from "./SamplerWrapper.ts";
 import {v4 as uuidv4} from "uuid";
-import {TextureHashProvider} from "../hashing/TextureHashProvider.ts";
+import {TextureAdaptor} from "../Adaptors/TextureAdaptor.ts";
 
 export class TextureWrapper {
     private image!: ImageWrapper;
     private sampler!: SamplerWrapper;
     readonly uuid: string;
-    readonly hashProvider: TextureHashProvider;
-
+    readonly adaptor: TextureAdaptor;
 
     constructor(image: ImageWrapper, sampler: SamplerWrapper) {
         this.uuid = uuidv4();
         this.image = image;
         this.sampler = sampler;
-        this.hashProvider = new TextureHashProvider({
-            getImage: this.getImage.bind(this),
-            getSampler: this.getSampler.bind(this),
-        })
+        this.adaptor = new TextureAdaptor();
+
     }
 
     getImage(): ImageWrapper {
@@ -25,8 +22,9 @@ export class TextureWrapper {
     }
 
     setImage(image: ImageWrapper): void {
+        if (this.image === image) return;
         this.image = image;
-        this.hashProvider.markChangeStamp()
+        this.adaptor.onTextureChange()
     }
 
     getSampler(): SamplerWrapper {
@@ -34,8 +32,9 @@ export class TextureWrapper {
     }
 
     setSampler(sampler: SamplerWrapper): void {
+        if (this.sampler === sampler) return;
         this.sampler = sampler;
-        this.hashProvider.markChangeStamp()
+        this.adaptor.onTextureChange()
     }
 
 

@@ -20,16 +20,19 @@ export class MaterialComponentWrapper {
         this.name = name;
         this.factors = factors;
         this.adaptor = new MaterialComponentAdaptor();
-
-
     }
 
     setTexture(texture: MaterialComponentTextureSlot): void {
+        if (this.texture === texture) return;
+        this.texture?.wrapper.adaptor.disconnectAdaptor(this.uuid)
+
         this.texture = texture;
+        texture.wrapper.adaptor.connectAdaptor(this.uuid, this.adaptor.onTextureChange)
         this.adaptor.onStructureChange()
     }
 
     removeTexture(): void {
+        this.texture?.wrapper.adaptor.disconnectAdaptor(this.uuid)
         this.texture = undefined;
         this.adaptor.onStructureChange()
     }

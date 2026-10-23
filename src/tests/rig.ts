@@ -4,7 +4,6 @@ import {Renderer} from "../engine/Renderer/Renderer.ts";
 import {RenderTarget} from "../engine/Renderer/RenderTarget.ts";
 import {getEpoch} from "../engine/hashing/utils/epoch.ts";
 import type {Hasher} from "../engine/hashing/utils/Hasher.ts";
-import type {SceneInternal} from "../engine/internals/SceneInternal.ts";
 import type {RenderContext} from "../engine/Renderer/RenderContext.ts";
 
 /** The offscreen colour target (and the canvas) are SIZE x SIZE pixels. */
@@ -139,7 +138,7 @@ export class Rig {
     readonly format: GPUTextureFormat;
     readonly hasher: Hasher;
     /** When set, this is drawn instead of `scene`. */
-    custom: SceneInternal | null = null;
+    custom: Scene | null = null;
 
     private readonly created: Counts = emptyCounts();
     private bufferWrites = 0;
@@ -479,7 +478,7 @@ export class Rig {
         console.log = () => {
         };
         try {
-            this.renderer.render(this.custom ?? this.scene.adaptor.internal, this.camera);
+            this.renderer.render(this.custom ?? this.scene, this.camera);
         } finally {
             console.log = log;
         }

@@ -27,7 +27,6 @@ export class RenderItemBuilder {
         const entry = cache.get(node);
         // The render side's own inputs. They stamp the node, so this comes before the staleness checks and a first
         // build sees them.
-
         // Quiet frame: nothing anywhere changed since the last frame
         if (entry && cache.lastFrameEpoch === getEpoch()) return entry.items;
 

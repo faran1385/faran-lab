@@ -1,4 +1,3 @@
-import type {SceneInternal} from "../internals/SceneInternal.ts";
 import {BufferInternal} from "../internals/BufferInternal.ts";
 import {BindgroupInteractor} from "../Representations/BindgroupInteractor.ts";
 import {Hasher} from "../hashing/utils/Hasher.ts";
@@ -14,6 +13,7 @@ import {UploadLayer} from "./UploadLayer.ts";
 import {flushPreFrame} from "../Adaptors/PreFrameQueue.ts";
 import type {FrameInfo, RenderContext} from "./RenderContext.ts";
 import type {RenderItem} from "./RenderItem.ts";
+import type {Scene} from "../Scene/Scene.ts";
 
 
 /**
@@ -97,8 +97,11 @@ export class Renderer {
         };
     }
 
-    render(scene: SceneInternal, camera: Camera): void {
+    render(scene: Scene, camera: Camera): void {
         // 1. wrappers -> internals, once, from the final state of everything that was set since the last frame
+
+        const sceneNodes = scene.adaptor.internal.getNodes();
+
 
         const ctx = this.renderContext;
 
@@ -109,7 +112,7 @@ export class Renderer {
         const frame = this.currentFrame();
         if (frame.colorFormat !== ctx.frame.colorFormat || frame.depthFormat !== ctx.frame.depthFormat) {
             ctx.frame = frame;
-            for (const node of scene.getNodes()) node.setFrame(frame);
+            for (const node of sceneNodes) node.setFrame(frame);
             this.renderCache.invalidateAll();
         }
 
@@ -138,7 +141,7 @@ export class Renderer {
         });
 
         // 3. + 4. refresh the render items of changed nodes, draw every item
-        for (const node of scene.getNodes()) {
+        for (const node of sceneNodes) {
             for (const item of RenderItemBuilder.build(node, ctx)) {
                 Renderer.draw(pass, item);
             }
