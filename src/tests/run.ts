@@ -1,4 +1,6 @@
-import {flushPreFrame} from "../engine/Adaptors/PreFrameQueue.ts";
+import {flushPreFrame, schedulePreFrame, hasPendingPreFrame} from "../engine/Adaptors/PreFrameQueue.ts";
+import {BindgroupInteractor} from "../engine/Representations/BindgroupInteractor.ts";
+import type {RenderContext} from "../engine/Renderer/RenderContext.ts";
 import {SceneAdaptor} from "../engine/Adaptors/SceneAdaptor.ts";
 import {AttributeWrapper} from "../engine/wrappers/AttributeWrapper.ts";
 import {GeometryWrapper} from "../engine/wrappers/GeometryWrapper.ts";
@@ -22,6 +24,16 @@ type Result = { name: string; status: "pass" | "fail" | "skip"; detail?: string 
 const resultsElement = document.querySelector<HTMLDivElement>("#results");
 const summaryElement = document.querySelector<HTMLParagraphElement>("#summary");
 if (!resultsElement || !summaryElement) throw new Error("Test page is missing #results or #summary");
+
+// Adapter tasks now consume RenderContext. Unit tests provide only the render-side values NodeAdaptor needs.
+const unitContext = {
+    frame: {colorFormat: "bgra8unorm", depthFormat: "depth24plus"},
+    sceneBindgroup: new BindgroupInteractor(),
+} as unknown as RenderContext;
+
+function flush(): void {
+    flushPreFrame(unitContext);
+}
 
 function assert(condition: unknown, message: string): asserts condition {
     if (!condition) throw new Error(message);
@@ -115,11 +127,11 @@ const tests: TestCase[] = [
             const scene = new SceneAdaptor(root.adaptor);
             root.addChild(child);
             child.setMesh(makeDrawable().mesh);
-            flushPreFrame();
+            flush();
             equal(scene.internal.getNodes().length, 1, "one mesh-bearing node should be in scene");
             equal(scene.internal.getNodes()[0], child.adaptor.internal, "scene should expose child internal");
             root.removeChild(child);
-            flushPreFrame();
+            flush();
             equal(scene.internal.getNodes().length, 0, "removed subtree should leave scene");
         },
     },
@@ -131,11 +143,11 @@ const tests: TestCase[] = [
             parent.addChild(child);
             parent.setTranslation(2, 0, 0);
             child.setTranslation(0, 3, 0);
-            flushPreFrame();
+            flush();
             near(child.getWorldMatrix()[12], 2, "child world X");
             near(child.getWorldMatrix()[13], 3, "child world Y");
             parent.setTranslation(5, 0, 0);
-            flushPreFrame();
+            flush();
             near(child.getWorldMatrix()[12], 5, "descendant world X after parent mutation");
         },
     },
@@ -143,14 +155,14 @@ const tests: TestCase[] = [
         name: "HIGH LEVEL — factor value changes preserve plan version when shape is unchanged",
         run() {
             const material = makeMaterial();
-            flushPreFrame();
+            flush();
             const component = material.getComponent("baseColor")!;
             const version = material.adaptor.getPlanVersion();
             component.setFactors([0.1, 0.2, 0.3, 1]);
-            flushPreFrame();
+            flush();
             equal(material.adaptor.getPlanVersion(), version, "same-arity factor update should not invalidate shader plan");
             component.setFactors([0.1, 0.2]);
-            flushPreFrame();
+            flush();
             assert(material.adaptor.getPlanVersion() > version, "factor arity change must invalidate generated shader plan");
         },
     },
@@ -158,17 +170,17 @@ const tests: TestCase[] = [
         name: "HIGH LEVEL — texture binding changes invalidate the material plan",
         run() {
             const material = makeMaterial();
-            flushPreFrame();
+            flush();
             const component = material.getComponent("baseColor")!;
             const before = material.adaptor.getPlanVersion();
             const image = new ImageWrapper(new Uint8Array([255, 255, 255, 255]).buffer, 1, 1);
             const texture = new TextureWrapper(image, new SamplerWrapper());
             component.setTexture({wrapper: texture, texCoord: "TEXCOORD_0"});
-            flushPreFrame();
+            flush();
             assert(material.adaptor.getPlanVersion() > before, "adding a texture binding should bump plan version");
             assert(material.adaptor.getBindingPlan().slots.length >= 2, "texture and sampler bindings should be planned");
             component.removeTexture();
-            flushPreFrame();
+            flush();
             assert(material.adaptor.getBindingPlan().slots.length === 0, "removing texture should remove texture/sampler slots");
         },
     },
@@ -179,33 +191,50 @@ const tests: TestCase[] = [
             const root = new NodeWrapper();
             root.addChild(drawable.node);
             const scene = new SceneAdaptor(root.adaptor);
-            flushPreFrame();
+            flush();
             const version = drawable.material.adaptor.getPlanVersion();
             const primitiveId = drawable.primitive.adaptor.internal.uuid;
             const before = drawable.node.adaptor.internal.getPipelines().get(primitiveId)!;
             equal(before.length, 1, "opaque single-sided material starts with one pipeline variant");
             drawable.material.setAlphaMode("blend");
             drawable.material.setDoubleSided(true);
-            flushPreFrame();
+            flush();
             equal(drawable.material.adaptor.getPlanVersion(), version, "pipeline settings must not alter shader plan");
             const after = drawable.node.adaptor.internal.getPipelines().get(primitiveId)!;
             equal(after.length, 2, "double-sided blended material needs two cull variants");
             assert(after[0] === before[0], "existing variant representation should be reused when possible");
             equal(scene.internal.getNodes().length, 1, "scene membership should remain stable");
+            equal(after[0].bindgroups.get(0), unitContext.sceneBindgroup, "group 0 should be the scene/camera binding");
+            equal(after[0].bindgroups.get(1), drawable.material.adaptor.internal.getBindgroupInteractor(), "group 1 should be the material binding");
+            equal(after[0].bindgroups.get(2), drawable.node.adaptor.internal.bindgroupInteractor, "group 2 should be the node binding");
         },
     },
     {
         name: "HIGH LEVEL — geometry layout version changes only when layout changes",
         run() {
             const geometry = makeGeometry();
-            flushPreFrame();
+            flush();
             const initial = geometry.adaptor.getLayoutVersion();
             geometry.getAttribute("position")!.setData(new Float32Array([-1, -1, 0, 1, -1, 0, 0, 1, 0]).buffer);
-            flushPreFrame();
+            flush();
             equal(geometry.adaptor.getLayoutVersion(), initial, "same attribute layout/data size should preserve layout version");
             geometry.setAttribute(new AttributeWrapper("uv", new Float32Array([0, 0, 1, 0, 0.5, 1]).buffer, "float32x2"));
-            flushPreFrame();
+            flush();
             assert(geometry.adaptor.getLayoutVersion() > initial, "adding an attribute should change layout version");
+        },
+    },
+    {
+        name: "LOW LEVEL — pre-frame queue deduplicates stable tasks and drains tasks scheduled during flush",
+        run() {
+            let calls = 0;
+            const second = () => { calls += 10; };
+            const first = () => { calls++; schedulePreFrame(second); };
+            schedulePreFrame(first);
+            schedulePreFrame(first);
+            assert(hasPendingPreFrame(), "scheduling should mark the queue pending");
+            flush();
+            equal(calls, 11, "first task should be deduplicated and its dependent task should run in the same flush");
+            assert(!hasPendingPreFrame(), "queue should be empty after a complete flush");
         },
     },
     {
@@ -247,16 +276,16 @@ const tests: TestCase[] = [
         name: "LOW LEVEL — representation hashes change for structural edits but buffer identity stays stable",
         run() {
             const geometry = makeGeometry();
-            flushPreFrame();
+            flush();
             const internal = geometry.adaptor.internal;
             const attributeBefore = internal.getVertexAttributes().get(0)!;
             const changedAtBefore = internal.hashProvider.getChangedAt();
             geometry.getAttribute("position")!.setData(new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0, 0.5, 0]).buffer);
-            flushPreFrame();
+            flush();
             equal(internal.getVertexAttributes().get(0), attributeBefore, "same-sized data update should reuse attribute identity");
             equal(internal.hashProvider.getChangedAt(), changedAtBefore, "buffer content update should not alter structural change stamp");
             geometry.setAttribute(new AttributeWrapper("normal", new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]).buffer, "float32x3"));
-            flushPreFrame();
+            flush();
             assert(internal.hashProvider.getChangedAt() > changedAtBefore, "adding an attribute should change geometry structural stamp");
         },
     },
