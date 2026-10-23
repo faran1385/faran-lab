@@ -67,10 +67,12 @@ export class MaterialAdaptor {
     private readonly task = () => this.ensure();
     private readonly onComponentChange = (change: ComponentChange) => {
         if (change === "structure") this.invalidatePlan();
+        else if (change === "resource") this.invalidateBindings();
         else this.invalidateFactors();
     };
 
     private planDirty = true;
+    private bindingsDirty = false;
     private settingsDirty = true;
     private factorsDirty = true;
 
@@ -118,6 +120,12 @@ export class MaterialAdaptor {
         schedulePreFrame(this.task);
     }
 
+    /** Only an existing texture's image/sampler reference changed: refresh bind-group resources without replanning. */
+    invalidateBindings() {
+        this.bindingsDirty = true;
+        schedulePreFrame(this.task);
+    }
+
     /** Only factor values (or alphaCutoff) changed: the plan is kept, the buffer is repacked. */
     invalidateFactors() {
         this.factorsDirty = true;
@@ -153,12 +161,14 @@ export class MaterialAdaptor {
     // -- the work -----------------------------------------------------------
 
     ensure(): void {
-        if (!this.planDirty && !this.settingsDirty && !this.factorsDirty) return;
+        if (!this.planDirty && !this.bindingsDirty && !this.settingsDirty && !this.factorsDirty) return;
 
         const planWasDirty = this.planDirty;
+        const bindingsWereDirty = this.bindingsDirty;
         const factorsWereDirty = this.factorsDirty;
         const settingsWereDirty = this.settingsDirty;
         this.planDirty = false;
+        this.bindingsDirty = false;
         this.factorsDirty = false;
         this.settingsDirty = false;
 
@@ -183,7 +193,7 @@ export class MaterialAdaptor {
             bufferReplaced = this.syncFactorsBuffer(packFactors(plan));
         }
 
-        if (planWasDirty || bufferReplaced) this.syncBindings();
+        if (planWasDirty || bufferReplaced || bindingsWereDirty) this.syncBindings();
         if (settingsWereDirty) this.syncSettings();
     }
 
