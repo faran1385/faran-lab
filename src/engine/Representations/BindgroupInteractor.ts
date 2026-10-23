@@ -13,10 +13,7 @@ export class BindgroupInteractor extends BindgroupRepresentation {
             this.setEntry(binding, {binding, resource});
         }
 
-        const layoutEntry = this.layout.getEntry(binding);
-        if (!layoutEntry || !("texture" in layoutEntry) || layoutEntry.visibility !== visibility) {
-            this.layout.setEntry(binding, {binding, texture: resource, visibility});
-        }
+        this.layout.setEntry(binding, {binding, texture: resource, visibility});
     }
 
     setUniform(binding: number, resource: BufferInternal, visibility: GPUShaderStageFlags) {
@@ -24,10 +21,7 @@ export class BindgroupInteractor extends BindgroupRepresentation {
             this.setEntry(binding, {binding, resource});
         }
 
-        const layoutEntry = this.layout.getEntry(binding);
-        if (!layoutEntry || !("buffer" in layoutEntry) || layoutEntry.visibility !== visibility) {
-            this.layout.setEntry(binding, {binding, buffer: resource, visibility});
-        }
+        this.layout.setEntry(binding, {binding, buffer: resource, visibility});
     }
 
     /** Removes the entry and its layout entry together, so the two never disagree. */
@@ -41,9 +35,6 @@ export class BindgroupInteractor extends BindgroupRepresentation {
             this.setEntry(binding, {binding, resource});
         }
 
-        const layoutEntry = this.layout.getEntry(binding);
-        if (!layoutEntry || !("sampler" in layoutEntry) || layoutEntry.visibility !== visibility) {
-            this.layout.setEntry(binding, {binding, sampler: resource, visibility});
-        }
+        this.layout.setEntry(binding, {binding, sampler: resource, visibility});
     }
 }
