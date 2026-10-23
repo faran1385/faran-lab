@@ -1,18 +1,20 @@
 import {NodeInternal} from "../internals/NodeInternal.ts";
 import {BufferInternal} from "../internals/BufferInternal.ts";
 import {PipelineInteractor} from "../Representations/PipelineInteractor.ts";
-import type {BindgroupInteractor} from "../Representations/BindgroupInteractor.ts";
 import {mat4} from "../../packages/math/matrix/mat4.ts";
 import {schedulePreFrame} from "./PreFrameQueue.ts";
 import {Source} from "./Source.ts";
 import type {MeshWrapper} from "../wrappers/MeshWrapper.ts";
 import type {MeshAdaptor} from "./MeshAdaptor.ts";
 import type {PrimitiveAdaptor} from "./PrimitiveAdaptor.ts";
+import type {RenderContext} from "../Renderer/RenderContext.ts";
 
 /** What the adapter reads from a node wrapper to compute its local matrix. */
 export interface TransformSource {
     getTranslation(): Float32Array;
+
     getRotation(): Float32Array;
+
     getScale(): Float32Array;
 }
 
@@ -53,13 +55,14 @@ export class NodeAdaptor {
 
     private mesh: MeshAdaptor | null = null;
     private readonly watchedPrimitives = new Map<string, PrimitiveAdaptor>();
-    private readonly task = () => this.ensure();
+    private readonly task = (ctx: RenderContext) => this.ensure(ctx);
     private readonly onDependencyChange = () => this.invalidate();
     private dirty = true;
 
+
     constructor(internal?: NodeInternal) {
         this.internal = internal ?? new NodeInternal();
-
+        if (this.internal.nodeBindgroupAt !== null) this.internal.bindgroupInteractor.setUniform(0, this.buffer, GPUShaderStage.VERTEX)
         schedulePreFrame(this.worldTask);
     }
 
@@ -87,6 +90,7 @@ export class NodeAdaptor {
     getWorldMatrix(): Float32Array {
         return this.world;
     }
+
 
     ensureWorld(): void {
         // by the invariant a clean parent has clean ancestors, so only a stale parent has to be brought up to date
@@ -150,7 +154,7 @@ export class NodeAdaptor {
         schedulePreFrame(this.task);
     }
 
-    ensure(): void {
+    ensure(ctx: RenderContext): void {
 
         const primitives = this.mesh ? this.mesh.getPrimitiveAdaptors() : [];
         this.syncWatched(primitives);
@@ -158,7 +162,7 @@ export class NodeAdaptor {
 
         if (!this.dirty) return;
         this.dirty = false;
-        this.rebuildPipelines(primitives);
+        this.rebuildPipelines(ctx, primitives);
     }
 
     /** Subscribes to primitives that joined the mesh and drops the ones that left it. */
@@ -179,25 +183,10 @@ export class NodeAdaptor {
         }
     }
 
-    /**
-     * Applies an explicitly named scene/node binding to a pipeline representation.
-     * Material bindings are primitive-specific and are supplied separately.
-     */
-    setBindingGroup(
-        pipeline: PipelineInteractor,
-        source: "scene" | "node",
-        group: number,
-        binding: BindgroupInteractor,
-    ): void {
-        // Keep the semantic source explicit at the call site rather than inferring it from the group number.
-        if (source !== "scene" && source !== "node") return;
-        pipeline.setBindgroup(group, binding);
-    }
+    private rebuildPipelines(ctx: RenderContext, primitives: readonly PrimitiveAdaptor[]): void {
 
-    private rebuildPipelines(primitives: readonly PrimitiveAdaptor[]): void {
-        const frame = this.internal.getFrame();
-        const scene = this.internal.getSceneBindgroup();
         const live = new Set<string>();
+
         for (const adaptor of primitives) {
             const primitive = adaptor.internal;
             const material = primitive.getMat();
@@ -223,10 +212,11 @@ export class NodeAdaptor {
                 pipeline.setVertexBuffers(buffers);
                 pipeline.setPrimitiveState({topology: "triangle-list", cullMode});
                 pipeline.setMaterialState({blend: settings.blend, depthWriteEnabled: settings.depthWriteEnabled});
-                if (frame) pipeline.setFrame(frame);
-                if (scene) this.setBindingGroup(pipeline, "scene", 0, scene);
+                pipeline.setFrame(ctx.frame);
+                if (this.internal.sceneBindgroupAt !== null) pipeline.setBindgroup(this.internal.sceneBindgroupAt, ctx.sceneBindgroup);
+
                 pipeline.setBindgroup(material.getGroup(), material.getBindgroupInteractor());
-                this.setBindingGroup(pipeline, "node", this.internal.group, this.internal.bindgroupInteractor);
+                if (this.internal.nodeBindgroupAt !== null) pipeline.setBindgroup(this.internal.nodeBindgroupAt, this.internal.bindgroupInteractor);
             });
 
             this.internal.setPipelines(primitive.uuid, pipelines);
@@ -235,5 +225,7 @@ export class NodeAdaptor {
         for (const uuid of Array.from(this.internal.getPipelines().keys())) {
             if (!live.has(uuid)) this.internal.removePipelines(uuid);
         }
+
+
     }
 }

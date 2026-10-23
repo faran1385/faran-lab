@@ -4,6 +4,7 @@ import {v4 as uuidv4} from "uuid";
 import {vec3} from "../../packages/math/vector/vec3.ts";
 import {quat} from "../../packages/math/quat/quat.ts";
 import {NodeAdaptor} from "../Adaptors/NodeAdaptor.ts";
+import {NodeInternal} from "../internals/NodeInternal.ts";
 
 export class NodeWrapper {
     readonly adaptor: NodeAdaptor;
@@ -31,12 +32,7 @@ export class NodeWrapper {
         scale?: Node["scale"],
         name?: string,
     ) {
-        this.adaptor = adaptor ?? new NodeAdaptor();
-
-        if (!adaptor) this.adaptor.internal.getPipelines().forEach(pipeline => pipeline.forEach((p) => {
-            this.adaptor.setBindingGroup(p, "scene", 0);
-            this.adaptor.setBindingGroup(p, "node", 1)
-        }))
+        this.adaptor = adaptor ?? new NodeAdaptor(new NodeInternal(2, 0));
 
         const t = translation ?? [0, 0, 0] as any;
         const r = rotation ?? [0, 0, 0, 1] as any;

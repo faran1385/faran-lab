@@ -4,7 +4,7 @@ import type { PipelineInteractor } from "../Representations/PipelineInteractor.t
 import type { MeshInternal } from "../internals/MeshInternal.ts";
 
 type InputFunctions = {
-    getGroup: () => number;
+    getGroup: () => number | null;
     getBindgroup: () => BindgroupInteractor;
     getPipelines: () => Map<string, PipelineInteractor[]>;
     getMesh: () => MeshInternal | null;

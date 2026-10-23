@@ -6,7 +6,7 @@ import {PipelineInteractor, type PipelineFrame} from "../Representations/Pipelin
 
 export class NodeInternal {
     readonly bindgroupInteractor = new BindgroupInteractor();
-    readonly group: number;
+    readonly nodeBindgroupAt: null | number = null;
     readonly uuid: string;
     private mesh: MeshInternal | null = null;
     /**
@@ -15,19 +15,23 @@ export class NodeInternal {
      */
     private pipelines = new Map<string, PipelineInteractor[]>();
     private frame: PipelineFrame | null = null;
-    private sceneBindgroup: BindgroupInteractor | null = null;
+    private sceneBindgroup: BindgroupInteractor | null = null
+    readonly sceneBindgroupAt: null | number = null;
     readonly hashProvider: NodeInternalHashProvider;
 
-    constructor(group: number = 2) {
-        this.group = group;
+    constructor(nodeBindgroupAt: number | null = null, sceneBindgroupAt: number | null = null) {
+        this.sceneBindgroupAt = sceneBindgroupAt;
+        this.nodeBindgroupAt = nodeBindgroupAt;
+
         this.uuid = uuidv4();
         this.hashProvider = new NodeInternalHashProvider({
-            getGroup: () => this.group,
+            getGroup: () => this.nodeBindgroupAt,
             getBindgroup: () => this.bindgroupInteractor,
             getPipelines: () => this.pipelines,
             getMesh: () => this.mesh,
         });
     }
+
 
     getMesh() {
         return this.mesh;

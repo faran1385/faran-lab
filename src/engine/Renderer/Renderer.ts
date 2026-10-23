@@ -99,9 +99,11 @@ export class Renderer {
 
     render(scene: SceneInternal, camera: Camera): void {
         // 1. wrappers -> internals, once, from the final state of everything that was set since the last frame
-        flushPreFrame();
 
         const ctx = this.renderContext;
+
+        flushPreFrame(ctx);
+
 
         // The target formats are part of every pipeline. A change reaches every node, then every node is re-checked.
         const frame = this.currentFrame();

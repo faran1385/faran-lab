@@ -1,3 +1,5 @@
+import type {RenderContext} from "../Renderer/RenderContext.ts";
+
 /**
  * Generic "run this before the frame" queue. It knows nothing about materials, adapters or the renderer.
  *
@@ -6,7 +8,7 @@
  *
  * No imports, like epoch.ts, so it can never be part of an import cycle.
  */
-export type PreFrameTask = () => void;
+export type PreFrameTask = (...args: any[]) => void;
 
 let pending = new Set<PreFrameTask>();
 
@@ -23,7 +25,7 @@ export function hasPendingPreFrame(): boolean {
  * Runs every queued task. Tasks may schedule more tasks (a dependent adapter being invalidated by a sync); those run
  * in the same flush. A throwing task does not stop the others: the first error is rethrown after the flush.
  */
-export function flushPreFrame(): void {
+export function flushPreFrame(ctx: RenderContext): void {
     let rounds = 0;
     let firstError: unknown;
     let failed = false;
@@ -36,7 +38,7 @@ export function flushPreFrame(): void {
         pending = new Set();
         for (const task of batch) {
             try {
-                task();
+                task(ctx);
             } catch (error) {
                 if (!failed) {
                     failed = true;
