@@ -110,7 +110,7 @@ export class MaterialAdaptor {
 
     // -- invalidation (cheap, idempotent, no computation) -----------------
 
-    /** A component was added/removed or a texture changed: bindings, factors layout and shader inputs are stale. */
+    /** A component or texture slot was added/removed: bindings, factors layout and shader inputs are stale. */
     invalidatePlan() {
         this.factorsDirty = true;
         if (!this.planDirty) {
