@@ -40,6 +40,10 @@ export class BindgroupLayoutRepresentation {
         return this.entries.values()
     }
 
+    getEntry(binding: number): BindgroupLayoutEntry<LayoutBinding> | undefined {
+        return this.entries.get(binding);
+    }
+
     setEntry(binding: number, entry: BindgroupLayoutEntry<LayoutBinding>) {
         this.entries.set(binding, entry)
         this.hashProvider.markChanged()
