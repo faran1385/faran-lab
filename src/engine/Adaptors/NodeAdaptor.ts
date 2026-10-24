@@ -61,7 +61,11 @@ export class NodeAdaptor {
 
     constructor(internal?: NodeInternal) {
         this.internal = internal ?? new NodeInternal();
-        if (this.internal.nodeBindgroupAt !== null) this.internal.bindgroupInteractor.setUniform(0, this.buffer, GPUShaderStage.VERTEX)
+        // Built-in nodes need this adaptor's world-matrix buffer, but a caller may wrap a NodeInternal
+        // with a hand-authored binding 0. Preserve that existing resource instead of silently replacing it.
+        if (this.internal.nodeBindgroupAt !== null && !this.internal.bindgroupInteractor.getEntry(0)) {
+            this.internal.bindgroupInteractor.setUniform(0, this.buffer, GPUShaderStage.VERTEX);
+        }
         schedulePreFrame(this.worldTask);
     }
 
