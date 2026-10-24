@@ -32,7 +32,6 @@ export class AttributeWrapper {
         return this.adaptor.internal.getData();
     }
 
-    /** Replace attribute bytes without changing the buffer's allocated size. */
     setData(data: ArrayBuffer | TypedArray): void {
         const bytes = data instanceof ArrayBuffer
             ? data

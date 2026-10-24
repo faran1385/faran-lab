@@ -50,7 +50,7 @@ export class NodeAdaptor {
 
     private worldDirty = true;
     private readonly worldTask = () => this.ensureWorld();
-    
+
 
     private mesh: MeshAdaptor | null = null;
     private readonly watchedPrimitives = new Map<string, PrimitiveAdaptor>();
@@ -218,7 +218,7 @@ export class NodeAdaptor {
             if (!settings) continue;
             const buffers = Array.from(geometry.getVertexAttributes().entries())
                 .sort(([a], [b]) => a - b)
-                .map(([, attribute]) => attribute.getLayout());
+                .map(([, attribute]) => attribute.getLayout()!);
 
             // Reuse by index so a material tweak that keeps the variant count keeps the same representations.
             const pipelines = this.internal.getPipelines().get(primitive.uuid) ?? [];
