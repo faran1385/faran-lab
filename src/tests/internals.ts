@@ -29,7 +29,9 @@ import {SamplerWrapper} from "../engine/wrappers/SamplerWrapper.ts";
 import {CentralManager} from "../engine/managers/CentralManager.ts";
 import {CentralProducer} from "../engine/producers/CentralProducer.ts";
 import {pixelBytes} from "./scenes.ts";
-import {SceneInternal} from "../engine/internals/SceneInternal.ts";
+import {Scene} from "../engine/Scene/Scene.ts";
+import {NodeAdaptor} from "../engine/Adaptors/NodeAdaptor.ts";
+import {NodeWrapper} from "../engine/wrappers/NodeWrapper.ts";
 
 /**
  * Low-level change-trigger tests: the engine's core without a single wrapper or adapter.
@@ -402,7 +404,7 @@ const hashProviders: Scenario = {
         expectEqual(ctx, "...without computing anything", calls(), callsBefore);
 
         // internals: no-op setters stamp nothing, real ones do
-        const node = new NodeInternal(2, 0);
+        const node = new NodeInternal(null, null);
         const mesh = new MeshInternal();
         node.setMesh(mesh);
         epoch = getEpoch();
@@ -660,7 +662,7 @@ function expectColor(ctx: TestCtx, label: string, pixels: Uint8ClampedArray, x: 
 
 const rawScene: Scenario = {
     name: "low-level-raw-scene",
-    description: "A scene built from internals with hand-written WGSL and no wrapper or adapter. Every internal setter is checked for what it costs and, by reading the frame back, for whether the change reached the screen.",
+    description: "Hand-built low-level resources and WGSL are rendered through NodeInternal → NodeAdaptor → NodeWrapper → Scene. Internal setters are checked for their costs and visible effects.",
     run: async (ctx) => {
         const rig = await newRig(ctx);
         const [cx, cy] = rig.project(0, 0, 0);
@@ -683,11 +685,12 @@ const rawScene: Scenario = {
         const mesh = new MeshInternal();
         mesh.setPrimitive(primitive);
         const raw = rawNode(rig, primitive, mesh);
-        const scene = new SceneInternal();
+        const scene = new Scene();
+        const rawWrapper = new NodeWrapper(new NodeAdaptor(raw.node));
 
-        // The raw test uses SceneInternal directly: no wrapper or adapter may rewrite its node list.
+        // Keep the hand-built internal pipeline intact, but route membership through the public Scene wrapper.
         const first = await rig.step(() => {
-            scene.setNodes([raw.node]);
+            scene.addNode(rawWrapper);
             rig.custom = scene;
         });
         gpuClean(ctx, rig, "first frame");
@@ -781,12 +784,13 @@ const rawScene: Scenario = {
 
         // a second node over the same primitive: its matrix and bind group, nothing else
         const second = rawNode(rig, primitive, mesh, 2);
-        await trigger(ctx, rig, "scene.setNodes (a second node over the same primitive)", () => scene.setNodes([raw.node, second.node]), {
+        const secondWrapper = new NodeWrapper(new NodeAdaptor(second.node));
+        await trigger(ctx, rig, "scene.addNode (a second node over the same primitive)", () => scene.addNode(secondWrapper), {
             created: {buffer: 1, bindgroup: 1},
         });
         const [sx, sy] = rig.project(2, 0, 0);
         expectColor(ctx, "the second node is drawn", await rig.readPixels(), sx, sy, [0, 0, 255]);
-        await trigger(ctx, rig, "scene.setNodes (the second node leaves)", () => scene.setNodes([raw.node]), {created: NOTHING}, {sameAfter: false});
+        await trigger(ctx, rig, "scene.removeNode (the second node leaves)", () => scene.removeNode(secondWrapper), {created: NOTHING}, {sameAfter: false});
 
         // the target format is the renderer's input: every node's pipeline follows
         const frameBefore = {...rig.frameInfo};
@@ -797,14 +801,16 @@ const rawScene: Scenario = {
         // membership
         const populated = rig.snapshot();
         await trigger(ctx, rig, "node.setMesh(null)", () => raw.node.setMesh(null), {});
+        scene.adaptor.invalidate();
         ctx.check(rig.addedSinceBaseline().pipeline === 0, `a node without a mesh keeps ${rig.addedSinceBaseline().pipeline} pipeline(s)`);
         await trigger(ctx, rig, "node.setMesh(mesh)", () => raw.node.setMesh(mesh), {});
+        scene.adaptor.invalidate();
         sameCount(ctx, rig, "mesh removed and set again", populated);
 
-        await trigger(ctx, rig, "scene.setNodes([]) (everything leaves)", () => scene.setNodes([]), {});
+        await trigger(ctx, rig, "scene.removeNode (everything leaves)", () => scene.removeNode(rawWrapper), {});
         const left = rig.addedSinceBaseline();
         ctx.check(Object.values(left).every((n) => n === 0), `an empty scene still holds ${JSON.stringify(left)}`);
-        await trigger(ctx, rig, "scene.setNodes([node]) (comes back)", () => scene.setNodes([raw.node]), {});
+        await trigger(ctx, rig, "scene.addNode (comes back)", () => scene.addNode(rawWrapper), {});
         sameResources(ctx, rig, "scene emptied and refilled", populated);
         expectColor(ctx, "drawn again", await rig.readPixels(), cx, cy, [0, 0, 255]);
 
