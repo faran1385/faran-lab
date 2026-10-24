@@ -1,6 +1,5 @@
 import {PerspectiveCamera} from "../engine/Camera/PerspectiveCamera.ts";
 import {Scene} from "../engine/Scene/Scene.ts";
-import {SceneInternal} from "../engine/internals/SceneInternal.ts";
 import {Renderer} from "../engine/Renderer/Renderer.ts";
 import {RenderTarget} from "../engine/Renderer/RenderTarget.ts";
 import {getEpoch} from "../engine/hashing/utils/epoch.ts";
@@ -126,7 +125,7 @@ interface RendererInternals {
  * untouched. Frames go to an offscreen colour target instead of the canvas swapchain, so the tests also run where
  * presenting is unavailable and the result can be read back with copyTextureToBuffer.
  *
- * By default it draws `scene` (a wrapper Scene). Set `custom` to draw a hand-built SceneInternal instead.
+ * By default it draws `scene` (a wrapper Scene). Set `custom` to draw another Scene wrapper.
  */
 export class Rig {
     /** The canvas on the test page that shows the last frame that was read back (the renderer's own canvas is never attached). */
@@ -139,7 +138,7 @@ export class Rig {
     readonly format: GPUTextureFormat;
     readonly hasher: Hasher;
     /** When set, this is drawn instead of `scene`. */
-    custom: Scene | SceneInternal | null = null;
+    custom: Scene | null = null;
 
     private readonly created: Counts = emptyCounts();
     private bufferWrites = 0;
