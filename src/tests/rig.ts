@@ -1,5 +1,6 @@
 import {PerspectiveCamera} from "../engine/Camera/PerspectiveCamera.ts";
 import {Scene} from "../engine/Scene/Scene.ts";
+import {SceneInternal} from "../engine/internals/SceneInternal.ts";
 import {Renderer} from "../engine/Renderer/Renderer.ts";
 import {RenderTarget} from "../engine/Renderer/RenderTarget.ts";
 import {getEpoch} from "../engine/hashing/utils/epoch.ts";
@@ -138,7 +139,7 @@ export class Rig {
     readonly format: GPUTextureFormat;
     readonly hasher: Hasher;
     /** When set, this is drawn instead of `scene`. */
-    custom: Scene | null = null;
+    custom: Scene | SceneInternal | null = null;
 
     private readonly created: Counts = emptyCounts();
     private bufferWrites = 0;
