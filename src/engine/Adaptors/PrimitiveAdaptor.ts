@@ -49,7 +49,6 @@ export class PrimitiveAdaptor {
         this.material?.pipelineChanged.unsubscribe(this.internal.uuid);
         this.material = material.adaptor;
         this.material.changed.subscribe(this.internal.uuid, this.onDependencyChange);
-        console.log(material)
         this.material.pipelineChanged.subscribe(this.internal.uuid, this.onPipelineChange);
         this.internal.setMat(this.material.internal);
         this.codeDirty = true;

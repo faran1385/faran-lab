@@ -10,7 +10,6 @@ import type {RenderContext} from "./RenderContext.ts";
 export class UploadLayer {
     static flush(ctx: RenderContext): void {
         const {managers, producer, hasher} = ctx;
-
         for (const buffer of takeQueuedBuffers()) {
             const key = buffer.hashProvider.convertToHash();
             // No GPU buffer yet: it will be created from the current data when a node first needs it.

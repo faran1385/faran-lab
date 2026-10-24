@@ -71,28 +71,22 @@ export class GeometryAdaptor {
         for (const slot of plan.slots) {
             live.add(slot.name);
             const source = this.owner.getAttribute(slot.name)!;
+            const internal = source.adaptor.internal;
             const layout: GPUVertexBufferLayout = {
                 arrayStride: slot.arrayStride,
                 stepMode: "vertex",
                 attributes: [{shaderLocation: slot.shaderLocation, offset: 0, format: slot.format}],
             };
 
-            let attribute = this.attributes.get(slot.name);
-            // A different byte size is a different GPU buffer: a new internal (new uuid), not an in-place update.
-            if (attribute && attribute.getData().byteLength !== source.getData().byteLength) {
-                this.attributes.delete(slot.name);
-                attribute = undefined;
-            }
-            if (!attribute) {
-                attribute = new AttributeInternal(source.getData(), layout);
-                this.attributes.set(slot.name, attribute);
+
+            if (!this.attributes.has(slot.name)) {
+                this.attributes.set(slot.name, internal);
             } else {
-                if (attribute.getData() !== source.getData()) attribute.setData(source.getData());
-                if (stableKey(attribute.getLayout()) !== stableKey(layout)) attribute.setLayout(layout);
+                if (stableKey(internal.getLayout()) !== stableKey(layout)) internal.setLayout(layout);
             }
 
-            if (this.internal.getVertexAttributes().get(slot.slot) !== attribute) {
-                this.internal.setVertexAttribute(slot.slot, attribute);
+            if (this.internal.getVertexAttributes().get(slot.slot) !== internal) {
+                this.internal.setVertexAttribute(slot.slot, internal);
             }
         }
 
@@ -124,7 +118,7 @@ export class GeometryAdaptor {
         const counted = this.attributePlan.byName.get("position") ?? slots[0];
         const source = counted ? this.owner.getAttribute(counted.name) : undefined;
         const vertexCount = counted && source && counted.arrayStride > 0
-            ? source.getData().byteLength / counted.arrayStride
+            ? source.adaptor.internal.getData().byteLength / counted.arrayStride
             : 0;
         const key = `draw:${vertexCount}`;
         if (key === this.drawKey) return;

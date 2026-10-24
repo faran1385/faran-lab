@@ -52,7 +52,6 @@ export class RenderItemBuilder {
     private static buildPrimitive(node: NodeInternal, primitive: PrimitiveInternal, ctx: RenderContext, held: HeldKeys): RenderItem | null {
         const pipelines = node.getPipelines().get(primitive.uuid);
         const geometry = primitive.getGeo();
-
         if (!pipelines || pipelines.length === 0 || !geometry || !geometry.getDrawInfo()) return null;
 
         // All variants of one primitive share their bind groups: take them from the first.

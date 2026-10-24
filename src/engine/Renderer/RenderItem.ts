@@ -1,5 +1,5 @@
 export type DrawCall =
-    | {
+    {
     indexed: false;
     vertexCount: number;
     instanceCount: number;
