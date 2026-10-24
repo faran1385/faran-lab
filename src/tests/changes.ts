@@ -271,7 +271,7 @@ const highTextures: Scenario = {
     name: "high-level-texture",
     description: "Textures, images and samplers: new pixels are a texture upload, a new image is a new texture, a sampler setting is a new sampler, removing the texture changes the bind group layout. Also: changes made on a TextureWrapper must reach the bind group.",
     run: async (ctx) => {
-        const {rig, material, texture} = await fixture(ctx);
+        const {rig, material, texture, counted} = await fixture(ctx);
         const base = material.getComponent("baseColor")!;
         const image = texture.getImage();
         const sampler = texture.getSampler();
