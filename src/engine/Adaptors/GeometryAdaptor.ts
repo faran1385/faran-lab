@@ -96,23 +96,7 @@ export class GeometryAdaptor {
     }
 
     private syncDrawInfo(): void {
-        const indices = this.owner.getIndices();
-
-        if (indices) {
-            const bytesPerIndex = indices.format === "uint16" ? 2 : 4;
-            const indexBytes = indices.getData().byteLength;
-            if (indexBytes % bytesPerIndex !== 0) {
-                throw new Error(`GeometryAdaptor: index buffer byte length (${indexBytes}) is not divisible by ${bytesPerIndex} for ${indices.format} indices`);
-            }
-            const indexCount = indexBytes / bytesPerIndex;
-            const key = `indexed:${indices.uuid}:${indices.format}:${indexCount}`;
-            if (key === this.drawKey) return;
-            this.drawKey = key;
-            this.internal.setDrawInfo({indexCount, indexBuffer: indices, indexFormat: indices.format});
-            return;
-        }
-
-        // Validate every attribute's vertex count before deriving the non-indexed draw count.
+        // Every attribute must contain whole vertices, including for indexed draws.
         let commonVertexCount: number | undefined;
         for (const slot of this.attributePlan.slots) {
             if (slot.arrayStride <= 0) {
@@ -128,6 +112,21 @@ export class GeometryAdaptor {
                 throw new Error(`GeometryAdaptor: attribute "${slot.name}" has ${count} vertices; expected ${commonVertexCount} to match the other attributes`);
             }
             commonVertexCount = count;
+        }
+
+        const indices = this.owner.getIndices();
+        if (indices) {
+            const bytesPerIndex = indices.format === "uint16" ? 2 : 4;
+            const indexBytes = indices.getData().byteLength;
+            if (indexBytes % bytesPerIndex !== 0) {
+                throw new Error(`GeometryAdaptor: index buffer byte length (${indexBytes}) is not divisible by ${bytesPerIndex} for ${indices.format} indices`);
+            }
+            const indexCount = indexBytes / bytesPerIndex;
+            const key = `indexed:${indices.uuid}:${indices.format}:${indexCount}`;
+            if (key === this.drawKey) return;
+            this.drawKey = key;
+            this.internal.setDrawInfo({indexCount, indexBuffer: indices, indexFormat: indices.format});
+            return;
         }
 
         // Non-indexed: count the vertices of "position" if there is one, otherwise of the first attribute.
