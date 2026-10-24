@@ -10,14 +10,9 @@ import type {GeometryWrapper} from "../wrappers/GeometryWrapper.ts";
  * Translates a GeometryWrapper (attributes keyed by name) into a GeometryInternal (vertex buffers keyed by slot, plus
  * the draw command). Slots and shader locations come from sorting the attribute names, same as the attribute plan the
  * shader producers use, so the shader, the pipeline and the draw call agree.
- *
- * One AttributeInternal is kept per attribute name for the lifetime of the adapter: a buffer's identity is its uuid,
- * so recreating them on every sync would re-create every GPU buffer.
  */
 export class GeometryAdaptor {
     readonly internal: GeometryInternal;
-
-    /** Fires when the vertex layout or the draw command is stale. Dependents schedule their own rebuild. */
     readonly changed = new Source<void>();
 
     private readonly owner: GeometryWrapper;
@@ -78,11 +73,11 @@ export class GeometryAdaptor {
                 attributes: [{shaderLocation: slot.shaderLocation, offset: 0, format: slot.format}],
             };
 
-
-            if (!this.attributes.has(slot.name)) {
-                this.attributes.set(slot.name, internal);
-            } else {
-                if (stableKey(internal.getLayout()) !== stableKey(layout)) internal.setLayout(layout);
+            // A newly attached AttributeInternal has no layout yet. Always synchronize it, not only
+            // attributes already present in the tracking map.
+            this.attributes.set(slot.name, internal);
+            if (stableKey(internal.getLayout()) !== stableKey(layout)) {
+                internal.setLayout(layout);
             }
 
             if (this.internal.getVertexAttributes().get(slot.slot) !== internal) {
@@ -105,7 +100,11 @@ export class GeometryAdaptor {
 
         if (indices) {
             const bytesPerIndex = indices.format === "uint16" ? 2 : 4;
-            const indexCount = indices.getData().byteLength / bytesPerIndex;
+            const indexBytes = indices.getData().byteLength;
+            if (indexBytes % bytesPerIndex !== 0) {
+                throw new Error(`GeometryAdaptor: index buffer byte length (${indexBytes}) is not divisible by ${bytesPerIndex} for ${indices.format} indices`);
+            }
+            const indexCount = indexBytes / bytesPerIndex;
             const key = `indexed:${indices.uuid}:${indices.format}:${indexCount}`;
             if (key === this.drawKey) return;
             this.drawKey = key;
@@ -113,12 +112,30 @@ export class GeometryAdaptor {
             return;
         }
 
+        // Validate every attribute's vertex count before deriving the non-indexed draw count.
+        let commonVertexCount: number | undefined;
+        for (const slot of this.attributePlan.slots) {
+            if (slot.arrayStride <= 0) {
+                throw new Error(`GeometryAdaptor: attribute "${slot.name}" has invalid stride ${slot.arrayStride}`);
+            }
+            const attribute = this.owner.getAttribute(slot.name)!;
+            const byteLength = attribute.getData().byteLength;
+            if (byteLength % slot.arrayStride !== 0) {
+                throw new Error(`GeometryAdaptor: attribute "${slot.name}" byte length (${byteLength}) is not divisible by stride ${slot.arrayStride}`);
+            }
+            const count = byteLength / slot.arrayStride;
+            if (commonVertexCount !== undefined && count !== commonVertexCount) {
+                throw new Error(`GeometryAdaptor: attribute "${slot.name}" has ${count} vertices; expected ${commonVertexCount} to match the other attributes`);
+            }
+            commonVertexCount = count;
+        }
+
         // Non-indexed: count the vertices of "position" if there is one, otherwise of the first attribute.
         const slots = this.attributePlan.slots;
         const counted = this.attributePlan.byName.get("position") ?? slots[0];
         const source = counted ? this.owner.getAttribute(counted.name) : undefined;
-        const vertexCount = counted && source && counted.arrayStride > 0
-            ? source.adaptor.internal.getData().byteLength / counted.arrayStride
+        const vertexCount = counted && source
+            ? source.getData().byteLength / counted.arrayStride
             : 0;
         const key = `draw:${vertexCount}`;
         if (key === this.drawKey) return;
