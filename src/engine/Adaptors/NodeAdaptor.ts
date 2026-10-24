@@ -175,8 +175,12 @@ export class NodeAdaptor {
     }
 
     ensure(ctx: RenderContext): void {
+        // A NodeAdaptor can wrap a hand-authored NodeInternal whose mesh, pipelines and bind groups were
+        // configured directly. Until a MeshWrapper is assigned, this adaptor does not own those pipelines:
+        // rebuilding from an empty adaptor-managed primitive list would erase the low-level configuration.
+        if (!this.mesh) return;
 
-        const primitives = this.mesh ? this.mesh.getPrimitiveAdaptors() : [];
+        const primitives = this.mesh.getPrimitiveAdaptors();
         this.syncWatched(primitives);
         for (const primitive of primitives) primitive.ensure();
 
