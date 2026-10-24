@@ -16,24 +16,27 @@ export type TypedArray =
     | BigUint64Array<ArrayBuffer>;
 
 export class AttributeWrapper {
-    readonly adaptor: AttributeAdaptor
+    readonly adaptor: AttributeAdaptor;
     readonly name: string;
     readonly format: VertexFormat;
-    readonly stride: number
+    readonly stride: number;
 
     constructor(name: string, data: ArrayBuffer, format: VertexFormat) {
         this.name = name;
         this.format = format;
-        this.stride = getVertexFormatSize(format) || 0;
-
+        this.stride = getVertexFormatSize(format);
         this.adaptor = new AttributeAdaptor(data);
     }
 
-    getData() {
+    getData(): ArrayBuffer {
         return this.adaptor.internal.getData();
     }
 
-    setData(data: TypedArray) {
-        this.adaptor.internal.setData(data.buffer);
+    /** Replace attribute bytes without changing the buffer's allocated size. */
+    setData(data: ArrayBuffer | TypedArray): void {
+        const bytes = data instanceof ArrayBuffer
+            ? data
+            : data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;
+        this.adaptor.internal.setData(bytes);
     }
 }
