@@ -4,7 +4,7 @@ export class AttributeAdaptor {
     readonly internal: AttributeInternal;
 
 
-    constructor(data: ArrayBuffer, layout: GPUVertexBufferLayout) {
-        this.internal = new AttributeInternal(data, layout)
+    constructor(data: ArrayBuffer) {
+        this.internal = new AttributeInternal(data)
     }
 }
