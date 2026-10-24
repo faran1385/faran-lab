@@ -16,6 +16,16 @@ export class GeometryWrapper {
     }
 
     setAttribute(attribute: AttributeWrapper) {
+        const current = this.attributes.get(attribute.name);
+
+        // Same format and byte length means the GPU allocation and vertex layout remain valid.
+        // Preserve the existing wrapper/internal identity and enqueue an in-place data upload.
+        if (current && current.format === attribute.format
+            && current.getData().byteLength === attribute.getData().byteLength) {
+            current.setData(attribute.getData());
+            return;
+        }
+
         this.attributes.set(attribute.name, attribute);
         this.adaptor.invalidate();
     }
