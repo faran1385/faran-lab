@@ -800,11 +800,9 @@ const rawScene: Scenario = {
 
         // membership
         const populated = rig.snapshot();
-        await trigger(ctx, rig, "node.setMesh(null)", () => raw.node.setMesh(null), {});
-        scene.adaptor.invalidate();
+        await trigger(ctx, rig, "node.setMesh(null)", () => { raw.node.setMesh(null); scene.adaptor.invalidate(); }, {});
         ctx.check(rig.addedSinceBaseline().pipeline === 0, `a node without a mesh keeps ${rig.addedSinceBaseline().pipeline} pipeline(s)`);
-        await trigger(ctx, rig, "node.setMesh(mesh)", () => raw.node.setMesh(mesh), {});
-        scene.adaptor.invalidate();
+        await trigger(ctx, rig, "node.setMesh(mesh)", () => { raw.node.setMesh(mesh); scene.adaptor.invalidate(); }, {});
         sameCount(ctx, rig, "mesh removed and set again", populated);
 
         await trigger(ctx, rig, "scene.removeNode (everything leaves)", () => scene.removeNode(rawWrapper), {});
