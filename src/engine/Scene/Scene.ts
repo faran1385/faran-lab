@@ -3,8 +3,8 @@ import {SceneAdaptor} from "../Adaptors/SceneAdaptor.ts";
 import {v4 as uuidv4} from "uuid";
 
 /**
- * The friendly scene API. The renderer does not take this: it takes `scene.adaptor.internal` (a SceneInternal, the
- * flat list of nodes to draw), exactly like every other wrapper hands its internal to the engine.
+ * The friendly scene API. Renderer.render() accepts this wrapper and, after the pre-frame queue flushes, reads the
+ * flattened SceneInternal maintained by SceneAdaptor.
  */
 export class Scene {
     private readonly worldRoot = new NodeWrapper();
