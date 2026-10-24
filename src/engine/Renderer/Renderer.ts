@@ -100,12 +100,12 @@ export class Renderer {
     render(scene: Scene, camera: Camera): void {
         // 1. wrappers -> internals, once, from the final state of everything that was set since the last frame
 
-        const sceneNodes = scene.adaptor.internal.getNodes();
-
-
         const ctx = this.renderContext;
 
         flushPreFrame(ctx);
+
+        // Scene membership is synchronized by the pre-frame queue; read the flattened list after it flushes.
+        const sceneNodes = scene.adaptor.internal.getNodes();
 
 
         // The target formats are part of every pipeline. A change reaches every node, then every node is re-checked.
