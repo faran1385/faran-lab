@@ -7,16 +7,14 @@ export class BufferInternal<TUsage extends GPUBufferUsageFlags = GPUBufferUsageF
 
     protected usage: TUsage;
     protected data: ArrayBuffer;
-    readonly hashProvider: BufferHashProvider
+    readonly hashProvider: BufferHashProvider;
 
     constructor(data: ArrayBuffer, usage: TUsage) {
         this.uuid = uuidv4();
         this.data = data;
         this.usage = usage;
-
-        this.hashProvider = new BufferHashProvider(this.uuid)
+        this.hashProvider = new BufferHashProvider(this.uuid);
     }
-
 
     getUsage(): TUsage {
         return this.usage;
@@ -32,6 +30,11 @@ export class BufferInternal<TUsage extends GPUBufferUsageFlags = GPUBufferUsageF
      * new contents do not change the buffer's identity or anything hashed from it.
      */
     setData(data: ArrayBuffer): void {
+        if (data.byteLength !== this.data.byteLength) {
+            throw new RangeError(
+                `BufferInternal.setData: byte length must remain ${this.data.byteLength}, received ${data.byteLength}; replace the buffer to change its allocation size`,
+            );
+        }
         this.data = data;
         this.markDirty();
     }
@@ -41,5 +44,4 @@ export class BufferInternal<TUsage extends GPUBufferUsageFlags = GPUBufferUsageF
         this.hashProvider.markNeedsUpdate();
         queueBufferUpload(this);
     }
-
 }
