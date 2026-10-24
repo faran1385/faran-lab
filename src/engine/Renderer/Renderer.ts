@@ -14,11 +14,10 @@ import {flushPreFrame} from "../Adaptors/PreFrameQueue.ts";
 import type {FrameInfo, RenderContext} from "./RenderContext.ts";
 import type {RenderItem} from "./RenderItem.ts";
 import type {Scene} from "../Scene/Scene.ts";
-import {SceneInternal} from "../internals/SceneInternal.ts";
 
 
 /**
- * Draws a SceneInternal. Nothing in here reads a wrapper: the adapters turn wrappers into internals in the pre-frame
+ * Draws a Scene. The scene adapter turns wrappers into internals in the pre-frame
  * queue, and the renderer only consumes the result.
  *
  * A frame is: flush the pre-frame queue, write changed data into existing GPU resources, build/refresh the render
@@ -98,7 +97,7 @@ export class Renderer {
         };
     }
 
-    render(scene: Scene | SceneInternal, camera: Camera): void {
+    render(scene: Scene, camera: Camera): void {
         // 1. wrappers -> internals, once, from the final state of everything that was set since the last frame
 
         const ctx = this.renderContext;
@@ -106,9 +105,7 @@ export class Renderer {
         flushPreFrame(ctx);
 
         // Scene membership is synchronized by the pre-frame queue; read the flattened list after it flushes.
-        const sceneNodes = scene instanceof SceneInternal
-            ? scene.getNodes()
-            : scene.adaptor.internal.getNodes();
+        const sceneNodes = scene.adaptor.internal.getNodes();
 
 
         // The target formats are part of every pipeline. A change reaches every node, then every node is re-checked.
