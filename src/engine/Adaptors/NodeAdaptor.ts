@@ -50,7 +50,6 @@ export class NodeAdaptor {
 
     private worldDirty = true;
     private readonly worldTask = () => this.ensureWorld();
-    private readonly onParentWorldChange = () => this.invalidateWorld();
     private readonly onChildStructureChange = () => this.structureChanged.notify();
 
     private mesh: MeshAdaptor | null = null;
@@ -79,11 +78,18 @@ export class NodeAdaptor {
      * notify again, and a newly attached child (setParent) marks itself.
      */
     invalidateWorld(): void {
-        if (!this.worldDirty) {
-            this.worldDirty = true;
-            this.worldChanged.notify();
+        // Walk the subtree iteratively: deep hierarchies must not recurse through Source.notify().
+        const stack: NodeAdaptor[] = [this];
+        while (stack.length > 0) {
+            const node = stack.pop()!;
+            if (!node.worldDirty) {
+                node.worldDirty = true;
+                node.worldChanged.notify();
+            }
+            schedulePreFrame(node.worldTask);
+            const children = node.childrenArray;
+            for (let i = children.length - 1; i >= 0; i--) stack.push(children[i]);
         }
-        schedulePreFrame(this.worldTask);
     }
 
     /** The world matrix as of the last flush. */
@@ -91,21 +97,27 @@ export class NodeAdaptor {
         return this.world;
     }
 
-
     ensureWorld(): void {
-        // by the invariant a clean parent has clean ancestors, so only a stale parent has to be brought up to date
-        if (this.parent && this.parent.worldDirty) this.parent.ensureWorld();
-        if (!this.worldDirty) return;
-        this.worldDirty = false;
+        // Pull dirty ancestors iteratively, then compute matrices parent-to-child.
+        const chain: NodeAdaptor[] = [];
+        let node: NodeAdaptor | null = this;
+        while (node && node.worldDirty) {
+            chain.push(node);
+            node = node.parent;
+        }
 
-        const source = this.source;
-        if (source) mat4.compose(this.local, source.getTranslation(), source.getRotation(), source.getScale());
-        else mat4.identity(this.local);
+        for (let i = chain.length - 1; i >= 0; i--) {
+            const current = chain[i];
+            const source = current.source;
+            if (source) mat4.compose(current.local, source.getTranslation(), source.getRotation(), source.getScale());
+            else mat4.identity(current.local);
 
-        if (this.parent) mat4.mul(this.world, this.parent.world, this.local);
-        else this.world.set(this.local);
+            if (current.parent) mat4.mul(current.world, current.parent.world, current.local);
+            else current.world.set(current.local);
 
-        this.buffer.markDirty();
+            current.worldDirty = false;
+            current.buffer.markDirty();
+        }
     }
 
     // -- tree ---------------------------------------------------------------
@@ -132,9 +144,7 @@ export class NodeAdaptor {
     }
 
     private setParent(parent: NodeAdaptor | null): void {
-        this.parent?.worldChanged.unsubscribe(this.internal.uuid);
         this.parent = parent;
-        parent?.worldChanged.subscribe(this.internal.uuid, this.onParentWorldChange);
         this.invalidateWorld();
     }
 
