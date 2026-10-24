@@ -14,6 +14,7 @@ import {flushPreFrame} from "../Adaptors/PreFrameQueue.ts";
 import type {FrameInfo, RenderContext} from "./RenderContext.ts";
 import type {RenderItem} from "./RenderItem.ts";
 import type {Scene} from "../Scene/Scene.ts";
+import {SceneInternal} from "../internals/SceneInternal.ts";
 
 
 /**
@@ -97,7 +98,7 @@ export class Renderer {
         };
     }
 
-    render(scene: Scene, camera: Camera): void {
+    render(scene: Scene | SceneInternal, camera: Camera): void {
         // 1. wrappers -> internals, once, from the final state of everything that was set since the last frame
 
         const ctx = this.renderContext;
