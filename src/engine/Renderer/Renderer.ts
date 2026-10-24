@@ -106,7 +106,9 @@ export class Renderer {
         flushPreFrame(ctx);
 
         // Scene membership is synchronized by the pre-frame queue; read the flattened list after it flushes.
-        const sceneNodes = scene.adaptor.internal.getNodes();
+        const sceneNodes = scene instanceof SceneInternal
+            ? scene.getNodes()
+            : scene.adaptor.internal.getNodes();
 
 
         // The target formats are part of every pipeline. A change reaches every node, then every node is re-checked.
