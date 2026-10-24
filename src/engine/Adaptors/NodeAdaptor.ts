@@ -50,7 +50,7 @@ export class NodeAdaptor {
 
     private worldDirty = true;
     private readonly worldTask = () => this.ensureWorld();
-    private readonly onChildStructureChange = () => this.structureChanged.notify();
+    
 
     private mesh: MeshAdaptor | null = null;
     private readonly watchedPrimitives = new Map<string, PrimitiveAdaptor>();
@@ -131,21 +131,31 @@ export class NodeAdaptor {
         this.children.set(child.internal.uuid, child);
         this.childrenArray = Array.from(this.children.values());
         child.setParent(this);
-        child.structureChanged.subscribe(this.internal.uuid, this.onChildStructureChange);
-        this.structureChanged.notify();
+        this.notifyStructureChanged();
     }
 
     removeChild(child: NodeAdaptor): void {
         if (!this.children.delete(child.internal.uuid)) return;
         this.childrenArray = Array.from(this.children.values());
         child.setParent(null);
-        child.structureChanged.unsubscribe(this.internal.uuid);
-        this.structureChanged.notify();
+        this.notifyStructureChanged();
     }
 
     private setParent(parent: NodeAdaptor | null): void {
         this.parent = parent;
         this.invalidateWorld();
+    }
+
+    /**
+     * Notify structure observers from this node up to the root without recursive child-to-parent Source callbacks.
+     * Deep imported hierarchies can be thousands of nodes tall.
+     */
+    private notifyStructureChanged(): void {
+        let node: NodeAdaptor | null = this;
+        while (node) {
+            node.structureChanged.notify();
+            node = node.parent;
+        }
     }
 
     // -- mesh and pipelines -------------------------------------------------
@@ -156,7 +166,7 @@ export class NodeAdaptor {
         this.mesh?.changed.subscribe(this.internal.uuid, this.onDependencyChange);
         this.internal.setMesh(this.mesh?.internal ?? null);
         this.invalidate();
-        this.structureChanged.notify();
+        this.notifyStructureChanged();
     }
 
     invalidate() {
