@@ -15,6 +15,7 @@ import {PrimitiveInternal} from "./engine/internals/PrimitiveInternal.ts";
 import {GeometryInternal} from "./engine/internals/GeometryInternal.ts";
 import {MaterialInternal} from "./engine/internals/MaterialInternal.ts";
 import {PipelineInteractor} from "./engine/Representations/PipelineInteractor.ts";
+import {BindgroupInteractor} from "./engine/Representations/BindgroupInteractor.ts";
 
 const canvas = document.getElementById("gpu-canvas") as HTMLCanvasElement;
 if (!canvas) throw new Error('Missing canvas element "#gpu-canvas".');
@@ -76,6 +77,7 @@ n.setMesh(m);
 
 scene.addNode(n);
 
+sc
 
 window.addEventListener("resize", () => {
     camera.setAspect(window.innerWidth / window.innerHeight);

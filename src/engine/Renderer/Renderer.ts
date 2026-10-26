@@ -85,7 +85,6 @@ export class Renderer {
     render(scene: Scene, camera: Camera): void {
         const ctx = this.renderContext;
 
-        // Update the camera-owned CPU buffer, then resolve its GPU allocation before adapters consume the context.
         camera.updateBuffer();
         const cameraBuffer = camera.getBuffer();
         const cameraBufferKey = cameraBuffer.hashProvider.convertToHash();

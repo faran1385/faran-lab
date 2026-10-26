@@ -19,7 +19,7 @@ export interface TransformSource {
 
 /**
  * Translates a node. World transforms, adapter-managed pipelines and tree structure are synchronized before the frame.
- * The renderer supplies a scene binding only to this adapter-managed path; hand-authored pipelines own their bindings.
+ * The renderer supplies a camera binding only to this adapter-managed path; hand-authored pipelines own their bindings.
  */
 export class NodeAdaptor {
     readonly internal: NodeInternal;
