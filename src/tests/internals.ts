@@ -648,7 +648,9 @@ function rawNode(rig: Rig, primitive: PrimitiveInternal, mesh: MeshInternal, x =
     pipeline.setPrimitiveState({topology: "triangle-list", cullMode: "none"});
     pipeline.setMaterialState({blend: undefined, depthWriteEnabled: true});
     pipeline.setFrame(ctx.frame);
-    pipeline.setBindgroup(0, ctx.sceneBindgroup);
+    const cameraBindings = new BindgroupInteractor();
+    cameraBindings.setUniform(0, rig.camera.getBuffer(), GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT);
+    pipeline.setBindgroup(0, cameraBindings);
     pipeline.setBindgroup(1, primitive.getMat().bindgroupInteractor);
     pipeline.setBindgroup(2, node.bindgroupInteractor);
     node.setPipelines(primitive.uuid, [pipeline]);

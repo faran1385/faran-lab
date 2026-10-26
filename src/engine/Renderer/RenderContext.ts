@@ -16,6 +16,6 @@ export interface RenderContext {
     hasher: Hasher;
     frame: FrameInfo;
     cache: RenderCache;
-    /** Group 0: the camera. Handed to every node so its pipelines include it in their layout. */
-    sceneBindgroup: BindgroupInteractor;
+    /** Convenience camera binding for adapter-managed pipelines; hand-authored pipelines choose their own bindings. */
+    cameraBindgroup: BindgroupInteractor;
 }

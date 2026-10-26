@@ -2,8 +2,9 @@ import {vec3} from "../../packages/math/vector/vec3.ts";
 import {mat4} from "../../packages/math/matrix/mat4.ts";
 import {VersionFlag} from "../hashing/utils/VersionFlag.ts";
 import {v4 as uuidv4} from "uuid";
+import {CameraInternal} from "./CameraInternal.ts";
 
-export abstract class Camera {
+export abstract class Camera extends CameraInternal {
     readonly uuid: string
     protected position = vec3.fromValues(0, 0, 0);
     protected target = vec3.fromValues(0, 0, 0);
@@ -18,31 +19,32 @@ export abstract class Camera {
     private readonly uploadProjectionFlag = new VersionFlag();
 
     constructor() {
+        super();
         this.uuid = uuidv4();
         this._viewFlag.addVersion();
-        this.uploadVewFlag.addVersion()
+        this.uploadVewFlag.addVersion();
         this._projectionFlag.addVersion();
-        this.uploadProjectionFlag.addVersion()
+        this.uploadProjectionFlag.addVersion();
     }
 
     setPosition(x: number, y: number, z: number): this {
         vec3.set(this.position, x, y, z);
         this._viewFlag.addVersion();
-        this.uploadVewFlag.addVersion()
+        this.uploadVewFlag.addVersion();
         return this;
     }
 
     lookAt(x: number, y: number, z: number): this {
         vec3.set(this.target, x, y, z);
         this._viewFlag.addVersion();
-        this.uploadVewFlag.addVersion()
+        this.uploadVewFlag.addVersion();
         return this;
     }
 
     setUp(x: number, y: number, z: number): this {
         vec3.set(this.up, x, y, z);
         this._viewFlag.addVersion();
-        this.uploadVewFlag.addVersion()
+        this.uploadVewFlag.addVersion();
         return this;
     }
 
@@ -66,27 +68,31 @@ export abstract class Camera {
         return this.projectionMatrix;
     }
 
+    /**
+     * Writes changed matrices into this camera's CPU-side uniform buffer.
+     * BufferInternal queues the upload; the renderer's normal upload layer performs it.
+     */
+    updateBuffer(): void {
+        let dirty = false;
+        const data = new Float32Array(this.buffer.getData());
 
+        if (this.uploadVewFlag.needsUpdate()) {
+            data.set(this.getViewMatrix(), 0);
+            this.uploadVewFlag.sync();
+            dirty = true;
+        }
+        if (this.uploadProjectionFlag.needsUpdate()) {
+            data.set(this.getProjectionMatrix(), 16);
+            this.uploadProjectionFlag.sync();
+            dirty = true;
+        }
 
-    isUploadViewDirty() {
-        return this.uploadVewFlag.needsUpdate();
-    }
-
-    isUploadProjectionDirty() {
-        return this.uploadProjectionFlag.needsUpdate();
-    }
-
-    syncUploadView() {
-        this.uploadVewFlag.sync();
-    }
-
-    syncUploadProjection() {
-        this.uploadProjectionFlag.sync();
+        if (dirty) this.buffer.markDirty();
     }
 
     protected markProjectionDirty(): void {
         this._projectionFlag.addVersion();
-        this.uploadProjectionFlag.addVersion()
+        this.uploadProjectionFlag.addVersion();
     }
 
     protected abstract updateProjectionMatrix(out: Float32Array): void;

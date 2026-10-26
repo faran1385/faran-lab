@@ -13,33 +13,19 @@ import {BindgroupInteractor} from "../Representations/BindgroupInteractor.ts";
 /** What the adapter reads from a node wrapper to compute its local matrix. */
 export interface TransformSource {
     getTranslation(): Float32Array;
-
     getRotation(): Float32Array;
-
     getScale(): Float32Array;
 }
 
 /**
- * Translates a node. Three jobs, all done before the frame:
- *
- * 1. World matrix. The node's world matrix lives in `buffer` (a BufferInternal, bound into the node's bind group when
- *    `needNodeTransform` is given). A transform change marks this node and, through `worldChanged`, every descendant
- *    stale; each recomputes `parentWorld * local` once when the queue is flushed, pulling its parent first.
- * 2. Pipelines. For every primitive of the node's mesh it builds the pipeline representations the render side will
- *    create GPU pipelines from (stored on the NodeInternal, keyed by primitive uuid).
- * 3. Structure. It mirrors the wrapper tree (parent/children) and tells whoever listens (the scene adapter) when the
- *    tree or a mesh assignment changed.
- *
- * Frame formats and the group 0 bind group are render-side inputs: they live on the NodeInternal (setFrame /
- * setSceneBindgroup) and this adapter only applies what is stored there to the pipelines it builds.
+ * Translates a node. World transforms, adapter-managed pipelines and tree structure are synchronized before the frame.
+ * The renderer supplies a camera binding only to this adapter-managed path; hand-authored pipelines own their bindings.
  */
 export class NodeAdaptor {
     readonly internal: NodeInternal;
     readonly buffer = new BufferInternal(mat4.create().buffer, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
 
-    /** Parent to children: this node's world matrix is stale, so is every descendant's. */
     readonly worldChanged = new Source<void>();
-    /** Child to parent: the tree below this node, or a mesh assignment in it, changed. */
     readonly structureChanged = new Source<void>();
 
     private readonly world = new Float32Array(this.buffer.getData());
@@ -52,7 +38,6 @@ export class NodeAdaptor {
     private worldDirty = true;
     private readonly worldTask = () => this.ensureWorld();
 
-
     private mesh: MeshAdaptor | null = null;
     private readonly watchedPrimitives = new Map<string, PrimitiveAdaptor>();
     private readonly task = (ctx: RenderContext) => this.ensure(ctx);
@@ -61,28 +46,18 @@ export class NodeAdaptor {
 
     readonly nodeBindgroupInteractor = new BindgroupInteractor();
 
-
     constructor(internal?: NodeInternal) {
         this.internal = internal ?? new NodeInternal();
-
         this.nodeBindgroupInteractor.setUniform(0, this.buffer, GPUShaderStage.VERTEX);
         schedulePreFrame(this.worldTask);
     }
 
-    // -- transform ----------------------------------------------------------
-
-    /** The wrapper whose translation/rotation/scale this adapter turns into a world matrix. */
     setSource(source: TransformSource): void {
         this.source = source;
         this.invalidateWorld();
     }
 
-    /**
-     * Invariant: a stale node implies all its descendants are stale. So a node that is already stale does not
-     * notify again, and a newly attached child (setParent) marks itself.
-     */
     invalidateWorld(): void {
-        // Walk the subtree iteratively: deep hierarchies must not recurse through Source.notify().
         const stack: NodeAdaptor[] = [this];
         while (stack.length > 0) {
             const node = stack.pop()!;
@@ -96,13 +71,11 @@ export class NodeAdaptor {
         }
     }
 
-    /** The world matrix as of the last flush. */
     getWorldMatrix(): Float32Array {
         return this.world;
     }
 
     ensureWorld(): void {
-        // Pull dirty ancestors iteratively, then compute matrices parent-to-child.
         const chain: NodeAdaptor[] = [];
         let node: NodeAdaptor | null = this;
         while (node && node.worldDirty) {
@@ -123,8 +96,6 @@ export class NodeAdaptor {
             current.buffer.markDirty();
         }
     }
-
-    // -- tree ---------------------------------------------------------------
 
     getChildren(): readonly NodeAdaptor[] {
         return this.childrenArray;
@@ -150,10 +121,6 @@ export class NodeAdaptor {
         this.invalidateWorld();
     }
 
-    /**
-     * Notify structure observers from this node up to the root without recursive child-to-parent Source callbacks.
-     * Deep imported hierarchies can be thousands of nodes tall.
-     */
     private notifyStructureChanged(): void {
         let node: NodeAdaptor | null = this;
         while (node) {
@@ -161,8 +128,6 @@ export class NodeAdaptor {
             node = node.parent;
         }
     }
-
-    // -- mesh and pipelines -------------------------------------------------
 
     setMesh(mesh: MeshWrapper | null) {
         this.mesh?.changed.unsubscribe(this.internal.uuid);
@@ -179,9 +144,7 @@ export class NodeAdaptor {
     }
 
     ensure(ctx: RenderContext): void {
-        // A NodeAdaptor can wrap a hand-authored NodeInternal whose mesh, pipelines and bind groups were
-        // configured directly. Until a MeshWrapper is assigned, this adaptor does not own those pipelines:
-        // rebuilding from an empty adaptor-managed primitive list would erase the low-level configuration.
+        // Custom NodeInternal pipelines remain user-owned and are not rebuilt or injected with engine bindings.
         if (!this.mesh) return;
 
         const primitives = this.mesh.getPrimitiveAdaptors();
@@ -193,7 +156,6 @@ export class NodeAdaptor {
         this.rebuildPipelines(ctx, primitives);
     }
 
-    /** Subscribes to primitives that joined the mesh and drops the ones that left it. */
     private syncWatched(primitives: readonly PrimitiveAdaptor[]): void {
         const wanted = new Set<string>();
         for (const primitive of primitives) wanted.add(primitive.internal.uuid);
@@ -212,7 +174,6 @@ export class NodeAdaptor {
     }
 
     private rebuildPipelines(ctx: RenderContext, primitives: readonly PrimitiveAdaptor[]): void {
-
         const live = new Set<string>();
 
         for (const adaptor of primitives) {
@@ -228,7 +189,6 @@ export class NodeAdaptor {
                 .sort(([a], [b]) => a - b)
                 .map(([, attribute]) => attribute.getLayout()!);
 
-            // Reuse by index so a material tweak that keeps the variant count keeps the same representations.
             const pipelines = this.internal.getPipelines().get(primitive.uuid) ?? [];
             while (pipelines.length < settings.cullModes.length) pipelines.push(new PipelineInteractor());
             pipelines.length = settings.cullModes.length;
@@ -241,9 +201,7 @@ export class NodeAdaptor {
                 pipeline.setPrimitiveState({topology: "triangle-list", cullMode});
                 pipeline.setMaterialState({blend: settings.blend, depthWriteEnabled: settings.depthWriteEnabled});
                 pipeline.setFrame(ctx.frame);
-
-
-                pipeline.setBindgroup(0, ctx.sceneBindgroup);
+                pipeline.setBindgroup(0, ctx.cameraBindgroup);
                 pipeline.setBindgroup(2, material.bindgroupInteractor);
                 pipeline.setBindgroup(1, this.nodeBindgroupInteractor);
             });

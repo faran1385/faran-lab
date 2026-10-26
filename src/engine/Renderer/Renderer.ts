@@ -1,27 +1,22 @@
-import {BufferInternal} from "../internals/BufferInternal.ts";
-import {BindgroupInteractor} from "../Representations/BindgroupInteractor.ts";
 import {Hasher} from "../hashing/utils/Hasher.ts";
 import {CentralProducer} from "../producers/CentralProducer.ts";
-import type {Camera} from "../Camera/Camera.ts";
-import {v4 as uuidv4} from "uuid";
 import {CentralManager} from "../managers/CentralManager.ts";
 import {RenderTarget} from "./RenderTarget.ts";
 import {RenderItemBuilder} from "./RenderItemBuilder.ts";
 import {RenderCache} from "./RenderCache.ts";
+import {v4 as uuidv4} from "uuid";
 import {getEpoch} from "../hashing/utils/epoch.ts";
 import {UploadLayer} from "./UploadLayer.ts";
 import {flushPreFrame} from "../Adaptors/PreFrameQueue.ts";
+import {BindgroupInteractor} from "../Representations/BindgroupInteractor.ts";
 import type {FrameInfo, RenderContext} from "./RenderContext.ts";
 import type {RenderItem} from "./RenderItem.ts";
 import type {Scene} from "../Scene/Scene.ts";
-
+import type {Camera} from "../Camera/Camera.ts";
 
 /**
- * Draws a Scene. The scene adapter turns wrappers into internals in the pre-frame
- * queue, and the renderer only consumes the result.
- *
- * A frame is: flush the pre-frame queue, write changed data into existing GPU resources, build/refresh the render
- * items of the nodes whose internals changed, draw every item, release what is no longer used.
+ * Draws a Scene. The scene adapter turns wrappers into internals in the pre-frame queue, and the renderer only consumes
+ * the result. Camera matrix data belongs to the Camera; this renderer only ensures its buffer has a GPU allocation.
  */
 export class Renderer {
     private device!: GPUDevice;
@@ -39,10 +34,8 @@ export class Renderer {
     hasher!: Hasher;
     private readonly producer = new CentralProducer();
     private readonly renderCache = new RenderCache();
-
-    /** Group 0. The camera matrices are written straight into it, so it is not an adapter's business. */
-    private cameraBuffer!: BufferInternal;
     private renderContext!: RenderContext;
+    private activeCameraBufferKey: string | null = null;
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -61,17 +54,9 @@ export class Renderer {
         this.managers = new CentralManager(this.device);
         this.depthRenderTarget = new RenderTarget(this.canvas.width, this.canvas.height, {
             format: "depth32float",
-        })
+        });
 
         this.hasher = await Hasher.create();
-
-        // group 0: view + projection. The renderer keeps one reference for good, so the buffer outlives frames in
-        // which no node uses the scene bind group and uploads never find it missing.
-        this.cameraBuffer = new BufferInternal(new Float32Array(32).buffer, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
-        const sceneBindgroup = new BindgroupInteractor();
-        sceneBindgroup.setUniform(0, this.cameraBuffer, GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT);
-        this.managers.bufferManager.ensure(this.cameraBuffer.uuid, () => this.producer.produceBuffer(this.cameraBuffer));
-        this.managers.bufferManager.acquire(this.cameraBuffer.uuid);
 
         this.renderContext = {
             managers: this.managers,
@@ -79,7 +64,7 @@ export class Renderer {
             hasher: this.hasher,
             frame: this.currentFrame(),
             cache: this.renderCache,
-            sceneBindgroup,
+            cameraBindgroup: new BindgroupInteractor(),
         };
     }
 
@@ -98,17 +83,24 @@ export class Renderer {
     }
 
     render(scene: Scene, camera: Camera): void {
-        // 1. wrappers -> internals, once, from the final state of everything that was set since the last frame
-
         const ctx = this.renderContext;
+
+        // Update the camera-owned CPU buffer, then resolve its GPU allocation before adapters consume the context.
+        camera.updateBuffer();
+        const cameraBuffer = camera.getBuffer();
+        const cameraBufferKey = cameraBuffer.hashProvider.convertToHash();
+        if (cameraBufferKey !== this.activeCameraBufferKey) {
+            this.managers.bufferManager.ensure(cameraBufferKey, () => this.producer.produceBuffer(cameraBuffer));
+            this.managers.bufferManager.acquire(cameraBufferKey);
+            if (this.activeCameraBufferKey !== null) this.managers.bufferManager.release(this.activeCameraBufferKey);
+            this.activeCameraBufferKey = cameraBufferKey;
+        }
+        ctx.cameraBindgroup.setUniform(0, cameraBuffer, GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT);
 
         flushPreFrame(ctx);
 
-        // Scene membership is synchronized by the pre-frame queue; read the flattened list after it flushes.
         const sceneNodes = scene.adaptor.internal.getNodes();
 
-
-        // The target formats are part of every pipeline. A change reaches every node, then every node is re-checked.
         const frame = this.currentFrame();
         if (frame.colorFormat !== ctx.frame.colorFormat || frame.depthFormat !== ctx.frame.depthFormat) {
             ctx.frame = frame;
@@ -116,12 +108,10 @@ export class Renderer {
             this.renderCache.invalidateAll();
         }
 
-        // 2. data that changed in place goes into the GPU resources that already exist
         UploadLayer.flush(ctx);
-        UploadLayer.updateCamera(camera, ctx, this.cameraBuffer.uuid);
 
-        this.colorRenderTarget?.ensureTexture(this.device)
-        this.depthRenderTarget?.ensureTexture(this.device)
+        this.colorRenderTarget?.ensureTexture(this.device);
+        this.depthRenderTarget?.ensureTexture(this.device);
         const encoder = this.device.createCommandEncoder();
         const pass = encoder.beginRenderPass({
             colorAttachments: [
@@ -140,7 +130,6 @@ export class Renderer {
             }
         });
 
-        // 3. + 4. refresh the render items of changed nodes, draw every item
         for (const node of sceneNodes) {
             for (const item of RenderItemBuilder.build(node, ctx)) {
                 Renderer.draw(pass, item);
@@ -151,9 +140,8 @@ export class Renderer {
         pass.end();
         this.device.queue.submit([encoder.finish()]);
 
-        // 5. nodes that left the scene release their resources, then unused resources are collected
-        this.renderCache.endFrame(ctx)
-        this.managers.endFrame()
+        this.renderCache.endFrame(ctx);
+        this.managers.endFrame();
     }
 
     /** Bind groups and buffers are shared by every variant: set once, then one setPipeline + draw per variant. */
