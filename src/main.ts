@@ -70,7 +70,7 @@ g.setDrawInfo({
 p.setMat(mat);
 const m = new MeshInternal();
 m.setPrimitive(p)
-const n = new NodeInternal(2, 0);
+const n = new NodeInternal();
 n.setMesh(m);
 // node.setMesh(mesh);
 

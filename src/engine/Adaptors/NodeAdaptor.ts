@@ -19,7 +19,7 @@ export interface TransformSource {
 
 /**
  * Translates a node. World transforms, adapter-managed pipelines and tree structure are synchronized before the frame.
- * The renderer supplies a camera binding only to this adapter-managed path; hand-authored pipelines own their bindings.
+ * The renderer supplies a scene binding only to this adapter-managed path; hand-authored pipelines own their bindings.
  */
 export class NodeAdaptor {
     readonly internal: NodeInternal;
@@ -201,7 +201,7 @@ export class NodeAdaptor {
                 pipeline.setPrimitiveState({topology: "triangle-list", cullMode});
                 pipeline.setMaterialState({blend: settings.blend, depthWriteEnabled: settings.depthWriteEnabled});
                 pipeline.setFrame(ctx.frame);
-                pipeline.setBindgroup(0, ctx.cameraBindgroup);
+                pipeline.setBindgroup(0, ctx.sceneBindgroup);
                 pipeline.setBindgroup(2, material.bindgroupInteractor);
                 pipeline.setBindgroup(1, this.nodeBindgroupInteractor);
             });

@@ -16,6 +16,5 @@ export interface RenderContext {
     hasher: Hasher;
     frame: FrameInfo;
     cache: RenderCache;
-    /** Convenience camera binding for adapter-managed pipelines; hand-authored pipelines choose their own bindings. */
-    cameraBindgroup: BindgroupInteractor;
+    sceneBindgroup: BindgroupInteractor;
 }

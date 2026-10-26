@@ -64,7 +64,7 @@ export class Renderer {
             hasher: this.hasher,
             frame: this.currentFrame(),
             cache: this.renderCache,
-            cameraBindgroup: new BindgroupInteractor(),
+            sceneBindgroup: new BindgroupInteractor(),
         };
     }
 
@@ -95,7 +95,7 @@ export class Renderer {
             if (this.activeCameraBufferKey !== null) this.managers.bufferManager.release(this.activeCameraBufferKey);
             this.activeCameraBufferKey = cameraBufferKey;
         }
-        ctx.cameraBindgroup.setUniform(0, cameraBuffer, GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT);
+        ctx.sceneBindgroup.setUniform(0, cameraBuffer, GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT);
 
         flushPreFrame(ctx);
 
