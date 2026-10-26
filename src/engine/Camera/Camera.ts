@@ -2,9 +2,8 @@ import {vec3} from "../../packages/math/vector/vec3.ts";
 import {mat4} from "../../packages/math/matrix/mat4.ts";
 import {VersionFlag} from "../hashing/utils/VersionFlag.ts";
 import {v4 as uuidv4} from "uuid";
-import {CameraInternal} from "./CameraInternal.ts";
 
-export abstract class Camera extends CameraInternal {
+export abstract class Camera {
     readonly uuid: string
     protected position = vec3.fromValues(0, 0, 0);
     protected target = vec3.fromValues(0, 0, 0);
@@ -15,41 +14,33 @@ export abstract class Camera extends CameraInternal {
 
     private readonly _viewFlag = new VersionFlag();
     private readonly _projectionFlag = new VersionFlag();
-    private readonly uploadVewFlag = new VersionFlag();
-    private readonly uploadProjectionFlag = new VersionFlag();
-    /**
-     * Counts the times updateBuffer() rewrote the buffer's bytes. Unlike the upload flags it is never consumed, so every
-     * renderer can compare it with the version it last uploaded, whichever renderer called updateBuffer() first.
-     */
-    private bufferVersion = 0;
+    private viewVersion = 0;
+    private projectionVersion = 0;
 
     constructor() {
-        super();
         this.uuid = uuidv4();
         this._viewFlag.addVersion();
-        this.uploadVewFlag.addVersion();
         this._projectionFlag.addVersion();
-        this.uploadProjectionFlag.addVersion();
     }
 
     setPosition(x: number, y: number, z: number): this {
         vec3.set(this.position, x, y, z);
         this._viewFlag.addVersion();
-        this.uploadVewFlag.addVersion();
+        this.viewVersion++;
         return this;
     }
 
     lookAt(x: number, y: number, z: number): this {
         vec3.set(this.target, x, y, z);
         this._viewFlag.addVersion();
-        this.uploadVewFlag.addVersion();
+        this.viewVersion++;
         return this;
     }
 
     setUp(x: number, y: number, z: number): this {
         vec3.set(this.up, x, y, z);
         this._viewFlag.addVersion();
-        this.uploadVewFlag.addVersion();
+        this.viewVersion++;
         return this;
     }
 
@@ -73,39 +64,19 @@ export abstract class Camera extends CameraInternal {
         return this.projectionMatrix;
     }
 
-    /**
-     * Writes changed matrices into this camera's CPU-side uniform buffer.
-     * BufferInternal queues the upload; the renderer's normal upload layer performs it.
-     */
-    updateBuffer(): void {
-        let dirty = false;
-        const data = new Float32Array(this.buffer.getData());
-
-        if (this.uploadVewFlag.needsUpdate()) {
-            data.set(this.getViewMatrix(), 0);
-            this.uploadVewFlag.sync();
-            dirty = true;
-        }
-        if (this.uploadProjectionFlag.needsUpdate()) {
-            data.set(this.getProjectionMatrix(), 16);
-            this.uploadProjectionFlag.sync();
-            dirty = true;
-        }
-
-        if (dirty) {
-            this.bufferVersion++;
-            this.buffer.markDirty();
-        }
+    /** Monotonically increases whenever a view-affecting setter changes the camera. */
+    getViewVersion(): number {
+        return this.viewVersion;
     }
 
-    /** Changes whenever updateBuffer() rewrote the buffer's bytes; see `bufferVersion`. */
-    getBufferVersion(): number {
-        return this.bufferVersion;
+    /** Monotonically increases whenever a projection-affecting setter changes the camera. */
+    getProjectionVersion(): number {
+        return this.projectionVersion;
     }
 
     protected markProjectionDirty(): void {
         this._projectionFlag.addVersion();
-        this.uploadProjectionFlag.addVersion();
+        this.projectionVersion++;
     }
 
     protected abstract updateProjectionMatrix(out: Float32Array): void;

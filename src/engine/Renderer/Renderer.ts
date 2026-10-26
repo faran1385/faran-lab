@@ -45,9 +45,6 @@ export class Renderer {
     private renderContext!: RenderContext;
     /** Key of this renderer's GPU copy of the shared global buffer. */
     private readonly globalBufferKey = globalBuffer.hashProvider.convertToHash();
-    /** What was last written into that copy: it is rewritten only for another camera or a newer camera upload. */
-    private uploadedCamera: Camera | null = null;
-    private uploadedCameraVersion = -1;
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -99,18 +96,7 @@ export class Renderer {
     render(scene: Scene, camera: Camera): void {
         const ctx = this.renderContext;
 
-        // Update the camera-owned CPU buffer, then copy it into this renderer's GPU copy of the global buffer. Pipelines
-        // and render items keep binding that same buffer whatever the camera, so nothing cached can go stale. It is written
-        // directly, not through the upload queue: the queue is global, so another renderer could drain the request.
-        // The camera's upload flags are consumed by whichever renderer calls updateBuffer() first, so each renderer
-        // remembers the camera and version it last wrote instead.
-        camera.updateBuffer();
-        const cameraVersion = camera.getBufferVersion();
-        if (camera !== this.uploadedCamera || cameraVersion !== this.uploadedCameraVersion) {
-            this.managers.bufferManager.upload(this.globalBufferKey, camera.getBuffer().getData());
-            this.uploadedCamera = camera;
-            this.uploadedCameraVersion = cameraVersion;
-        }
+        UploadLayer.updateCamera(camera, ctx, this.globalBufferKey);
 
         flushPreFrame(ctx);
 

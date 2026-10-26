@@ -31,6 +31,11 @@ export class RenderCache {
      * The global epoch at the end of the previous frame. If it still equals getEpoch(), nothing that can affect
      * a render item has changed anywhere, and every cached item can be reused without looking at any node.
      */
+    /** Camera identity and matrix versions last written into this renderer's global GPU buffer. */
+    lastCameraUUID: string | null = null;
+    lastCameraViewVersion = -1;
+    lastCameraProjectionVersion = -1;
+
     lastFrameEpoch = -1;
 
     /** Forces the next frame to check every node, whatever the epoch says (the frame formats changed, say). */
