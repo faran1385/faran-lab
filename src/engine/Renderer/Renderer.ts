@@ -64,7 +64,7 @@ export class Renderer {
         this.format = navigator.gpu.getPreferredCanvasFormat();
         this.ctx.configure({device: this.device, format: this.format, alphaMode: "opaque"});
         this.managers = new CentralManager(this.device);
-        // This renderer's own GPU copy of the shared global buffer, held for the renderer's lifetime so it is never collected.
+
         this.managers.bufferManager.ensure(this.globalBufferKey, () => this.producer.produceBuffer(globalBuffer));
         this.managers.bufferManager.acquire(this.globalBufferKey);
         this.depthRenderTarget = new RenderTarget(this.canvas.width, this.canvas.height, {
