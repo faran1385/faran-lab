@@ -32,6 +32,7 @@ import {pixelBytes} from "./scenes.ts";
 import {Scene} from "../engine/Scene/Scene.ts";
 import {NodeAdaptor} from "../engine/Adaptors/NodeAdaptor.ts";
 import {NodeWrapper} from "../engine/wrappers/NodeWrapper.ts";
+import {Renderer} from "../engine/Renderer/Renderer.ts";
 
 /**
  * Low-level change-trigger tests: the engine's core without a single wrapper or adapter.
@@ -648,9 +649,7 @@ function rawNode(rig: Rig, primitive: PrimitiveInternal, mesh: MeshInternal, x =
     pipeline.setPrimitiveState({topology: "triangle-list", cullMode: "none"});
     pipeline.setMaterialState({blend: undefined, depthWriteEnabled: true});
     pipeline.setFrame(ctx.frame);
-    const cameraBindings = new BindgroupInteractor();
-    cameraBindings.setUniform(0, rig.camera.getBuffer(), GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT);
-    pipeline.setBindgroup(0, cameraBindings);
+    pipeline.setBindgroup(0, Renderer.globalBindgroupInteractor);
     pipeline.setBindgroup(1, primitive.getMat().bindgroupInteractor);
     pipeline.setBindgroup(2, node.bindgroupInteractor);
     node.setPipelines(primitive.uuid, [pipeline]);
