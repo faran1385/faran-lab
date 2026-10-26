@@ -32,7 +32,6 @@ export class RenderCache {
      * a render item has changed anywhere, and every cached item can be reused without looking at any node.
      */
     lastFrameEpoch = -1;
-    lastCameraUUID = ""
 
     /** Forces the next frame to check every node, whatever the epoch says (the frame formats changed, say). */
     invalidateAll() {

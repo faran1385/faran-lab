@@ -147,7 +147,7 @@ export class Rig {
     private hashCalls = 0;
     private gpuErrors: string[] = [];
 
-    /** Snapshot of an empty scene: the renderer's own resources (the camera buffer). */
+    /** Snapshot of an empty scene: the renderer's own resources (the global buffer). */
     baseline!: Snapshot;
 
     private readonly internals: RendererInternals;

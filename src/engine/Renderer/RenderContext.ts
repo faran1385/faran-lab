@@ -1,7 +1,6 @@
 import type {CentralManager} from "../managers/CentralManager.ts";
 import type {CentralProducer} from "../producers/CentralProducer.ts";
 import type {Hasher} from "../hashing/utils/Hasher.ts";
-import type {BindgroupInteractor} from "../Representations/BindgroupInteractor.ts";
 import type {RenderCache} from "./RenderCache.ts";
 
 export interface FrameInfo {
@@ -16,5 +15,4 @@ export interface RenderContext {
     hasher: Hasher;
     frame: FrameInfo;
     cache: RenderCache;
-    sceneBindgroup: BindgroupInteractor;
 }

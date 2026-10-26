@@ -31,6 +31,7 @@ export class BindgroupLayoutRepresentation {
     readonly uuid: string;
     private entries = new Map<number, BindgroupLayoutEntry<LayoutBinding>>()
     readonly hashProvider: BindgroupLayoutRepresentationHashProvider;
+    private locked = false;
 
     constructor() {
         this.uuid = uuidv4();
@@ -45,7 +46,13 @@ export class BindgroupLayoutRepresentation {
         return this.entries.get(binding);
     }
 
+    /** One way: there is no unlock. A locked layout throws on every change (see BindgroupInteractor.lock). */
+    lock(): void {
+        this.locked = true;
+    }
+
     setEntry(binding: number, entry: BindgroupLayoutEntry<LayoutBinding>) {
+        this.assertUnlocked("setEntry");
         const previous = this.entries.get(binding);
         const previousShape = previous ? this.entryShape(previous) : undefined;
         const nextShape = this.entryShape(entry);
@@ -63,7 +70,12 @@ export class BindgroupLayoutRepresentation {
     }
 
     removeEntry(binding: number) {
+        this.assertUnlocked("removeEntry");
         this.entries.delete(binding)
         this.hashProvider.markChanged()
+    }
+
+    private assertUnlocked(method: string): void {
+        if (this.locked) throw new Error(`BindgroupLayoutRepresentation.${method}: this layout is locked, its entries can no longer change`);
     }
 }
