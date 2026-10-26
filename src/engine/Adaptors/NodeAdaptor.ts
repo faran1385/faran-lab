@@ -9,6 +9,7 @@ import type {MeshAdaptor} from "./MeshAdaptor.ts";
 import type {PrimitiveAdaptor} from "./PrimitiveAdaptor.ts";
 import type {RenderContext} from "../Renderer/RenderContext.ts";
 import {BindgroupInteractor} from "../Representations/BindgroupInteractor.ts";
+import {globalBindgroupInteractor} from "../Representations/GlobalBindgroup.ts";
 
 /** What the adapter reads from a node wrapper to compute its local matrix. */
 export interface TransformSource {
@@ -19,7 +20,7 @@ export interface TransformSource {
 
 /**
  * Translates a node. World transforms, adapter-managed pipelines and tree structure are synchronized before the frame.
- * The renderer supplies a camera binding only to this adapter-managed path; hand-authored pipelines own their bindings.
+ * Adapter-managed pipelines bind the shared global bind group at slot 0; hand-authored pipelines own their bindings.
  */
 export class NodeAdaptor {
     readonly internal: NodeInternal;
@@ -201,7 +202,7 @@ export class NodeAdaptor {
                 pipeline.setPrimitiveState({topology: "triangle-list", cullMode});
                 pipeline.setMaterialState({blend: settings.blend, depthWriteEnabled: settings.depthWriteEnabled});
                 pipeline.setFrame(ctx.frame);
-                pipeline.setBindgroup(0, ctx.sceneBindgroup);
+                pipeline.setBindgroup(0, globalBindgroupInteractor);
                 pipeline.setBindgroup(2, material.bindgroupInteractor);
                 pipeline.setBindgroup(1, this.nodeBindgroupInteractor);
             });

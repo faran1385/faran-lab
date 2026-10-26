@@ -17,6 +17,11 @@ export abstract class Camera extends CameraInternal {
     private readonly _projectionFlag = new VersionFlag();
     private readonly uploadVewFlag = new VersionFlag();
     private readonly uploadProjectionFlag = new VersionFlag();
+    /**
+     * Counts the times updateBuffer() rewrote the buffer's bytes. Unlike the upload flags it is never consumed, so every
+     * renderer can compare it with the version it last uploaded, whichever renderer called updateBuffer() first.
+     */
+    private bufferVersion = 0;
 
     constructor() {
         super();
@@ -87,7 +92,15 @@ export abstract class Camera extends CameraInternal {
             dirty = true;
         }
 
-        if (dirty) this.buffer.markDirty();
+        if (dirty) {
+            this.bufferVersion++;
+            this.buffer.markDirty();
+        }
+    }
+
+    /** Changes whenever updateBuffer() rewrote the buffer's bytes; see `bufferVersion`. */
+    getBufferVersion(): number {
+        return this.bufferVersion;
     }
 
     protected markProjectionDirty(): void {

@@ -5,10 +5,15 @@
  */
 import type {BufferInternal} from "../internals/BufferInternal.ts";
 
+// GPUBufferUsage.UNIFORM and GPUBufferUsage.STORAGE as numbers: this runs while modules are still being evaluated (the
+// shared global bind group is built at import time), where the GPUBufferUsage global may not exist (SSR, node).
+const UNIFORM_USAGE = 0x0040;
+const STORAGE_USAGE = 0x0080;
+
 export function bufferBindingTypeOf(buffer: BufferInternal): GPUBufferBindingType {
     const usage = buffer.getUsage();
-    if (usage & GPUBufferUsage.UNIFORM) return "uniform";
-    if (usage & GPUBufferUsage.STORAGE) return "read-only-storage";
+    if (usage & UNIFORM_USAGE) return "uniform";
+    if (usage & STORAGE_USAGE) return "read-only-storage";
     throw new Error("bufferBindingTypeOf: a bound buffer needs UNIFORM or STORAGE usage");
 }
 

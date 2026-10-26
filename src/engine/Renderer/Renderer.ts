@@ -8,7 +8,7 @@ import {v4 as uuidv4} from "uuid";
 import {getEpoch} from "../hashing/utils/epoch.ts";
 import {UploadLayer} from "./UploadLayer.ts";
 import {flushPreFrame} from "../Adaptors/PreFrameQueue.ts";
-import {BindgroupInteractor} from "../Representations/BindgroupInteractor.ts";
+import {globalBindgroupInteractor, globalBuffer} from "../Representations/GlobalBindgroup.ts";
 import type {FrameInfo, RenderContext} from "./RenderContext.ts";
 import type {RenderItem} from "./RenderItem.ts";
 import type {Scene} from "../Scene/Scene.ts";
@@ -16,9 +16,17 @@ import type {Camera} from "../Camera/Camera.ts";
 
 /**
  * Draws a Scene. The scene adapter turns wrappers into internals in the pre-frame queue, and the renderer only consumes
- * the result. Camera matrix data belongs to the Camera; this renderer only ensures its buffer has a GPU allocation.
+ * the result. Camera matrix data belongs to the Camera; each render() copies it into this renderer's own GPU copy of the
+ * shared global buffer (see GlobalBindgroup.ts), which every engine-built pipeline binds at group 0.
  */
 export class Renderer {
+    /**
+     * The group-0 bind group of engine-built pipelines: one locked interactor shared by every renderer. It is only a
+     * description, each renderer resolves it through its own managers. Custom pipelines can bind it at any group:
+     * `pipeline.setBindgroup(group, Renderer.globalBindgroupInteractor)`.
+     */
+    static readonly globalBindgroupInteractor = globalBindgroupInteractor;
+
     private device!: GPUDevice;
     private ctx!: GPUCanvasContext;
     readonly uuid: string;
@@ -35,7 +43,11 @@ export class Renderer {
     private readonly producer = new CentralProducer();
     private readonly renderCache = new RenderCache();
     private renderContext!: RenderContext;
-    private activeCameraBufferKey: string | null = null;
+    /** Key of this renderer's GPU copy of the shared global buffer. */
+    private readonly globalBufferKey = globalBuffer.hashProvider.convertToHash();
+    /** What was last written into that copy: it is rewritten only for another camera or a newer camera upload. */
+    private uploadedCamera: Camera | null = null;
+    private uploadedCameraVersion = -1;
 
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
@@ -52,6 +64,9 @@ export class Renderer {
         this.format = navigator.gpu.getPreferredCanvasFormat();
         this.ctx.configure({device: this.device, format: this.format, alphaMode: "opaque"});
         this.managers = new CentralManager(this.device);
+        // This renderer's own GPU copy of the shared global buffer, held for the renderer's lifetime so it is never collected.
+        this.managers.bufferManager.ensure(this.globalBufferKey, () => this.producer.produceBuffer(globalBuffer));
+        this.managers.bufferManager.acquire(this.globalBufferKey);
         this.depthRenderTarget = new RenderTarget(this.canvas.width, this.canvas.height, {
             format: "depth32float",
         });
@@ -64,7 +79,6 @@ export class Renderer {
             hasher: this.hasher,
             frame: this.currentFrame(),
             cache: this.renderCache,
-            sceneBindgroup: new BindgroupInteractor(),
         };
     }
 
@@ -85,16 +99,18 @@ export class Renderer {
     render(scene: Scene, camera: Camera): void {
         const ctx = this.renderContext;
 
+        // Update the camera-owned CPU buffer, then copy it into this renderer's GPU copy of the global buffer. Pipelines
+        // and render items keep binding that same buffer whatever the camera, so nothing cached can go stale. It is written
+        // directly, not through the upload queue: the queue is global, so another renderer could drain the request.
+        // The camera's upload flags are consumed by whichever renderer calls updateBuffer() first, so each renderer
+        // remembers the camera and version it last wrote instead.
         camera.updateBuffer();
-        const cameraBuffer = camera.getBuffer();
-        const cameraBufferKey = cameraBuffer.hashProvider.convertToHash();
-        if (cameraBufferKey !== this.activeCameraBufferKey) {
-            this.managers.bufferManager.ensure(cameraBufferKey, () => this.producer.produceBuffer(cameraBuffer));
-            this.managers.bufferManager.acquire(cameraBufferKey);
-            if (this.activeCameraBufferKey !== null) this.managers.bufferManager.release(this.activeCameraBufferKey);
-            this.activeCameraBufferKey = cameraBufferKey;
+        const cameraVersion = camera.getBufferVersion();
+        if (camera !== this.uploadedCamera || cameraVersion !== this.uploadedCameraVersion) {
+            this.managers.bufferManager.upload(this.globalBufferKey, camera.getBuffer().getData());
+            this.uploadedCamera = camera;
+            this.uploadedCameraVersion = cameraVersion;
         }
-        ctx.sceneBindgroup.setUniform(0, cameraBuffer, GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT);
 
         flushPreFrame(ctx);
 
