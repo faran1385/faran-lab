@@ -64,7 +64,7 @@ export class ResourceLayer {
             ResourceLayer.buffer(attribute, ctx, held);
         }
         const draw = geometry.getDrawInfo();
-        if (draw && "indexBuffer" in draw) ResourceLayer.buffer(draw.indexBuffer, ctx, held);
+        if ("indexBuffer" in draw) ResourceLayer.buffer(draw.indexBuffer, ctx, held);
     }
 
     /**

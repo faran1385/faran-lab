@@ -1,6 +1,8 @@
 import {NodeWrapper} from "../wrappers/NodeWrapper.ts";
 import {SceneAdaptor} from "../Adaptors/SceneAdaptor.ts";
 import {v4 as uuidv4} from "uuid";
+import type {NodeInternal} from "../internals/NodeInternal.ts";
+import {NodeAdaptor} from "../Adaptors/NodeAdaptor.ts";
 
 /**
  * The friendly scene API. Renderer.render() accepts this wrapper and, after the pre-frame queue flushes, reads the
@@ -16,8 +18,8 @@ export class Scene {
         this.adaptor = new SceneAdaptor(this.worldRoot.adaptor);
     }
 
-    addNode(node: NodeWrapper): void {
-        this.worldRoot.addChild(node);
+    addNode(node: NodeWrapper | NodeInternal): void {
+        this.worldRoot.addChild(node instanceof NodeWrapper ? node : new NodeWrapper(new NodeAdaptor(node)));
     }
 
     removeNode(node: NodeWrapper): void {

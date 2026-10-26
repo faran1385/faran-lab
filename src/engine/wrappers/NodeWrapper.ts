@@ -32,7 +32,9 @@ export class NodeWrapper {
         scale?: Node["scale"],
         name?: string,
     ) {
-        this.adaptor = adaptor ?? new NodeAdaptor(new NodeInternal(2, 0));
+        this.adaptor = adaptor ?? new NodeAdaptor(new NodeInternal());
+
+        if (this.adaptor) this.adaptor.invalidate();
 
         const t = translation ?? [0, 0, 0] as any;
         const r = rotation ?? [0, 0, 0, 1] as any;

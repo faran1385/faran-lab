@@ -61,10 +61,12 @@ export class PipelineInteractor extends PipelineRepresentation {
         this.compose();
     }
 
+
     setBindgroup(group: number, bindgroup: BindgroupInteractor) {
         this.bindgroups.set(group, bindgroup);
         this.layout.setLayout(group, bindgroup.layout);
     }
+
 
     removeBindgroup(group: number) {
         this.bindgroups.delete(group);

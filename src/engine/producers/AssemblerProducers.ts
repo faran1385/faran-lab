@@ -103,7 +103,7 @@ export function nodeBindings(): BindGroupEntry[] {
     return [
         {
             kind: "uniform",
-            group: 2,
+            group: 1,
             binding: 0,
             name: "node",
             structName: "NodeUniforms",
@@ -149,7 +149,7 @@ function materialBindings(bindingPlan: MaterialBindingPlan, factorPlan: Material
     });
 
     const entries: BindGroupEntry[] = [{
-        kind: "uniform", group: 1, binding: FACTORS_BINDING,
+        kind: "uniform", group: 2, binding: FACTORS_BINDING,
         name: "material", structName: "MaterialUniforms",
         fields: FactorFields, size: FactorSize,
     }];
@@ -165,14 +165,14 @@ function materialBindings(bindingPlan: MaterialBindingPlan, factorPlan: Material
             slot.kind === "texture"
                 ? {
                     kind: "texture",
-                    group: 1,
+                    group: 2,
                     binding: slot.binding,
                     name: `texture${slot.binding}`,
                     textureType: "texture_2d<f32>",
                 }
                 : {
                     kind: "sampler",
-                    group: 1,
+                    group: 2,
                     binding: slot.binding,
                     name: `sampler${slot.binding}`,
                     samplerType: "sampler",

@@ -25,11 +25,11 @@ export class RenderItemBuilder {
         cache.touch(node);
 
         const entry = cache.get(node);
+
         // The render side's own inputs. They stamp the node, so this comes before the staleness checks and a first
         // build sees them.
         // Quiet frame: nothing anywhere changed since the last frame
         if (entry && cache.lastFrameEpoch === getEpoch()) return entry.items;
-
         // One comparison tells whether anything this node draws with changed (mesh, primitives, materials, geometry,
         // shader code, pipelines): the node's stamp covers all of it.
         if (entry && node.hashProvider.getChangedAt() <= entry.builtAt) return entry.items;

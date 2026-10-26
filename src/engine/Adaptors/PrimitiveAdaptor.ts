@@ -107,30 +107,33 @@ export class PrimitiveAdaptor {
         const geometry = this.geometry;
         if (!material || !geometry || !this.vertexAssembler || !this.fragmentAssembler) return;
 
-        const stale = this.codeDirty
-            || material.getPlanVersion() !== this.seenPlanVersion
-            || geometry.getLayoutVersion() !== this.seenLayoutVersion;
-        if (!stale) return;
-
-        this.codeDirty = false;
-        this.seenPlanVersion = material.getPlanVersion();
-        this.seenLayoutVersion = geometry.getLayoutVersion();
-
         const bindingPlan = material.getBindingPlan();
         const factorsPlan = material.getFactorsPlan();
         const attributePlan = geometry.getAttributePlan();
 
-        const vertexCode = this.vertexAssembler.assemble(
-            VertexShaderProducer.produce(() => bindingPlan, () => attributePlan),
-            VERTEX_ENTRY_POINT,
-        );
-        const fragmentCode = this.fragmentAssembler.assemble(
-            FragmentShaderProducer.produce(() => bindingPlan, () => factorsPlan),
-            FRAGMENT_ENTRY_POINT,
-        );
+        if (this.codeDirty || geometry.getLayoutVersion() !== this.seenLayoutVersion) {
 
-        this.fillStage(this.internal.vertex, vertexCode, VERTEX_ENTRY_POINT);
-        this.fillStage(this.internal.fragment, fragmentCode, FRAGMENT_ENTRY_POINT);
+            const vertexCode = this.vertexAssembler.assemble(
+                VertexShaderProducer.produce(() => bindingPlan, () => attributePlan),
+                VERTEX_ENTRY_POINT,
+            );
+            this.fillStage(this.internal.vertex, vertexCode, VERTEX_ENTRY_POINT);
+        }
+
+        if (this.codeDirty || material.getPlanVersion() !== this.seenPlanVersion) {
+
+            const fragmentCode = this.fragmentAssembler.assemble(
+                FragmentShaderProducer.produce(() => bindingPlan, () => factorsPlan),
+                FRAGMENT_ENTRY_POINT,
+            );
+
+            this.fillStage(this.internal.fragment, fragmentCode, FRAGMENT_ENTRY_POINT);
+        }
+
+
+        this.codeDirty = false;
+        this.seenPlanVersion = material.getPlanVersion();
+        this.seenLayoutVersion = geometry.getLayoutVersion();
     }
 
     /** setCode/setEntryPoint always mark the stage changed, so only call them when the value really differs. */

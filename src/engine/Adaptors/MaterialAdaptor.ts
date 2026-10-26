@@ -39,10 +39,6 @@ function packFactors(plan: MaterialFactorsPlan): Float32Array {
     return new Float32Array(Array.from(plan.values()).flatMap((entry) => entry.factor));
 }
 
-/** Names, types and offsets only. Two plans with the same shape generate the same shader and the same buffer layout. */
-function factorsShape(plan: MaterialFactorsPlan): string {
-    return Array.from(plan.entries()).map(([name, e]) => `${name}:${e.wgslType}@${e.offset}`).join("|");
-}
 
 /**
  * Translates a MaterialWrapper into its MaterialInternal: the binding plan, the factors buffer, the bind group
@@ -78,7 +74,6 @@ export class MaterialAdaptor {
 
     private bindingPlan: MaterialBindingPlan = {slots: [], byComponent: new Map(), signature: ""};
     private factorsPlan: MaterialFactorsPlan = new Map();
-    private factorsShapeKey = "";
     private planVersion = 0;
 
     private factorsBuffer: BufferInternal | null = null;
@@ -180,16 +175,7 @@ export class MaterialAdaptor {
         let bufferReplaced = false;
         if (planWasDirty || factorsWereDirty) {
             const plan = planMaterialFactors(this.owner);
-            const shape = factorsShape(plan);
             this.factorsPlan = plan;
-
-            // A factor whose arity changed (vec3 -> vec4) changes offsets and the generated struct: that is a plan change.
-            if (!planWasDirty && shape !== this.factorsShapeKey) {
-                this.planVersion++;
-                this.changed.notify();
-            }
-            this.factorsShapeKey = shape;
-
             bufferReplaced = this.syncFactorsBuffer(packFactors(plan));
         }
 
@@ -212,7 +198,7 @@ export class MaterialAdaptor {
     }
 
     private syncBindings(): void {
-        const bindgroup = this.internal.getBindgroupInteractor();
+        const bindgroup = this.internal.bindgroupInteractor;
         const wanted = new Set<number>([FACTORS_BINDING]);
 
         bindgroup.setUniform(FACTORS_BINDING, this.factorsBuffer!, GPUShaderStage.FRAGMENT);

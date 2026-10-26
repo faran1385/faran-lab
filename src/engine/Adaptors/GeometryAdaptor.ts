@@ -17,7 +17,7 @@ export class GeometryAdaptor {
 
     private readonly owner: GeometryWrapper;
     private readonly task = () => this.ensure();
-    private dirty = true;
+    private attributesDirty = true;
 
     private attributePlan: GeometryAttributePlan = {slots: [], byName: new Map()};
     private layoutKey = "";
@@ -33,8 +33,8 @@ export class GeometryAdaptor {
 
     /** Called by the wrapper when attributes or indices were added, removed or replaced. */
     invalidate() {
-        if (!this.dirty) {
-            this.dirty = true;
+        if (!this.attributesDirty) {
+            this.attributesDirty = true;
             this.changed.notify();
         }
         schedulePreFrame(this.task);
@@ -50,8 +50,8 @@ export class GeometryAdaptor {
     }
 
     ensure(): void {
-        if (!this.dirty) return;
-        this.dirty = false;
+        if (!this.attributesDirty) return;
+        this.attributesDirty = false;
 
         const plan = planGeometryAttributes(this.owner);
         this.attributePlan = plan;

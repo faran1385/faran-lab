@@ -1,7 +1,8 @@
-import { v4 as uuidv4 } from "uuid";
-import { GeometryInternalHashProvider } from "../hashing/GeometryInternalHashProvider.ts";
-import { AttributeInternal } from "./AttributeInternal.ts";
-import type { BufferInternal } from "./BufferInternal.ts";
+import {v4 as uuidv4} from "uuid";
+import {GeometryInternalHashProvider} from "../hashing/GeometryInternalHashProvider.ts";
+import {AttributeInternal} from "./AttributeInternal.ts";
+import type {BufferInternal} from "./BufferInternal.ts";
+import {BindgroupInteractor} from "../Representations/BindgroupInteractor.ts";
 
 export type Draw = {
     vertexCount: number;
@@ -27,7 +28,12 @@ export class GeometryInternal {
     readonly hashProvider: GeometryInternalHashProvider;
     private drawInfo!: Draw | DrawIndexed;
 
-    constructor() {
+    readonly group: number;
+    readonly bindgroupInteractor = new BindgroupInteractor();
+
+    constructor(group?: number) {
+        this.group = group ?? 3;
+
         this.uuid = uuidv4();
         this.hashProvider = new GeometryInternalHashProvider({
             getVertexAttributes: () => this.vertexAttributes,

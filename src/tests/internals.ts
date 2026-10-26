@@ -404,7 +404,7 @@ const hashProviders: Scenario = {
         expectEqual(ctx, "...without computing anything", calls(), callsBefore);
 
         // internals: no-op setters stamp nothing, real ones do
-        const node = new NodeInternal(null, null);
+        const node = new NodeInternal();
         const mesh = new MeshInternal();
         node.setMesh(mesh);
         epoch = getEpoch();
@@ -427,7 +427,7 @@ const hashProviders: Scenario = {
 
         // propagation: node -> mesh -> primitive -> material -> bind group -> image / sampler / buffer
         const material = new MaterialInternal(1);
-        const matGroup = material.getBindgroupInteractor();
+        const matGroup = material.bindgroupInteractor;
         const matImage = new ImageWrapper(pixelBytes(2, [5, 5, 5, 5]), 2, 2);
         const matSampler = new SamplerWrapper();
         const matBuffer = uniformBuffer();
@@ -649,7 +649,7 @@ function rawNode(rig: Rig, primitive: PrimitiveInternal, mesh: MeshInternal, x =
     pipeline.setMaterialState({blend: undefined, depthWriteEnabled: true});
     pipeline.setFrame(ctx.frame);
     pipeline.setBindgroup(0, ctx.sceneBindgroup);
-    pipeline.setBindgroup(1, primitive.getMat().getBindgroupInteractor());
+    pipeline.setBindgroup(1, primitive.getMat().bindgroupInteractor);
     pipeline.setBindgroup(2, node.bindgroupInteractor);
     node.setPipelines(primitive.uuid, [pipeline]);
     return {node, pipeline, matrix};
@@ -675,7 +675,7 @@ const rawScene: Scenario = {
 
         const material = new MaterialInternal(1);
         const color = new BufferInternal(new Float32Array([1, 0, 0, 1]).buffer, UNIFORM);
-        material.getBindgroupInteractor().setUniform(0, color, GPUShaderStage.FRAGMENT);
+        material.bindgroupInteractor.setUniform(0, color, GPUShaderStage.FRAGMENT);
 
         const primitive = new PrimitiveInternal();
         primitive.setMat(material);
@@ -779,7 +779,7 @@ const rawScene: Scenario = {
         }, {created: {buffer: 1, bindgroup: 1}}, {sameAfter: true});
         await trigger(ctx, rig, "material bind group: another colour buffer", () => {
             const replacement = new BufferInternal(new Float32Array([0, 0, 1, 1]).buffer, UNIFORM);
-            material.getBindgroupInteractor().setUniform(0, replacement, GPUShaderStage.FRAGMENT);
+            material.bindgroupInteractor.setUniform(0, replacement, GPUShaderStage.FRAGMENT);
         }, {created: {buffer: 1, bindgroup: 1}}, {sameAfter: true});
         expectColor(ctx, "drawn with the new colour buffer", await rig.readPixels(), cx, cy, [0, 0, 255]);
 

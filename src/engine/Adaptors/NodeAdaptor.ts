@@ -8,6 +8,7 @@ import type {MeshWrapper} from "../wrappers/MeshWrapper.ts";
 import type {MeshAdaptor} from "./MeshAdaptor.ts";
 import type {PrimitiveAdaptor} from "./PrimitiveAdaptor.ts";
 import type {RenderContext} from "../Renderer/RenderContext.ts";
+import {BindgroupInteractor} from "../Representations/BindgroupInteractor.ts";
 
 /** What the adapter reads from a node wrapper to compute its local matrix. */
 export interface TransformSource {
@@ -58,14 +59,13 @@ export class NodeAdaptor {
     private readonly onDependencyChange = () => this.invalidate();
     private dirty = true;
 
+    readonly nodeBindgroupInteractor = new BindgroupInteractor();
+
 
     constructor(internal?: NodeInternal) {
         this.internal = internal ?? new NodeInternal();
-        // Built-in nodes need this adaptor's world-matrix buffer, but a caller may wrap a NodeInternal
-        // with a hand-authored binding 0. Preserve that existing resource instead of silently replacing it.
-        if (this.internal.nodeBindgroupAt !== null && !this.internal.bindgroupInteractor.getEntry(0)) {
-            this.internal.bindgroupInteractor.setUniform(0, this.buffer, GPUShaderStage.VERTEX);
-        }
+
+        this.nodeBindgroupInteractor.setUniform(0, this.buffer, GPUShaderStage.VERTEX);
         schedulePreFrame(this.worldTask);
     }
 
@@ -241,10 +241,11 @@ export class NodeAdaptor {
                 pipeline.setPrimitiveState({topology: "triangle-list", cullMode});
                 pipeline.setMaterialState({blend: settings.blend, depthWriteEnabled: settings.depthWriteEnabled});
                 pipeline.setFrame(ctx.frame);
-                if (this.internal.sceneBindgroupAt !== null) pipeline.setBindgroup(this.internal.sceneBindgroupAt, ctx.sceneBindgroup);
 
-                pipeline.setBindgroup(material.getGroup(), material.getBindgroupInteractor());
-                if (this.internal.nodeBindgroupAt !== null) pipeline.setBindgroup(this.internal.nodeBindgroupAt, this.internal.bindgroupInteractor);
+
+                pipeline.setBindgroup(0, ctx.sceneBindgroup);
+                pipeline.setBindgroup(2, material.bindgroupInteractor);
+                pipeline.setBindgroup(1, this.nodeBindgroupInteractor);
             });
 
             this.internal.setPipelines(primitive.uuid, pipelines);
@@ -253,7 +254,5 @@ export class NodeAdaptor {
         for (const uuid of Array.from(this.internal.getPipelines().keys())) {
             if (!live.has(uuid)) this.internal.removePipelines(uuid);
         }
-
-
     }
 }
