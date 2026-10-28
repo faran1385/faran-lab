@@ -77,7 +77,6 @@ export class ResourceLayer {
         const vertex = pipeline.getVertexShader();
         const fragment = pipeline.getFragmentShader();
 
-
         if (!vertex.code || !fragment.code
             || !pipeline.getPrimitive() || !pipeline.getDepthStencil()
             || pipeline.getFragmentTargets().size === 0) return null;

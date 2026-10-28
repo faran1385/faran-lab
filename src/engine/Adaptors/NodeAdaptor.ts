@@ -8,13 +8,14 @@ import type {MeshWrapper} from "../wrappers/MeshWrapper.ts";
 import type {MeshAdaptor} from "./MeshAdaptor.ts";
 import type {PrimitiveAdaptor} from "./PrimitiveAdaptor.ts";
 import type {RenderContext} from "../Renderer/RenderContext.ts";
-import {BindgroupInteractor} from "../Representations/BindgroupInteractor.ts";
 import {globalBindgroupInteractor} from "../Representations/GlobalBindgroup.ts";
 
 /** What the adapter reads from a node wrapper to compute its local matrix. */
 export interface TransformSource {
     getTranslation(): Float32Array;
+
     getRotation(): Float32Array;
+
     getScale(): Float32Array;
 }
 
@@ -45,11 +46,10 @@ export class NodeAdaptor {
     private readonly onDependencyChange = () => this.invalidate();
     private dirty = true;
 
-    readonly nodeBindgroupInteractor = new BindgroupInteractor();
 
     constructor(internal?: NodeInternal) {
         this.internal = internal ?? new NodeInternal();
-        this.nodeBindgroupInteractor.setUniform(0, this.buffer, GPUShaderStage.VERTEX);
+        this.internal.bindgroupInteractor.setUniform(0, this.buffer, GPUShaderStage.VERTEX);
         schedulePreFrame(this.worldTask);
     }
 
@@ -204,7 +204,7 @@ export class NodeAdaptor {
                 pipeline.setFrame(ctx.frame);
                 pipeline.setBindgroup(0, globalBindgroupInteractor);
                 pipeline.setBindgroup(2, material.bindgroupInteractor);
-                pipeline.setBindgroup(1, this.nodeBindgroupInteractor);
+                pipeline.setBindgroup(1, this.internal.bindgroupInteractor);
             });
 
             this.internal.setPipelines(primitive.uuid, pipelines);

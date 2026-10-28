@@ -636,7 +636,7 @@ interface RawNode {
 function rawNode(rig: Rig, primitive: PrimitiveInternal, mesh: MeshInternal, x = 0): RawNode {
     const ctx = rig.context;
     // This test owns its matrix binding and pipeline slots directly; do not ask NodeAdaptor to replace binding 0.
-    const node = new NodeInternal(null, null);
+    const node = new NodeInternal();
     const matrix = new BufferInternal(translation(x), UNIFORM);
     node.bindgroupInteractor.setUniform(0, matrix, GPUShaderStage.VERTEX);
     node.setMesh(mesh);

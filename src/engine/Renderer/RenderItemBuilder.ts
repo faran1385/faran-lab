@@ -30,10 +30,10 @@ export class RenderItemBuilder {
         // build sees them.
         // Quiet frame: nothing anywhere changed since the last frame
         if (entry && cache.lastFrameEpoch === getEpoch()) return entry.items;
+
         // One comparison tells whether anything this node draws with changed (mesh, primitives, materials, geometry,
         // shader code, pipelines): the node's stamp covers all of it.
         if (entry && node.hashProvider.getChangedAt() <= entry.builtAt) return entry.items;
-
         const held = emptyHeldKeys();
         const items: RenderItem[] = [];
         for (const primitive of node.getMesh()?.getAllPrimitives() ?? []) {

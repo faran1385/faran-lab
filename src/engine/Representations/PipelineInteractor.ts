@@ -1,4 +1,4 @@
-import {PipelineRepresentation} from "./PipelineRepresentation.ts";
+import {type FrameTarget, PipelineRepresentation} from "./PipelineRepresentation.ts";
 import type {ShaderStageRepresentation} from "./ShaderStageRepresentation.ts";
 import type {BindgroupInteractor} from "./BindgroupInteractor.ts";
 import {stableKey} from "../hashing/utils/stableKey.ts";
@@ -21,7 +21,11 @@ export interface PipelineMaterialState {
  */
 export class PipelineInteractor extends PipelineRepresentation {
     private materialState: PipelineMaterialState = {blend: undefined, depthWriteEnabled: true};
-    private frame: PipelineFrame | null = null;
+    private frame: PipelineFrame = {
+        colorFormat: "bgra8unorm",
+        depthFormat: "depth32float"
+    };
+
     private composedKey = "";
 
     constructor() {
@@ -51,6 +55,10 @@ export class PipelineInteractor extends PipelineRepresentation {
         this.setPrimitive(state);
     }
 
+    setFrameTargetState(frameTarget: FrameTarget) {
+        this.setFrameTarget(frameTarget);
+    }
+
     setMaterialState(state: PipelineMaterialState) {
         this.materialState = state;
         this.compose();
@@ -65,6 +73,10 @@ export class PipelineInteractor extends PipelineRepresentation {
     setBindgroup(group: number, bindgroup: BindgroupInteractor) {
         this.bindgroups.set(group, bindgroup);
         this.layout.setLayout(group, bindgroup.layout);
+    }
+
+    setDepth(depthStencil: GPUDepthStencilState) {
+        this.setDepthStencil(depthStencil);
     }
 
 

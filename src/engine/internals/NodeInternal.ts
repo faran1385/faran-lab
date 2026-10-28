@@ -2,10 +2,14 @@ import {v4 as uuidv4} from "uuid";
 import {NodeInternalHashProvider} from "../hashing/NodeInternalHashProvider.ts";
 import type {MeshInternal} from "./MeshInternal.ts";
 import {PipelineInteractor, type PipelineFrame} from "../Representations/PipelineInteractor.ts";
+import {BindgroupInteractor} from "../Representations/BindgroupInteractor.ts";
 
 export class NodeInternal {
     readonly uuid: string;
     private mesh: MeshInternal | null = null;
+
+    readonly bindgroupInteractor = new BindgroupInteractor();
+
 
     /**
      * Keyed by primitive uuid. The value is an array because one primitive can need several pipelines (a double-sided
