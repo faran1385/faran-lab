@@ -52,6 +52,7 @@ export type VertexFormat =
     | "float32x3"
     | "float32x4"
     | "uint16x2"
+    | "uint16x4"
     | "uint32";
 
 export interface Attribute {
@@ -101,16 +102,63 @@ export interface Mesh {
 }
 
 export interface Node {
+    /** The node's index in the source file's nodes[]. Skin joints and animation channels refer to nodes by it. */
+    index: number;
     name?: string;
     mesh?: number;
+    /** Index into SceneIR.skins. Set on skinned mesh nodes only. */
+    skin?: number;
     translation: vec3;
     rotation: quat;
     scale: vec3;
     children: Node[];
 }
 
+/**
+ * Pure skin data from the file. Joints are nodes: `joints[i]` is a Node.index, and `inverseBindMatrices` holds one
+ * column-major mat4 per joint (16 floats each) in the same order.
+ */
+export interface Skin {
+    name?: string;
+    joints: number[];
+    inverseBindMatrices: Float32Array;
+    /** Node.index of the skeleton root, when the file names one. */
+    skeleton?: number;
+}
+
+export type AnimationPath = "translation" | "rotation" | "scale";
+export type AnimationInterpolation = "linear" | "step" | "cubicspline";
+
+/**
+ * Keyframes. `times` has one entry per keyframe; `values` holds `componentCount` floats per keyframe, or three times
+ * that for "cubicspline" (in-tangent, value, out-tangent per keyframe). Stored raw, nothing is sampled at import.
+ */
+export interface AnimationSampler {
+    interpolation: AnimationInterpolation;
+    times: Float32Array;
+    values: Float32Array;
+}
+
+export interface AnimationChannel {
+    /** Node.index of the animated node. */
+    node: number;
+    path: AnimationPath;
+    /** Index into AnimationClip.samplers. */
+    sampler: number;
+}
+
+export interface AnimationClip {
+    name?: string;
+    samplers: AnimationSampler[];
+    channels: AnimationChannel[];
+    /** Seconds: the latest keyframe time of any sampler. */
+    duration: number;
+}
+
 export interface SceneIR {
     roots: Node[];
+    skins: Skin[];
+    animations: AnimationClip[];
     geometries: Geometry[];
     materials: Material[];
     images: DecodedImage[];

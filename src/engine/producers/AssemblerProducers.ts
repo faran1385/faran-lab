@@ -62,12 +62,45 @@ export interface BindGroupSamplerEntry {
 }
 
 
+/** A WGSL struct: name plus fields. Used for the palette's element type. */
+export interface Struct {
+    structName: string;
+    fields: StructField[];
+}
+
+/**
+ * What the vertex shader needs from a node's skinning method (see SkinningMethod for the WGSL contract). `id` keys the
+ * vertex stage variants a primitive keeps, so it must change whenever `code` or `paletteElement` does.
+ */
+export interface SkinShaderInfo {
+    id: string;
+    code: string;
+    paletteElement: Struct;
+}
+
+/** Binding of the skin palette inside the node bind group (group 1, next to the world matrix at binding 0). */
+export const PALETTE_BINDING = 1;
+
+export function paletteBinding(element: Struct): BindGroupStorageEntry {
+    return {
+        kind: "storage",
+        group: 1,
+        binding: PALETTE_BINDING,
+        name: "palette",
+        elementStructName: element.structName,
+        elementFields: element.fields,
+        access: "read",
+    };
+}
+
 export interface VertexShaderDescriptor {
     inputs: VertexInputField[];
     bindings: BindGroupEntry[],
     componentDataMap: Map<string, {
         uv?: string
-    }>
+    }>,
+    /** Set for a skinned node: the assembler declares the palette and the method's code, and calls `skin`. */
+    skin?: SkinShaderInfo;
 }
 
 export interface FragmentShaderDescriptor {
@@ -116,7 +149,11 @@ export function nodeBindings(): BindGroupEntry[] {
 }
 
 export class VertexShaderProducer {
-    static produce(getMaterialPlan: () => MaterialBindingPlan, getAttributePlan: () => GeometryAttributePlan): VertexShaderDescriptor {
+    static produce(
+        getMaterialPlan: () => MaterialBindingPlan,
+        getAttributePlan: () => GeometryAttributePlan,
+        skin?: SkinShaderInfo,
+    ): VertexShaderDescriptor {
         const plan = getAttributePlan();
         const matPlan = getMaterialPlan();
         const componentDataMap: VertexShaderDescriptor["componentDataMap"] = new Map()
@@ -136,7 +173,10 @@ export class VertexShaderProducer {
         }));
 
 
-        return {inputs, componentDataMap, bindings: [...sceneBindings(), ...nodeBindings()]};
+        const bindings = [...sceneBindings(), ...nodeBindings()];
+        if (skin) bindings.push(paletteBinding(skin.paletteElement));
+
+        return {inputs, componentDataMap, bindings, skin};
     }
 }
 

@@ -5,9 +5,12 @@ import {vec3} from "../../packages/math/vector/vec3.ts";
 import {quat} from "../../packages/math/quat/quat.ts";
 import {NodeAdaptor} from "../Adaptors/NodeAdaptor.ts";
 import {NodeInternal} from "../internals/NodeInternal.ts";
+import {AnimationHandler} from "./AnimationHandler.ts";
 
 export class NodeWrapper {
     readonly adaptor: NodeAdaptor;
+    /** Everything animation-related this node carries (its skin). */
+    readonly animationHandler: AnimationHandler;
     readonly uuid: string;
     private name?: string;
     private mesh: MeshWrapper | null = null;
@@ -35,6 +38,7 @@ export class NodeWrapper {
         this.adaptor = adaptor ?? new NodeAdaptor(new NodeInternal());
 
         if (this.adaptor) this.adaptor.invalidate();
+        this.animationHandler = new AnimationHandler((skin) => this.adaptor.setSkin(skin?.adaptor ?? null));
 
         const t = translation ?? [0, 0, 0] as any;
         const r = rotation ?? [0, 0, 0, 1] as any;
@@ -84,6 +88,12 @@ export class NodeWrapper {
 
     setRotation(x: number, y: number, z: number) {
         quat.fromEuler(this.rotation, x, y, z)
+        this.adaptor.invalidateWorld();
+    }
+
+    /** Sets the rotation from a quaternion directly (setRotation takes Euler angles). Used by animation. */
+    setRotationQuat(x: number, y: number, z: number, w: number) {
+        quat.set(this.rotation, x, y, z, w);
         this.adaptor.invalidateWorld();
     }
 

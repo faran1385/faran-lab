@@ -9,6 +9,8 @@ import type {MeshAdaptor} from "./MeshAdaptor.ts";
 import type {PrimitiveAdaptor} from "./PrimitiveAdaptor.ts";
 import type {RenderContext} from "../Renderer/RenderContext.ts";
 import {globalBindgroupInteractor} from "../Representations/GlobalBindgroup.ts";
+import {PALETTE_BINDING} from "../producers/AssemblerProducers.ts";
+import type {SkinAdaptor} from "./SkinAdaptor.ts";
 
 /** What the adapter reads from a node wrapper to compute its local matrix. */
 export interface TransformSource {
@@ -41,9 +43,16 @@ export class NodeAdaptor {
     private readonly worldTask = () => this.ensureWorld();
 
     private mesh: MeshAdaptor | null = null;
+    private skin: SkinAdaptor | null = null;
+    private paletteBound = false;
     private readonly watchedPrimitives = new Map<string, PrimitiveAdaptor>();
     private readonly task = (ctx: RenderContext) => this.ensure(ctx);
     private readonly onDependencyChange = () => this.invalidate();
+    /** The skin's palette buffer or method changed: rebind the palette, then rebuild like for any dependency. */
+    private readonly onSkinChange = () => {
+        this.syncSkinBinding();
+        this.invalidate();
+    };
     private dirty = true;
 
 
@@ -139,6 +148,31 @@ export class NodeAdaptor {
         this.notifyStructureChanged();
     }
 
+    /**
+     * Skins the node's mesh with `skin`, or un-skins it with null. The palette becomes a storage binding of this node's
+     * bind group and the vertex shader of the node's primitives is regenerated for the skin's method.
+     */
+    setSkin(skin: SkinAdaptor | null) {
+        if (this.skin === skin) return;
+        this.skin?.changed.unsubscribe(this.internal.uuid);
+        this.skin = skin;
+        this.skin?.changed.subscribe(this.internal.uuid, this.onSkinChange);
+        this.onSkinChange();
+    }
+
+    /** Keeps the node's bind group and internal in step with the skin. A no-op when nothing really changed. */
+    private syncSkinBinding(): void {
+        const bindgroup = this.internal.bindgroupInteractor;
+        if (this.skin) {
+            bindgroup.setStorage(PALETTE_BINDING, this.skin.internal.getPalette(), GPUShaderStage.VERTEX);
+            this.paletteBound = true;
+        } else if (this.paletteBound) {
+            bindgroup.removeBinding(PALETTE_BINDING);
+            this.paletteBound = false;
+        }
+        this.internal.setSkin(this.skin?.internal ?? null);
+    }
+
     invalidate() {
         this.dirty = true;
         schedulePreFrame(this.task);
@@ -194,9 +228,12 @@ export class NodeAdaptor {
             while (pipelines.length < settings.cullModes.length) pipelines.push(new PipelineInteractor());
             pipelines.length = settings.cullModes.length;
 
+            // Skinned nodes use the primitive's vertex stage generated for their skin's method.
+            const vertexStage = adaptor.getVertexStage(this.skin?.getShaderInfo() ?? null);
+
             settings.cullModes.forEach((cullMode, i) => {
                 const pipeline = pipelines[i];
-                pipeline.setVertex(primitive.vertex);
+                pipeline.setVertex(vertexStage);
                 pipeline.setFragment(primitive.fragment);
                 pipeline.setVertexBuffers(buffers);
                 pipeline.setPrimitiveState({topology: "triangle-list", cullMode});

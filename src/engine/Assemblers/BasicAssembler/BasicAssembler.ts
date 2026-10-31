@@ -3,7 +3,7 @@ import {
     type ComponentsMap,
     FragmentAssemblerBase, type FragmentPhase2Output,
     type ValueMap,
-    VertexAssemblerBase, type VertexPhase2Output
+    VertexAssemblerBase, type VertexPhase2Output, type VertexSkin
 } from "../BaseAssembler.ts";
 
 export class BasicVertexAssembler extends VertexAssemblerBase {
@@ -12,12 +12,19 @@ export class BasicVertexAssembler extends VertexAssemblerBase {
         bindingValues: ValueMap,
         dataMap: Map<string, ComponentData>,
         _builtinValues: ValueMap,
+        skin?: VertexSkin,
     ): VertexPhase2Output {
+        const position = inputValues.get("position")?.access;
+        const viewProjection = `${bindingValues.get("projection")?.access} * ${bindingValues.get("view")?.access}`;
+
+        // A skinned vertex comes out of the skinning method already in world space: no world matrix on top of it.
+        const place = skin
+            ? `let skinned = ${skin.call(position ?? "vec3f(0.)", inputValues.get("normal")?.access ?? "vec3f(0., 1., 0.)")};
+            let pos = ${viewProjection} * vec4f(skinned.position, 1.);`
+            : `let pos = ${viewProjection} * ${bindingValues.get("worldMatrix")?.access} * vec4f(${position}, 1.);`;
+
         const codeBody = `
-            let pos=${bindingValues.get("projection")?.access} *
-             ${bindingValues.get("view")?.access} *
-             ${bindingValues.get("worldMatrix")?.access} *
-             vec4f(${inputValues.get("position")?.access},1.);
+            ${place}
         
             return VertexOutput(pos,${dataMap.get("baseColor")?.uv?.access ?? "vec2f(0,0)"});
         `

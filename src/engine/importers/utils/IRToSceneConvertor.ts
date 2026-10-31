@@ -11,6 +11,8 @@ import type {
     Mesh,
     Node,
     AttributeName,
+    Skin,
+    AnimationClip,
 } from "./IR.ts";
 
 import {AttributeWrapper} from "../../wrappers/AttributeWrapper.ts";
@@ -24,10 +26,26 @@ import {MaterialWrapper} from "../../wrappers/MaterialWrapper.ts";
 import {PrimitiveWrapper} from "../../wrappers/PrimitiveWrapper.ts";
 import {MeshWrapper} from "../../wrappers/MeshWrapper.ts";
 import {NodeWrapper} from "../../wrappers/NodeWrapper.ts";
+import {SkinWrapper} from "../../wrappers/SkinWrapper.ts";
+import {AnimationClipWrapper, type AnimationChannelWrapper} from "../../animation/AnimationClipWrapper.ts";
 
 
 export type ConvertedIRResult = {
     root: NodeWrapper
+    /** One per skin in the file. Skinned nodes already hold theirs in their animation handler. */
+    skins: SkinWrapper[]
+    /** The file's animations ("walk", "run", ...). A clip drives nodes, it is not owned by a skin. */
+    clips: AnimationClipWrapper[]
+}
+
+/**
+ * State collected while the node tree is built, for the steps that need the finished tree: skins resolve joint node
+ * indices, clips resolve channel targets, and skinned nodes get their skin.
+ */
+interface NodeBuildContext {
+    /** glTF node index -> the wrapper built for it. */
+    byIndex: Map<number, NodeWrapper>;
+    skinned: { wrapper: NodeWrapper; skin: number }[];
 }
 
 /**
@@ -65,9 +83,15 @@ export class IRToSceneConvertor {
         );
         const meshes = ir.meshes.map((mesh) => this.createMeshWrapper(mesh, primitives));
 
-        return {
-            root: this.createSceneRoot(ir.roots, meshes)
-        }
+        const context: NodeBuildContext = {byIndex: new Map(), skinned: []};
+        const root = this.createSceneRoot(ir.roots, meshes, context);
+
+        // Both need the finished tree, so they run after it.
+        const skins = ir.skins.map((skin) => this.createSkinWrapper(skin, context));
+        this.attachSkins(context, skins);
+        const clips = ir.animations.map((clip) => this.createClipWrapper(clip, context));
+
+        return {root, skins, clips};
     }
 
     // -- attributes / geometry -------------------------------------------
@@ -181,27 +205,90 @@ export class IRToSceneConvertor {
 
     // -- node graph ------------------------------------------------------
 
-    private static createNodeWrapper(node: Node, meshes: MeshWrapper[]): NodeWrapper {
+    private static createNodeWrapper(node: Node, meshes: MeshWrapper[], context: NodeBuildContext): NodeWrapper {
         const wrapper = new NodeWrapper(undefined, node.translation, node.rotation, node.scale, node.name);
+        context.byIndex.set(node.index, wrapper);
 
         if (node.mesh !== undefined) {
             wrapper.setMesh(meshes[node.mesh]);
         }
 
+        if (node.skin !== undefined) {
+            context.skinned.push({wrapper, skin: node.skin});
+        }
+
         for (const child of node.children) {
-            wrapper.addChild(this.createNodeWrapper(child, meshes));
+            wrapper.addChild(this.createNodeWrapper(child, meshes, context));
         }
 
         return wrapper;
     }
 
-    private static createSceneRoot(roots: Node[], meshes: MeshWrapper[]): NodeWrapper {
+    private static createSceneRoot(roots: Node[], meshes: MeshWrapper[], context: NodeBuildContext): NodeWrapper {
         const root = new NodeWrapper(undefined, undefined, undefined, undefined, "RendererSceneRoot");
 
         for (const node of roots) {
-            root.addChild(this.createNodeWrapper(node, meshes));
+            root.addChild(this.createNodeWrapper(node, meshes, context));
         }
 
         return root;
+    }
+
+    // -- skins -----------------------------------------------------------
+
+    private static createSkinWrapper(skin: Skin, context: NodeBuildContext): SkinWrapper {
+        const joints = new Map<NodeWrapper, Float32Array>();
+
+        skin.joints.forEach((nodeIndex, i) => {
+            const node = context.byIndex.get(nodeIndex);
+            if (!node) {
+                // The importer only walks the scene's node tree, so a joint outside it was never imported.
+                throw new Error(`IRToSceneConvertor: skin joint node ${nodeIndex} is not part of the imported scene`);
+            }
+            if (joints.has(node)) {
+                // The Map's order is the palette index: a repeated joint would shift every index after it.
+                throw new Error(`IRToSceneConvertor: skin lists joint node ${nodeIndex} more than once`);
+            }
+            joints.set(node, skin.inverseBindMatrices.slice(i * 16, i * 16 + 16));
+        });
+
+        return new SkinWrapper(joints, undefined, skin.name);
+    }
+
+    /** Gives every skinned node its skin. Nodes of the same skin share one wrapper, so one palette. */
+    private static attachSkins(context: NodeBuildContext, skins: SkinWrapper[]): void {
+        for (const {wrapper, skin} of context.skinned) {
+            const instance = skins[skin];
+            if (!instance) {
+                throw new Error(`IRToSceneConvertor: node references skin ${skin}, which does not exist`);
+            }
+            wrapper.animationHandler.setSkin(instance);
+        }
+    }
+
+    // -- animation clips -------------------------------------------------
+
+    private static createClipWrapper(clip: AnimationClip, context: NodeBuildContext): AnimationClipWrapper {
+        const channels: AnimationChannelWrapper[] = [];
+
+        for (const channel of clip.channels) {
+            const target = context.byIndex.get(channel.node);
+            if (!target) {
+                // Clips may animate nodes outside the scene (cameras, unused props). Nothing to drive here.
+                console.warn(
+                    `IRToSceneConvertor: clip "${clip.name ?? "(unnamed)"}" targets node ${channel.node}, which is not part of the imported scene; channel skipped`,
+                );
+                continue;
+            }
+
+            const sampler = clip.samplers[channel.sampler];
+            if (!sampler) {
+                throw new Error(`IRToSceneConvertor: clip "${clip.name ?? "(unnamed)"}" references missing sampler ${channel.sampler}`);
+            }
+
+            channels.push({target, path: channel.path, sampler});
+        }
+
+        return new AnimationClipWrapper(channels, clip.duration, clip.name);
     }
 }

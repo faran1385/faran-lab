@@ -3,10 +3,12 @@ import {NodeInternalHashProvider} from "../hashing/NodeInternalHashProvider.ts";
 import type {MeshInternal} from "./MeshInternal.ts";
 import {PipelineInteractor, type PipelineFrame} from "../Representations/PipelineInteractor.ts";
 import {BindgroupInteractor} from "../Representations/BindgroupInteractor.ts";
+import type {SkinInternal} from "./SkinInternal.ts";
 
 export class NodeInternal {
     readonly uuid: string;
     private mesh: MeshInternal | null = null;
+    private skin: SkinInternal | null = null;
 
     readonly bindgroupInteractor = new BindgroupInteractor();
 
@@ -25,6 +27,7 @@ export class NodeInternal {
         this.hashProvider = new NodeInternalHashProvider({
             getPipelines: () => this.pipelines,
             getMesh: () => this.mesh,
+            getSkin: () => this.skin,
         });
     }
 
@@ -35,6 +38,17 @@ export class NodeInternal {
     setMesh(mesh: MeshInternal | null) {
         if (this.mesh === mesh) return;
         this.mesh = mesh;
+        this.hashProvider.markChanged();
+    }
+
+    getSkin() {
+        return this.skin;
+    }
+
+    /** The skin whose palette this node binds. Its vertex shader variant is chosen by the skin's method id. */
+    setSkin(skin: SkinInternal | null) {
+        if (this.skin === skin) return;
+        this.skin = skin;
         this.hashProvider.markChanged();
     }
 

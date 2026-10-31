@@ -83,16 +83,29 @@ function renderStruct(structName: string, fields: OutputFieldDecl[]): string {
     return `struct ${structName} {\n${lines.join("\n")}\n};`;
 }
 
+/**
+ * Handed to a skinned node's phase 2. `call` writes the WGSL call of the skinning method: the result is a
+ * `SkinnedVertex` (position and normal) in WORLD space, so the node's world matrix must not be applied on top of it.
+ */
+export type VertexSkin = {
+    call: (position: string, normal: string) => string;
+};
+
+const SKINNED_VERTEX_STRUCT = `struct SkinnedVertex {
+  position: vec3f,
+  normal: vec3f,
+};`;
+
 export type VertexPhase2Output = { body: string; usedBuiltins: UsedBuiltin[]; outputs: OutputFieldDecl[] }
 
 export abstract class VertexAssemblerBase {
     assemble(d: VertexShaderDescriptor, entryPoint: string): string {
-        const {preamble, inputValues, bindingValues, dataMap, builtinValues} = this.vertexPhase1(d);
+        const {preamble, inputValues, bindingValues, dataMap, builtinValues, skin} = this.vertexPhase1(d);
         const {
             body,
             usedBuiltins,
             outputs,
-        } = this.vertexPhase2(inputValues, bindingValues, dataMap, builtinValues);
+        } = this.vertexPhase2(inputValues, bindingValues, dataMap, builtinValues, skin);
         return this.vertexPhase3(preamble, body, usedBuiltins, outputs, entryPoint);
     }
 
@@ -118,6 +131,20 @@ export abstract class VertexAssemblerBase {
             VERTEX_INPUT_BUILTINS.map((b) => [b.name, {type: b.type, access: b.name}]),
         );
 
+        let skin: VertexSkin | undefined;
+        if (d.skin) {
+            const joints = inputValues.get("joints0");
+            const weights = inputValues.get("weights0");
+            if (!joints || !weights) {
+                throw new Error("VertexAssemblerBase: a skinned vertex shader needs the joints0 and weights0 attributes");
+            }
+            if (joints.type !== "vec4u" || weights.type !== "vec4f") {
+                throw new Error(`VertexAssemblerBase: skinning expects joints0: vec4u and weights0: vec4f, got ${joints.type} and ${weights.type}`);
+            }
+            parts.push(SKINNED_VERTEX_STRUCT, d.skin.code);
+            skin = {call: (position, normal) => `skin(${position}, ${normal}, ${joints.access}, ${weights.access})`};
+        }
+
         d.componentDataMap.forEach((component, i) => {
             const value: ComponentData = {}
 
@@ -128,7 +155,7 @@ export abstract class VertexAssemblerBase {
             dataMap.set(i, value)
         })
 
-        return {preamble: parts.join("\n\n"), dataMap, inputValues, bindingValues, builtinValues};
+        return {preamble: parts.join("\n\n"), dataMap, inputValues, bindingValues, builtinValues, skin};
     }
 
     protected abstract vertexPhase2(
@@ -136,6 +163,7 @@ export abstract class VertexAssemblerBase {
         bindingValues: ValueMap,
         dataMap: Map<string, ComponentData>,
         builtinValues: ValueMap,
+        skin?: VertexSkin,
     ): VertexPhase2Output;
 
     protected vertexPhase3(preamble: string, body: string, usedBuiltins: UsedBuiltin[], outputs: OutputFieldDecl[], entryPoint: string): string {

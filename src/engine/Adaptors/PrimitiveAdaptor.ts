@@ -3,6 +3,7 @@ import {FragmentShaderProducer, VertexShaderProducer} from "../producers/Assembl
 import {schedulePreFrame} from "./PreFrameQueue.ts";
 import {Source} from "./Source.ts";
 import type {FragmentAssemblerBase, VertexAssemblerBase} from "../Assemblers/BaseAssembler.ts";
+import type {SkinShaderInfo} from "../producers/AssemblerProducers.ts";
 import type {ShaderStageRepresentation} from "../Representations/ShaderStageRepresentation.ts";
 import type {MaterialWrapper} from "../wrappers/MaterialWrapper.ts";
 import type {GeometryWrapper} from "../wrappers/GeometryWrapper.ts";
@@ -39,6 +40,10 @@ export class PrimitiveAdaptor {
     private codeDirty = true;
     private seenPlanVersion = -1;
     private seenLayoutVersion = -1;
+    /** Bumped whenever the plain vertex code is regenerated: skinned variants older than it are stale. */
+    private vertexCodeVersion = 0;
+    /** Per skinning method id: the vertexCodeVersion its variant was generated at. */
+    private readonly variantVersions = new Map<string, number>();
 
     constructor() {
         this.internal = new PrimitiveInternal();
@@ -111,6 +116,8 @@ export class PrimitiveAdaptor {
         const factorsPlan = material.getFactorsPlan();
         const attributePlan = geometry.getAttributePlan();
 
+        this.internal.setSkinnable(attributePlan.byName.has("joints0") && attributePlan.byName.has("weights0"));
+
         if (this.codeDirty || geometry.getLayoutVersion() !== this.seenLayoutVersion) {
 
             const vertexCode = this.vertexAssembler.assemble(
@@ -118,6 +125,7 @@ export class PrimitiveAdaptor {
                 VERTEX_ENTRY_POINT,
             );
             this.fillStage(this.internal.vertex, vertexCode, VERTEX_ENTRY_POINT);
+            this.vertexCodeVersion++;
         }
 
         if (this.codeDirty || material.getPlanVersion() !== this.seenPlanVersion) {
@@ -134,6 +142,33 @@ export class PrimitiveAdaptor {
         this.codeDirty = false;
         this.seenPlanVersion = material.getPlanVersion();
         this.seenLayoutVersion = geometry.getLayoutVersion();
+    }
+
+    /**
+     * The vertex stage a node with this skin (or none) draws with. A skinned variant is generated the first time a node
+     * asks for it and again whenever the plain code was regenerated since (geometry layout, material or assembler
+     * changed), so it is always as fresh as the plain stage. Geometry without joints0/weights0 can't be skinned and
+     * gets the plain stage whatever the node's skin is.
+     *
+     * Call after `ensure()`: it reads the plans `ensure()` brought up to date.
+     */
+    getVertexStage(skin: SkinShaderInfo | null): ShaderStageRepresentation {
+        if (!skin || !this.internal.isSkinnable()) return this.internal.vertex;
+
+        const stage = this.internal.getOrCreateVertexVariant(skin.id);
+        const material = this.material;
+        const geometry = this.geometry;
+        const assembler = this.vertexAssembler;
+        if (!material || !geometry || !assembler) return stage;
+        if (this.variantVersions.get(skin.id) === this.vertexCodeVersion) return stage;
+
+        const code = assembler.assemble(
+            VertexShaderProducer.produce(() => material.getBindingPlan(), () => geometry.getAttributePlan(), skin),
+            VERTEX_ENTRY_POINT,
+        );
+        this.fillStage(stage, code, VERTEX_ENTRY_POINT);
+        this.variantVersions.set(skin.id, this.vertexCodeVersion);
+        return stage;
     }
 
     /** setCode/setEntryPoint always mark the stage changed, so only call them when the value really differs. */

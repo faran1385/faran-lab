@@ -9,7 +9,13 @@ import {
     type Material,
     type Sampler,
     type DecodedImage,
-    type Texture, uvAttributeName, type MaterialComponentIR,
+    type Texture, uvAttributeName, jointsAttributeName, weightsAttributeName, type MaterialComponentIR,
+    type Skin,
+    type AnimationClip,
+    type AnimationSampler,
+    type AnimationChannel,
+    type AnimationPath,
+    type AnimationInterpolation,
 } from "./utils/IR.ts";
 import {ImageDecoder} from "./utils/ImageDecoder.ts";
 import {mat4} from "../../packages/math/matrix/mat4.ts";
@@ -77,11 +83,6 @@ const SIMPLE_ATTRIBUTE_MAP: Record<
     NORMAL: {irKey: "normal", componentCount: 3, format: "float32x3"},
     TANGENT: {irKey: "tangent", componentCount: 4, format: "float32x4"},
 };
-
-// Attributes we know about but don't support yet — skip with a warning
-// instead of failing the whole import. Skinning is explicitly deferred
-// (see architecture doc, "Deferred" section) so this is expected, not a bug.
-const KNOWN_DEFERRED_ATTRIBUTES = new Set(["JOINTS_0", "WEIGHTS_0"]);
 
 
 // ── accessor reading ─────────────────────────────────────────────────────
@@ -241,6 +242,31 @@ function readFloatAttribute(
     return Float32Array.from(raw.values);
 }
 
+// Reads a JOINTS_n accessor as uint16x4. glTF stores joint indices as
+// UNSIGNED_BYTE or UNSIGNED_SHORT VEC4 (never normalized); both fold into
+// uint16 so the IR needs only one joint-index format.
+function readJointsAttribute(
+    gltf: any,
+    buffers: ArrayBuffer[],
+    accessorIndex: number,
+): Uint16Array {
+    const raw = readRawAccessor(gltf, buffers, accessorIndex);
+    if (raw.componentCount !== 4) {
+        throw new Error(
+            `GLTFImporter: JOINTS accessor ${accessorIndex} has ${raw.componentCount} components, expected 4`,
+        );
+    }
+    if (
+        raw.componentType !== GLComponentType.UNSIGNED_BYTE &&
+        raw.componentType !== GLComponentType.UNSIGNED_SHORT
+    ) {
+        throw new Error(
+            `GLTFImporter: JOINTS accessor ${accessorIndex} has componentType ${raw.componentType}, expected UNSIGNED_BYTE or UNSIGNED_SHORT`,
+        );
+    }
+    return Uint16Array.from(raw.values);
+}
+
 // Reads an accessor as vertex indices, upconverting UNSIGNED_BYTE to
 // uint16 since our IR only distinguishes "uint16" | "uint32" (see ir.ts).
 function readIndices(
@@ -342,8 +368,37 @@ function importGeometry(
             continue;
         }
 
-        if (KNOWN_DEFERRED_ATTRIBUTES.has(semantic)) {
-            console.warn(`GLTFImporter: skipping "${semantic}" — skinning is deferred (see architecture doc)`);
+        // Skinning: JOINTS_n -> joints{n} (uint16x4), WEIGHTS_n -> weights{n}
+        // (float32x4, dequantized if stored as normalized ubyte/ushort).
+        // Joint indices refer to positions in the owning skin's joints[].
+        // Only influence set 0 (4 joints per vertex) is imported: the skinning methods read joints0/weights0.
+        const jointsMatch = /^JOINTS_(\d+)$/.exec(semantic);
+        if (jointsMatch) {
+            if (+jointsMatch[1] > 0) {
+                console.warn(`GLTFImporter: skipping "${semantic}" — only the first influence set (4 joints per vertex) is supported`);
+                continue;
+            }
+            const data = readJointsAttribute(gltf, buffers, accessorIndex);
+            const attributeIndex = poolAttribute(pool, accessorIndex, {
+                format: "uint16x4",
+                data: data.buffer as ArrayBuffer,
+            });
+            attributes[jointsAttributeName(+(jointsMatch[1]))] = attributeIndex;
+            continue;
+        }
+
+        const weightsMatch = /^WEIGHTS_(\d+)$/.exec(semantic);
+        if (weightsMatch) {
+            if (+weightsMatch[1] > 0) {
+                console.warn(`GLTFImporter: skipping "${semantic}" — only the first influence set (4 joints per vertex) is supported`);
+                continue;
+            }
+            const data = readFloatAttribute(gltf, buffers, accessorIndex, 4);
+            const attributeIndex = poolAttribute(pool, accessorIndex, {
+                format: "float32x4",
+                data: data.buffer as ArrayBuffer,
+            });
+            attributes[weightsAttributeName(+(weightsMatch[1]))] = attributeIndex;
             continue;
         }
 
@@ -590,6 +645,7 @@ function importNode(gltf: any, nodeIndex: number, visiting: Set<number>): Node {
     visiting.delete(nodeIndex);
 
     const node: Node = {
+        index: nodeIndex,
         translation,
         rotation,
         scale,
@@ -597,7 +653,90 @@ function importNode(gltf: any, nodeIndex: number, visiting: Set<number>): Node {
     };
     if (gltfNode.name) node.name = gltfNode.name;
     if (gltfNode.mesh !== undefined) node.mesh = gltfNode.mesh;
+    if (gltfNode.skin !== undefined) node.skin = gltfNode.skin;
     return node;
+}
+
+// ── skins ────────────────────────────────────────────────────────────────
+
+function importSkin(gltf: any, buffers: ArrayBuffer[], gltfSkin: any): Skin {
+    const joints: number[] = gltfSkin.joints ?? [];
+    if (joints.length === 0) {
+        throw new Error("GLTFImporter: skin has no joints");
+    }
+
+    let inverseBindMatrices: Float32Array;
+    if (gltfSkin.inverseBindMatrices !== undefined) {
+        inverseBindMatrices = readFloatAttribute(gltf, buffers, gltfSkin.inverseBindMatrices, 16);
+        if (inverseBindMatrices.length !== joints.length * 16) {
+            throw new Error(
+                `GLTFImporter: skin has ${joints.length} joints but ${inverseBindMatrices.length / 16} inverse bind matrices`,
+            );
+        }
+    } else {
+        // glTF: absent inverseBindMatrices means every joint's inverse bind matrix is the identity.
+        inverseBindMatrices = new Float32Array(joints.length * 16);
+        for (let i = 0; i < joints.length; i++) {
+            const o = i * 16;
+            inverseBindMatrices[o] = inverseBindMatrices[o + 5] = inverseBindMatrices[o + 10] = inverseBindMatrices[o + 15] = 1;
+        }
+    }
+
+    const skin: Skin = {joints, inverseBindMatrices};
+    if (gltfSkin.name) skin.name = gltfSkin.name;
+    if (gltfSkin.skeleton !== undefined) skin.skeleton = gltfSkin.skeleton;
+    return skin;
+}
+
+// ── animations ───────────────────────────────────────────────────────────
+
+const ANIMATION_PATHS = new Set<string>(["translation", "rotation", "scale"]);
+
+function normalizeInterpolation(mode: string | undefined): AnimationInterpolation {
+    switch (mode) {
+        case "STEP":
+            return "step";
+        case "CUBICSPLINE":
+            return "cubicspline";
+        case "LINEAR":
+        default:
+            return "linear";
+    }
+}
+
+function importAnimationSampler(gltf: any, buffers: ArrayBuffer[], gltfSampler: any): AnimationSampler {
+    const times = readFloatAttribute(gltf, buffers, gltfSampler.input, 1);
+    const outputAccessor = gltf.accessors[gltfSampler.output];
+    const values = readFloatAttribute(gltf, buffers, gltfSampler.output, GLTF_TYPE_COMPONENT_COUNT[outputAccessor.type]);
+    return {interpolation: normalizeInterpolation(gltfSampler.interpolation), times, values};
+}
+
+function importAnimation(gltf: any, buffers: ArrayBuffer[], gltfAnimation: any): AnimationClip {
+    const samplers: AnimationSampler[] = (gltfAnimation.samplers ?? []).map(
+        (s: any) => importAnimationSampler(gltf, buffers, s),
+    );
+
+    const channels: AnimationChannel[] = [];
+    for (const gltfChannel of gltfAnimation.channels ?? []) {
+        const path: string = gltfChannel.target?.path;
+        const nodeIndex: number | undefined = gltfChannel.target?.node;
+        if (nodeIndex === undefined) continue; // extension-driven channel, nothing to animate
+        if (!ANIMATION_PATHS.has(path)) {
+            // "weights" (morph targets) and "pointer" are deferred, same as morph targets in geometry.
+            console.warn(`GLTFImporter: skipping animation channel with unsupported path "${path}"`);
+            continue;
+        }
+        channels.push({node: nodeIndex, path: path as AnimationPath, sampler: gltfChannel.sampler});
+    }
+
+    let duration = 0;
+    for (const sampler of samplers) {
+        if (sampler.times.length > 0) duration = Math.max(duration, sampler.times[sampler.times.length - 1]);
+    }
+
+    const clip: AnimationClip = {samplers, channels, duration};
+    if (gltfAnimation.name) clip.name = gltfAnimation.name;
+    return clip;
 }
 
 // ── top-level import ─────────────────────────────────────────────────────
@@ -618,7 +757,7 @@ export class GLTFImporter {
         const images: DecodedImage[] = []
         let imageIndex = 0;
 
-        for (const image of gltf.images) {
+        for (const image of gltf.images ?? []) {
 
             const decodedImage = await importImage(gltf, buffers, image, imageIndex)
             images.push(decodedImage);
@@ -689,8 +828,11 @@ export class GLTFImporter {
 
         const roots: Node[] = rootNodeIndices.map((i) => importNode(gltf, i, new Set()));
 
+        const skins: Skin[] = (gltf.skins ?? []).map((s: any) => importSkin(gltf, buffers, s));
+        const animations: AnimationClip[] = (gltf.animations ?? []).map((a: any) => importAnimation(gltf, buffers, a));
+
         return {
-            roots, geometries, materials, images, samplers, textures, primitives, meshes,
+            roots, skins, animations, geometries, materials, images, samplers, textures, primitives, meshes,
             attributes: pool.attributes,
         };
     }

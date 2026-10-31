@@ -61,8 +61,12 @@ export class RenderItemBuilder {
         ResourceLayer.geometry(geometry, ctx, held);
 
         const pipelineKeys: string[] = [];
+        // A skinned node draws with the vertex stage generated for its skin's method. Not generated yet: not drawn yet.
+        const vertexStage = primitive.getVertexStage(node.getSkin()?.getMethodId());
+        if (!vertexStage) return null;
+
         for (const pipeline of pipelines) {
-            pipeline.setVertex(primitive.vertex);
+            pipeline.setVertex(vertexStage);
             pipeline.setFragment(primitive.fragment);
 
             const key = ResourceLayer.pipeline(pipeline, ctx, held);
