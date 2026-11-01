@@ -3,7 +3,10 @@ import type {
     VertexShaderDescriptor
 } from "../producers/AssemblerProducers.ts";
 import {buildBindingDecls} from "./utils.ts";
+import {buildMorphCode, type VertexMorph} from "./MorphCode.ts";
 import type {WGSLType} from "../producers/utils.ts";
+
+export type {VertexMorph} from "./MorphCode.ts";
 
 type AccessibleValue = { type: WGSLType; access: string };
 export type ValueMap = Map<string, AccessibleValue>;
@@ -100,12 +103,12 @@ export type VertexPhase2Output = { body: string; usedBuiltins: UsedBuiltin[]; ou
 
 export abstract class VertexAssemblerBase {
     assemble(d: VertexShaderDescriptor, entryPoint: string): string {
-        const {preamble, inputValues, bindingValues, dataMap, builtinValues, skin} = this.vertexPhase1(d);
+        const {preamble, inputValues, bindingValues, dataMap, builtinValues, skin, morph} = this.vertexPhase1(d);
         const {
             body,
             usedBuiltins,
             outputs,
-        } = this.vertexPhase2(inputValues, bindingValues, dataMap, builtinValues, skin);
+        } = this.vertexPhase2(inputValues, bindingValues, dataMap, builtinValues, skin, morph);
         return this.vertexPhase3(preamble, body, usedBuiltins, outputs, entryPoint);
     }
 
@@ -145,6 +148,14 @@ export abstract class VertexAssemblerBase {
             skin = {call: (position, normal) => `skin(${position}, ${normal}, ${joints.access}, ${weights.access})`};
         }
 
+        // The morph helpers read the bindings declared above, so they come after them. Phase 2 decides whether to call them.
+        let morph: VertexMorph | undefined;
+        if (d.morph) {
+            const built = buildMorphCode(d.morph);
+            parts.push(built.code);
+            morph = built.access;
+        }
+
         d.componentDataMap.forEach((component, i) => {
             const value: ComponentData = {}
 
@@ -155,15 +166,20 @@ export abstract class VertexAssemblerBase {
             dataMap.set(i, value)
         })
 
-        return {preamble: parts.join("\n\n"), dataMap, inputValues, bindingValues, builtinValues, skin};
+        return {preamble: parts.join("\n\n"), dataMap, inputValues, bindingValues, builtinValues, skin, morph};
     }
 
+    /**
+     * @param morph set when the geometry has morph targets. An assembler that ignores it simply draws the rest pose;
+     * one that uses it must also list `vertex_index` in `usedBuiltins`, because the morph functions take it.
+     */
     protected abstract vertexPhase2(
         inputValues: ValueMap,
         bindingValues: ValueMap,
         dataMap: Map<string, ComponentData>,
         builtinValues: ValueMap,
         skin?: VertexSkin,
+        morph?: VertexMorph,
     ): VertexPhase2Output;
 
     protected vertexPhase3(preamble: string, body: string, usedBuiltins: UsedBuiltin[], outputs: OutputFieldDecl[], entryPoint: string): string {

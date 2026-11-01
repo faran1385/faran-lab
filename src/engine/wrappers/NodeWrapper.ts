@@ -6,6 +6,7 @@ import {quat} from "../../packages/math/quat/quat.ts";
 import {NodeAdaptor} from "../Adaptors/NodeAdaptor.ts";
 import {NodeInternal} from "../internals/NodeInternal.ts";
 import {AnimationHandler} from "./AnimationHandler.ts";
+import type {MorphStateWrapper} from "./MorphStateWrapper.ts";
 
 export class NodeWrapper {
     readonly adaptor: NodeAdaptor;
@@ -14,6 +15,7 @@ export class NodeWrapper {
     readonly uuid: string;
     private name?: string;
     private mesh: MeshWrapper | null = null;
+    private morphState: MorphStateWrapper | null = null;
     private children = new Map<string, NodeWrapper>();
     private parent?: NodeWrapper;
 
@@ -63,6 +65,19 @@ export class NodeWrapper {
     setMesh(mesh: MeshWrapper | null) {
         this.mesh = mesh;
         this.adaptor.setMesh(mesh)
+    }
+
+    getMorphState() {
+        return this.morphState;
+    }
+
+    /**
+     * The morph weights of this node, for the morph targets of its mesh's geometries. Without one, morphed geometry
+     * draws its rest pose. Two nodes that share a mesh can have different states.
+     */
+    setMorphState(state: MorphStateWrapper | null) {
+        this.morphState = state;
+        this.adaptor.setMorphState(state);
     }
 
     setName(name: string | undefined) {

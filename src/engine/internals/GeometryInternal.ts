@@ -45,6 +45,11 @@ export class GeometryInternal {
         return this.vertexAttributes;
     }
 
+    /** True when something is bound in this geometry's bind group (morph targets today). Only then is it set on pipelines. */
+    hasBindings(): boolean {
+        return this.bindgroupInteractor.getEntries().next().done === false;
+    }
+
     setDrawInfo(info: Draw | DrawIndexed) {
         this.drawInfo = info;
         this.hashProvider.markChanged();

@@ -3,7 +3,7 @@ import {
     type ComponentsMap,
     FragmentAssemblerBase, type FragmentPhase2Output,
     type ValueMap,
-    VertexAssemblerBase, type VertexPhase2Output, type VertexSkin
+    VertexAssemblerBase, type VertexMorph, type VertexPhase2Output, type VertexSkin
 } from "../BaseAssembler.ts";
 
 export class BasicVertexAssembler extends VertexAssemblerBase {
@@ -11,17 +11,25 @@ export class BasicVertexAssembler extends VertexAssemblerBase {
         inputValues: ValueMap,
         bindingValues: ValueMap,
         dataMap: Map<string, ComponentData>,
-        _builtinValues: ValueMap,
+        builtinValues: ValueMap,
         skin?: VertexSkin,
+        morph?: VertexMorph,
     ): VertexPhase2Output {
         const position = inputValues.get("position")?.access;
+        const normal = inputValues.get("normal")?.access;
+        const vertexIndex = builtinValues.get("vertex_index")?.access;
         const viewProjection = `${bindingValues.get("projection")?.access} * ${bindingValues.get("view")?.access}`;
+
+        // Morph targets come first: they move the vertex in model space, on the rest pose. Skinning then deforms the
+        // morphed vertex, which is the order glTF defines.
+        const morphedPosition = morph && position && vertexIndex ? morph.position(position, vertexIndex) : position;
+        const morphedNormal = morph?.normal && normal && vertexIndex ? morph.normal(normal, vertexIndex) : normal;
 
         // A skinned vertex comes out of the skinning method already in world space: no world matrix on top of it.
         const place = skin
-            ? `let skinned = ${skin.call(position ?? "vec3f(0.)", inputValues.get("normal")?.access ?? "vec3f(0., 1., 0.)")};
+            ? `let skinned = ${skin.call(morphedPosition ?? "vec3f(0.)", morphedNormal ?? "vec3f(0., 1., 0.)")};
             let pos = ${viewProjection} * vec4f(skinned.position, 1.);`
-            : `let pos = ${viewProjection} * ${bindingValues.get("worldMatrix")?.access} * vec4f(${position}, 1.);`;
+            : `let pos = ${viewProjection} * ${bindingValues.get("worldMatrix")?.access} * vec4f(${morphedPosition}, 1.);`;
 
         const codeBody = `
             ${place}
@@ -31,7 +39,7 @@ export class BasicVertexAssembler extends VertexAssemblerBase {
 
         return {
             body: codeBody,
-            usedBuiltins: [],
+            usedBuiltins: morph ? [{name: "vertex_index", type: "u32"}] : [],
             outputs: [{
                 type: "vec4f",
                 name: "position",
@@ -53,10 +61,10 @@ export class BasicFragmentAssembler extends FragmentAssemblerBase {
         _builtinValues: ValueMap): FragmentPhase2Output {
         const baseColor = componentsMap.get("baseColor");
         const codeBody = `
-        
+
             let baseColorTexture=${baseColor?.texture ? `textureSample(${baseColor.texture?.access},${baseColor.sampler?.access},input.uv)` : "vec4f(1.)"};
             let output=vec4f(baseColorTexture.xyz * ${baseColor?.factor?.access ?? "vec3f(1)"}.xyz,1.);
-            
+
             return FragmentOutput(output);
         `
         return {

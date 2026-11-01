@@ -4,6 +4,7 @@ import {schedulePreFrame} from "./PreFrameQueue.ts";
 import {Source} from "./Source.ts";
 import type {FragmentAssemblerBase, VertexAssemblerBase} from "../Assemblers/BaseAssembler.ts";
 import type {SkinShaderInfo} from "../producers/AssemblerProducers.ts";
+import type {MorphPlan} from "../producers/MorphProducer.ts";
 import type {ShaderStageRepresentation} from "../Representations/ShaderStageRepresentation.ts";
 import type {MaterialWrapper} from "../wrappers/MaterialWrapper.ts";
 import type {GeometryWrapper} from "../wrappers/GeometryWrapper.ts";
@@ -73,6 +74,11 @@ export class PrimitiveAdaptor {
         return this.material?.getPipelineSettings();
     }
 
+    /** Set when this primitive's geometry has morph targets: the nodes drawing it then have to bind their active weights. */
+    getMorphPlan(): MorphPlan | null {
+        return this.geometry?.getMorphPlan() ?? null;
+    }
+
     setAssemblers(vertex: VertexAssemblerBase, fragment: FragmentAssemblerBase): void {
         this.vertexAssembler = vertex;
         this.fragmentAssembler = fragment;
@@ -115,13 +121,14 @@ export class PrimitiveAdaptor {
         const bindingPlan = material.getBindingPlan();
         const factorsPlan = material.getFactorsPlan();
         const attributePlan = geometry.getAttributePlan();
+        const morphPlan = geometry.getMorphPlan();
 
         this.internal.setSkinnable(attributePlan.byName.has("joints0") && attributePlan.byName.has("weights0"));
 
         if (this.codeDirty || geometry.getLayoutVersion() !== this.seenLayoutVersion) {
 
             const vertexCode = this.vertexAssembler.assemble(
-                VertexShaderProducer.produce(() => bindingPlan, () => attributePlan),
+                VertexShaderProducer.produce(() => bindingPlan, () => attributePlan, undefined, () => morphPlan),
                 VERTEX_ENTRY_POINT,
             );
             this.fillStage(this.internal.vertex, vertexCode, VERTEX_ENTRY_POINT);
@@ -163,7 +170,12 @@ export class PrimitiveAdaptor {
         if (this.variantVersions.get(skin.id) === this.vertexCodeVersion) return stage;
 
         const code = assembler.assemble(
-            VertexShaderProducer.produce(() => material.getBindingPlan(), () => geometry.getAttributePlan(), skin),
+            VertexShaderProducer.produce(
+                () => material.getBindingPlan(),
+                () => geometry.getAttributePlan(),
+                skin,
+                () => geometry.getMorphPlan(),
+            ),
             VERTEX_ENTRY_POINT,
         );
         this.fillStage(stage, code, VERTEX_ENTRY_POINT);
