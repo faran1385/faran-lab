@@ -5,6 +5,7 @@ import {
     type WGSLType
 } from "./utils.ts";
 import {FACTORS_BINDING, type MaterialBindingPlan} from "./BindGroupLayoutProducer.ts";
+import {morphGeometryBindings, morphNodeBindings, type MorphPlan} from "./MorphProducer.ts";
 
 export interface VertexInputField {
     name: string;
@@ -16,6 +17,7 @@ export interface VertexInputField {
 export type BindGroupEntry =
     | BindGroupUniformEntry
     | BindGroupStorageEntry
+    | BindGroupStorageScalarEntry
     | BindGroupTextureEntry
     | BindGroupSamplerEntry;
 
@@ -42,6 +44,16 @@ export interface BindGroupStorageEntry {
     name: string;
     elementStructName: string;
     elementFields: StructField[];
+    access: "read" | "read_write";
+}
+
+/** A storage buffer that is a flat array of one scalar/vector type (`array<f32>`), with no element struct. */
+export interface BindGroupStorageScalarEntry {
+    kind: "storageScalar";
+    group: number;
+    binding: number;
+    name: string;
+    elementType: WGSLType;
     access: "read" | "read_write";
 }
 
@@ -101,6 +113,8 @@ export interface VertexShaderDescriptor {
     }>,
     /** Set for a skinned node: the assembler declares the palette and the method's code, and calls `skin`. */
     skin?: SkinShaderInfo;
+    /** Set when the geometry has morph targets: the assembler declares the morph helpers and may call them. */
+    morph?: MorphPlan;
 }
 
 export interface FragmentShaderDescriptor {
@@ -153,9 +167,11 @@ export class VertexShaderProducer {
         getMaterialPlan: () => MaterialBindingPlan,
         getAttributePlan: () => GeometryAttributePlan,
         skin?: SkinShaderInfo,
+        getMorphPlan?: () => MorphPlan | null,
     ): VertexShaderDescriptor {
         const plan = getAttributePlan();
         const matPlan = getMaterialPlan();
+        const morph = getMorphPlan?.() ?? undefined;
         const componentDataMap: VertexShaderDescriptor["componentDataMap"] = new Map()
         matPlan.byComponent.forEach((i, name) => {
             if (i.texture) {
@@ -175,8 +191,9 @@ export class VertexShaderProducer {
 
         const bindings = [...sceneBindings(), ...nodeBindings()];
         if (skin) bindings.push(paletteBinding(skin.paletteElement));
+        if (morph) bindings.push(...morphNodeBindings(), ...morphGeometryBindings());
 
-        return {inputs, componentDataMap, bindings, skin};
+        return {inputs, componentDataMap, bindings, skin, morph};
     }
 }
 

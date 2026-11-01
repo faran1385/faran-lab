@@ -9,7 +9,7 @@ import {
     type Material,
     type Sampler,
     type DecodedImage,
-    type Texture, uvAttributeName, jointsAttributeName, weightsAttributeName, type MaterialComponentIR,
+    type Texture, uvAttributeName, jointsAttributeName, weightsAttributeName, type MaterialComponentIR, type MorphTargetIR,
     type Skin,
     type AnimationClip,
     type AnimationSampler,
@@ -137,15 +137,6 @@ function readRawAccessor(gltf: any, buffers: ArrayBuffer[], accessorIndex: numbe
     if (!accessor) {
         throw new Error(`GLTFImporter: accessor ${accessorIndex} not found`);
     }
-    if (accessor.sparse) {
-        // Sparse accessors are a real glTF feature (used for morph targets and
-        // large mostly-default buffers) but out of scope for v1 — deferred
-        // alongside skinning/morph targets rather than half-implemented.
-        throw new Error(
-            `GLTFImporter: accessor ${accessorIndex} uses sparse storage, which is not supported yet (deferred, see architecture doc)`,
-        );
-    }
-
     const componentType: GLComponentType = accessor.componentType;
     const componentCount = GLTF_TYPE_COMPONENT_COUNT[accessor.type];
     if (!componentCount) {
@@ -156,58 +147,106 @@ function readRawAccessor(gltf: any, buffers: ArrayBuffer[], accessorIndex: numbe
 
     const values = new Float64Array(count * componentCount);
 
-    if (accessor.bufferView === undefined) {
-        // Valid glTF: accessor with no bufferView means "all zeros" (used for
-        // sparse-only accessors, which we've already rejected above, or for
-        // certain animation defaults). Zero-filled Float64Array already
-        // satisfies this.
-        return {componentType, componentCount, count, normalized, values};
-    }
+    // An accessor without a bufferView is all zeros (the Float64Array already is). That is the base of a sparse accessor
+    // that only lists the elements that differ, which is how exporters store most morph targets.
+    if (accessor.bufferView !== undefined) {
+        const bufferView = gltf.bufferViews[accessor.bufferView];
+        const bufferData = resolveBufferView(gltf, buffers, accessor.bufferView);
 
-    const bufferView = gltf.bufferViews[accessor.bufferView];
-    const bufferData = resolveBufferView(gltf, buffers, accessor.bufferView);
+        const compSize = componentTypeSize(componentType);
+        const elementSize = compSize * componentCount;
+        const baseOffset = (bufferView.byteOffset ?? 0) + (accessor.byteOffset ?? 0);
+        // byteStride === 0/undefined means tightly packed; interleaved buffer
+        // views (byteStride set) are read element-by-element at their stride.
+        const stride = bufferView.byteStride ?? elementSize;
 
-    const compSize = componentTypeSize(componentType);
-    const elementSize = compSize * componentCount;
-    const baseOffset = (bufferView.byteOffset ?? 0) + (accessor.byteOffset ?? 0);
-    // byteStride === 0/undefined means tightly packed; interleaved buffer
-    // views (byteStride set) are read element-by-element at their stride.
-    const stride = bufferView.byteStride ?? elementSize;
+        const dv = new DataView(bufferData);
 
-    const dv = new DataView(bufferData);
-
-    for (let i = 0; i < count; i++) {
-        const elementOffset = baseOffset + i * stride;
-        for (let c = 0; c < componentCount; c++) {
-            const byteOffset = elementOffset + c * compSize;
-            let raw: number;
-            switch (componentType) {
-                case GLComponentType.BYTE:
-                    raw = dv.getInt8(byteOffset);
-                    break;
-                case GLComponentType.UNSIGNED_BYTE:
-                    raw = dv.getUint8(byteOffset);
-                    break;
-                case GLComponentType.SHORT:
-                    raw = dv.getInt16(byteOffset, true);
-                    break;
-                case GLComponentType.UNSIGNED_SHORT:
-                    raw = dv.getUint16(byteOffset, true);
-                    break;
-                case GLComponentType.UNSIGNED_INT:
-                    raw = dv.getUint32(byteOffset, true);
-                    break;
-                case GLComponentType.FLOAT:
-                    raw = dv.getFloat32(byteOffset, true);
-                    break;
-                default:
-                    throw new Error(`GLTFImporter: unsupported componentType ${componentType}`);
+        for (let i = 0; i < count; i++) {
+            const elementOffset = baseOffset + i * stride;
+            for (let c = 0; c < componentCount; c++) {
+                const raw = readComponent(dv, elementOffset + c * compSize, componentType);
+                values[i * componentCount + c] = normalized ? dequantize(raw, componentType) : raw;
             }
-            values[i * componentCount + c] = normalized ? dequantize(raw, componentType) : raw;
         }
     }
 
+    if (accessor.sparse) {
+        applySparse(gltf, buffers, accessorIndex, accessor.sparse, values, componentType, componentCount, count, normalized);
+    }
+
     return {componentType, componentCount, count, normalized, values};
+}
+
+function readComponent(dv: DataView, byteOffset: number, componentType: GLComponentType): number {
+    switch (componentType) {
+        case GLComponentType.BYTE:
+            return dv.getInt8(byteOffset);
+        case GLComponentType.UNSIGNED_BYTE:
+            return dv.getUint8(byteOffset);
+        case GLComponentType.SHORT:
+            return dv.getInt16(byteOffset, true);
+        case GLComponentType.UNSIGNED_SHORT:
+            return dv.getUint16(byteOffset, true);
+        case GLComponentType.UNSIGNED_INT:
+            return dv.getUint32(byteOffset, true);
+        case GLComponentType.FLOAT:
+            return dv.getFloat32(byteOffset, true);
+        default:
+            throw new Error(`GLTFImporter: unsupported componentType ${componentType}`);
+    }
+}
+
+// Overwrites `sparse.count` elements of `values` (in place) with the sparse values. Indices and values are tightly packed
+// (glTF forbids a byteStride on sparse buffer views), indices are strictly increasing unsigned integers.
+function applySparse(
+    gltf: any,
+    buffers: ArrayBuffer[],
+    accessorIndex: number,
+    sparse: any,
+    values: Float64Array,
+    componentType: GLComponentType,
+    componentCount: number,
+    count: number,
+    normalized: boolean,
+): void {
+    const sparseCount: number = sparse.count;
+    const indexInfo = sparse.indices;
+    const valueInfo = sparse.values;
+    if (!(sparseCount >= 1) || !indexInfo || !valueInfo) {
+        throw new Error(`GLTFImporter: accessor ${accessorIndex} has an invalid sparse block`);
+    }
+
+    const indexType: GLComponentType = indexInfo.componentType;
+    if (indexType !== GLComponentType.UNSIGNED_BYTE
+        && indexType !== GLComponentType.UNSIGNED_SHORT
+        && indexType !== GLComponentType.UNSIGNED_INT) {
+        throw new Error(`GLTFImporter: accessor ${accessorIndex} sparse indices must be unsigned byte, short or int, got ${indexType}`);
+    }
+
+    const indexView = gltf.bufferViews?.[indexInfo.bufferView];
+    const valueView = gltf.bufferViews?.[valueInfo.bufferView];
+    if (!indexView || !valueView) {
+        throw new Error(`GLTFImporter: accessor ${accessorIndex} sparse block references a missing bufferView`);
+    }
+
+    const indexData = new DataView(resolveBufferView(gltf, buffers, indexInfo.bufferView));
+    const valueData = new DataView(resolveBufferView(gltf, buffers, valueInfo.bufferView));
+    const indexBase = (indexView.byteOffset ?? 0) + (indexInfo.byteOffset ?? 0);
+    const valueBase = (valueView.byteOffset ?? 0) + (valueInfo.byteOffset ?? 0);
+    const indexSize = componentTypeSize(indexType);
+    const compSize = componentTypeSize(componentType);
+
+    for (let i = 0; i < sparseCount; i++) {
+        const element = readComponent(indexData, indexBase + i * indexSize, indexType);
+        if (element >= count) {
+            throw new Error(`GLTFImporter: accessor ${accessorIndex} sparse index ${element} is out of range (count ${count})`);
+        }
+        for (let c = 0; c < componentCount; c++) {
+            const raw = readComponent(valueData, valueBase + (i * componentCount + c) * compSize, componentType);
+            values[element * componentCount + c] = normalized ? dequantize(raw, componentType) : raw;
+        }
+    }
 }
 
 function dequantize(raw: number, componentType: GLComponentType): number {
@@ -308,11 +347,73 @@ function poolAttribute(pool: AttributePool, accessorIndex: number, attribute: At
     return newIndex;
 }
 
+// glTF morph target semantics we apply. Anything else a target carries (TEXCOORD_n, COLOR_n deltas) is skipped.
+const MORPH_SEMANTICS: Record<string, "position" | "normal" | "tangent"> = {
+    POSITION: "position",
+    NORMAL: "normal",
+    TANGENT: "tangent",
+};
+
+// Reads the primitive's morph targets as float32x3 delta attributes in the shared pool (same accessor, same attribute).
+// `vertexCount` is the base geometry's: every delta accessor has to match it. Names have to be unique inside a geometry
+// because the runtime looks targets up by name; a duplicate (or missing) name gets its index appended.
+function importMorphTargets(
+    gltf: any,
+    buffers: ArrayBuffer[],
+    gltfPrimitive: any,
+    pool: AttributePool,
+    targetNames: unknown,
+    vertexCount: number,
+): MorphTargetIR[] | undefined {
+    const gltfTargets: any[] | undefined = gltfPrimitive.targets;
+    if (!gltfTargets || gltfTargets.length === 0) return undefined;
+
+    const names = Array.isArray(targetNames) ? targetNames : [];
+    const used = new Set<string>();
+    const skipped = new Set<string>();
+
+    const targets = gltfTargets.map((gltfTarget, index): MorphTargetIR => {
+        let name = typeof names[index] === "string" && names[index] !== "" ? names[index] as string : `target${index}`;
+        if (used.has(name)) name = `${name}#${index}`;
+        used.add(name);
+
+        const target: MorphTargetIR = {name};
+        for (const [semantic, accessorIndex] of Object.entries<number>(gltfTarget ?? {})) {
+            const key = MORPH_SEMANTICS[semantic];
+            if (!key) {
+                skipped.add(semantic);
+                continue;
+            }
+
+            const accessor = gltf.accessors?.[accessorIndex];
+            if (!accessor) throw new Error(`GLTFImporter: morph target ${index} ${semantic} accessor ${accessorIndex} not found`);
+            if (accessor.count !== vertexCount) {
+                throw new Error(`GLTFImporter: morph target ${index} ${semantic} has ${accessor.count} vertices but the primitive has ${vertexCount}`);
+            }
+
+            const pooled = pool.accessorIndexToAttributeIndex.get(accessorIndex);
+            target[key] = pooled !== undefined
+                ? pooled
+                : poolAttribute(pool, accessorIndex, {
+                    format: "float32x3",
+                    data: readFloatAttribute(gltf, buffers, accessorIndex, 3).buffer as ArrayBuffer,
+                });
+        }
+        return target;
+    });
+
+    if (skipped.size > 0) {
+        console.warn(`GLTFImporter: skipping morph target attribute(s) ${Array.from(skipped).join(", ")} (only POSITION, NORMAL and TANGENT are applied)`);
+    }
+    return targets;
+}
+
 function importGeometry(
     gltf: any,
     buffers: ArrayBuffer[],
     gltfPrimitive: any,
     pool: AttributePool,
+    targetNames?: unknown,
 ): Geometry {
     const attributes: Record<string, number> = {};
     const gltfAttrs: Record<string, number> = gltfPrimitive.attributes ?? {};
@@ -414,7 +515,13 @@ function importGeometry(
         indices = readIndices(gltf, buffers, gltfPrimitive.indices);
     }
 
-    return {attributes: attributes, indices};
+    const geometry: Geometry = {attributes: attributes, indices};
+
+    const positionBytes = pool.attributes[attributes["position"]].data.byteLength;
+    const morphTargets = importMorphTargets(gltf, buffers, gltfPrimitive, pool, targetNames, positionBytes / 12);
+    if (morphTargets) geometry.morphTargets = morphTargets;
+
+    return geometry;
 }
 
 // ── images / samplers / textures ────────────────────────────────────────
@@ -654,6 +761,7 @@ function importNode(gltf: any, nodeIndex: number, visiting: Set<number>): Node {
     if (gltfNode.name) node.name = gltfNode.name;
     if (gltfNode.mesh !== undefined) node.mesh = gltfNode.mesh;
     if (gltfNode.skin !== undefined) node.skin = gltfNode.skin;
+    if (Array.isArray(gltfNode.weights)) node.weights = gltfNode.weights;
     return node;
 }
 
@@ -789,7 +897,8 @@ export class GLTFImporter {
 
         const geometries: Geometry[] = [];
         const primitives: Primitive[] = [];
-        const meshes: Mesh[] = (gltf.meshes ?? []).map((gltfMesh: any) => {
+        const meshes: Mesh[] = (gltf.meshes ?? []).map((gltfMesh: any, meshIndex: number) => {
+            const morphTargetCounts = new Set<number>();
             const primitiveIndices: number[] = gltfMesh.primitives.map((gltfPrimitive: any) => {
                 const mode: GLPrimitiveMode = gltfPrimitive.mode ?? GLPrimitiveMode.TRIANGLES;
                 const topology = TOPOLOGY_BY_MODE[mode];
@@ -799,8 +908,13 @@ export class GLTFImporter {
                     );
                 }
 
+                // Target names live on the mesh (extras.targetNames); some exporters put them on the primitive.
+                const targetNames = gltfMesh.extras?.targetNames ?? gltfPrimitive.extras?.targetNames;
+                const geometry = importGeometry(gltf, buffers, gltfPrimitive, pool, targetNames);
+                morphTargetCounts.add(geometry.morphTargets?.length ?? 0);
+
                 const geometryIndex = geometries.length;
-                geometries.push(importGeometry(gltf, buffers, gltfPrimitive, pool));
+                geometries.push(geometry);
 
                 const materialIndex =
                     gltfPrimitive.material !== undefined ? gltfPrimitive.material : getDefaultMaterialIndex();
@@ -809,7 +923,17 @@ export class GLTFImporter {
                 primitives.push({geometry: geometryIndex, material: materialIndex, topology});
                 return primitiveIndex;
             });
-            return {primitives: primitiveIndices};
+
+            // The weights belong to the mesh, so every primitive of it has to have the same number of targets.
+            if (morphTargetCounts.size > 1) {
+                throw new Error(
+                    `GLTFImporter: mesh ${meshIndex} has primitives with different morph target counts (${Array.from(morphTargetCounts).join(", ")})`,
+                );
+            }
+
+            const mesh: Mesh = {primitives: primitiveIndices};
+            if (Array.isArray(gltfMesh.weights)) mesh.weights = gltfMesh.weights;
+            return mesh;
         });
 
         const sceneIndex = gltf.scene ?? 0;

@@ -13,6 +13,7 @@ import type {
     AttributeName,
     Skin,
     AnimationClip,
+    MorphTargetIR,
 } from "./IR.ts";
 
 import {AttributeWrapper} from "../../wrappers/AttributeWrapper.ts";
@@ -28,6 +29,9 @@ import {MeshWrapper} from "../../wrappers/MeshWrapper.ts";
 import {NodeWrapper} from "../../wrappers/NodeWrapper.ts";
 import {SkinWrapper} from "../../wrappers/SkinWrapper.ts";
 import {AnimationClipWrapper, type AnimationChannelWrapper} from "../../animation/AnimationClipWrapper.ts";
+import {MorphTargetWrapper, type MorphTargetDeltas} from "../../wrappers/MorphTargetWrapper.ts";
+import {MorphStateWrapper} from "../../wrappers/MorphStateWrapper.ts";
+import {MORPH_MAX_ACTIVE} from "../../producers/MorphProducer.ts";
 
 
 export type ConvertedIRResult = {
@@ -46,7 +50,16 @@ interface NodeBuildContext {
     /** glTF node index -> the wrapper built for it. */
     byIndex: Map<number, NodeWrapper>;
     skinned: { wrapper: NodeWrapper; skin: number }[];
+    /** What gives a node its morph weights. */
+    morph: MorphContext;
 }
+
+/** What the node walk needs to give a node its morph weights: the IR meshes (default weights) and each mesh's targets. */
+type MorphContext = {
+    meshes: readonly Mesh[];
+    /** Per IR mesh: the morph targets of its first morphed primitive, or undefined when the mesh has none. */
+    meshTargets: readonly (MorphTargetWrapper | undefined)[];
+};
 
 /**
  * Converts a SceneIR (flat, index-based — GLTFImporter's output) into a
@@ -83,7 +96,21 @@ export class IRToSceneConvertor {
         );
         const meshes = ir.meshes.map((mesh) => this.createMeshWrapper(mesh, primitives));
 
-        const context: NodeBuildContext = {byIndex: new Map(), skinned: []};
+        const context: NodeBuildContext = {
+            byIndex: new Map(),
+            skinned: [],
+            morph: {
+                meshes: ir.meshes,
+                // Per IR mesh: the morph targets of its first morphed primitive, or undefined when it has none.
+                meshTargets: ir.meshes.map((mesh) => {
+                    for (const primitiveIndex of mesh.primitives) {
+                        const targets = geometries[ir.primitives[primitiveIndex].geometry].getMorphTargets();
+                        if (targets) return targets;
+                    }
+                    return undefined;
+                }),
+            },
+        };
         const root = this.createSceneRoot(ir.roots, meshes, context);
 
         // Both need the finished tree, so they run after it.
@@ -116,7 +143,38 @@ export class IRToSceneConvertor {
             );
         }
 
+        if (geometry.morphTargets && geometry.morphTargets.length > 0) {
+            wrapper.setMorphTargets(
+                this.createMorphTargetWrapper(geometry.morphTargets, geometry.attributes.position, attributePool),
+            );
+        }
+
         return wrapper;
+    }
+
+    /**
+     * Packs the geometry's targets for the GPU. A target without a POSITION delta (legal in glTF: it only morphs normals,
+     * say) gets zeros, because the packed layout always has positions. The deltas are copied into the packed buffer, so
+     * the pooled IR attributes (shared between primitives that use the same accessor) are never modified.
+     */
+    private static createMorphTargetWrapper(
+        targets: MorphTargetIR[],
+        positionAttribute: number,
+        attributePool: Attribute[],
+    ): MorphTargetWrapper {
+        const vertexCount = attributePool[positionAttribute].data.byteLength / 12;
+        const deltas = (index: number | undefined) =>
+            index === undefined ? undefined : new Float32Array(attributePool[index].data);
+
+        const map = new Map<string, MorphTargetDeltas>();
+        for (const target of targets) {
+            map.set(target.name, {
+                positionDeltas: deltas(target.position) ?? new Float32Array(vertexCount * 3),
+                normalDeltas: deltas(target.normal),
+                tangentDeltas: deltas(target.tangent),
+            });
+        }
+        return new MorphTargetWrapper(map);
     }
 
     // -- images / samplers / textures ------------------------------------
@@ -211,6 +269,9 @@ export class IRToSceneConvertor {
 
         if (node.mesh !== undefined) {
             wrapper.setMesh(meshes[node.mesh]);
+
+            const targets = context.morph.meshTargets[node.mesh];
+            if (targets) wrapper.setMorphState(this.createMorphState(node, context.morph.meshes[node.mesh], targets));
         }
 
         if (node.skin !== undefined) {
@@ -222,6 +283,26 @@ export class IRToSceneConvertor {
         }
 
         return wrapper;
+    }
+
+    /**
+     * One state per node, never shared: two nodes drawing the same mesh can show different expressions. The weights are
+     * the node's own (glTF `node.weights`), else the mesh's defaults, else all zero. A list of the wrong length is
+     * ignored with a warning instead of failing the import.
+     */
+    private static createMorphState(node: Node, mesh: Mesh, targets: MorphTargetWrapper): MorphStateWrapper {
+        const count = targets.getTargetCount();
+        let weights = node.weights ?? mesh.weights;
+        if (weights && weights.length !== count) {
+            console.warn(`IRToSceneConvertor: ${weights.length} morph weights for ${count} targets on node "${node.name ?? ""}", using zeros`);
+            weights = undefined;
+        }
+
+        return MorphStateWrapper.fromTargets(targets, {
+            weights,
+            // more entries than targets would only be padding
+            maxActive: Math.min(MORPH_MAX_ACTIVE, count),
+        });
     }
 
     private static createSceneRoot(roots: Node[], meshes: MeshWrapper[], context: NodeBuildContext): NodeWrapper {

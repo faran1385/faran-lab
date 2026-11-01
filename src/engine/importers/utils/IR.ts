@@ -66,9 +66,24 @@ export interface DecodedImage {
     data: ArrayBuffer;
 }
 
+/**
+ * One morph target of a geometry. The numbers index SceneIR.attributes (float32x3 deltas, one vec3 per vertex, relative
+ * to the geometry's base attributes). A target may leave any of them out: a missing one means "no change".
+ * Tangent deltas are vec3 as well: the tangent's w is never morphed.
+ */
+export interface MorphTargetIR {
+    /** Unique within its geometry. From glTF `extras.targetNames`, else `target<index>`. */
+    name: string;
+    position?: number;
+    normal?: number;
+    tangent?: number;
+}
+
 export interface Geometry {
     attributes: Record<AttributeName, number>;
     indices?: { format: "uint16" | "uint32"; data: ArrayBuffer };
+    /** In target order: the index in this array is the index of the target's weight. */
+    morphTargets?: MorphTargetIR[];
 }
 
 export interface Material {
@@ -99,6 +114,8 @@ export interface Primitive {
 
 export interface Mesh {
     primitives: number[];
+    /** Default morph weights, one per target (glTF `mesh.weights`). A node's own weights override them. */
+    weights?: number[];
 }
 
 export interface Node {
@@ -112,6 +129,8 @@ export interface Node {
     rotation: quat;
     scale: vec3;
     children: Node[];
+    /** Morph weights of this node's mesh (glTF `node.weights`); overrides `Mesh.weights`. */
+    weights?: number[];
 }
 
 /**

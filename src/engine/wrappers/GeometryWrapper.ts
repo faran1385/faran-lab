@@ -1,6 +1,7 @@
 import {v4 as uuidv4} from "uuid";
 import type {AttributeWrapper} from "./AttributeWrapper.ts";
 import type {IndexAttributeWrapper} from "./IndexWrapper.ts";
+import type {MorphTargetWrapper} from "./MorphTargetWrapper.ts";
 import {GeometryAdaptor} from "../Adaptors/GeometryAdaptor.ts";
 
 export class GeometryWrapper {
@@ -9,6 +10,7 @@ export class GeometryWrapper {
 
     private attributes: Map<string, AttributeWrapper> = new Map();
     private indices?: IndexAttributeWrapper;
+    private morphTargets?: MorphTargetWrapper;
 
 
     constructor() {
@@ -47,6 +49,20 @@ export class GeometryWrapper {
 
     getIndices() {
         return this.indices;
+    }
+
+    /**
+     * Attaches the morph targets (or removes them with null). The deltas are added to this geometry's own
+     * position/normal/tangent attributes, so the vertex count must match the position attribute. The targets are shared
+     * data (one GPU buffer for every node drawing this geometry); per-node weights live in a MorphStateWrapper on the node.
+     */
+    setMorphTargets(targets: MorphTargetWrapper | null) {
+        this.morphTargets = targets ?? undefined;
+        this.adaptor.invalidate();
+    }
+
+    getMorphTargets() {
+        return this.morphTargets;
     }
 
     getAttributes() {
