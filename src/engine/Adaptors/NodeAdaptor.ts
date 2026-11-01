@@ -96,6 +96,7 @@ export class NodeAdaptor {
         for (let i = chain.length - 1; i >= 0; i--) {
             const current = chain[i];
             const source = current.source;
+
             if (source) mat4.compose(current.local, source.getTranslation(), source.getRotation(), source.getScale());
             else mat4.identity(current.local);
 

@@ -15,6 +15,7 @@ export class Scene {
 
     constructor() {
         this.uuid = uuidv4();
+        this.worldRoot.setName("SceneNode")
         this.adaptor = new SceneAdaptor(this.worldRoot.adaptor);
     }
 
