@@ -41,6 +41,11 @@ export function buildBindingDecls(entries: BindGroupEntry[]): {
 
                 break;
             }
+            case "storageScalar": {
+                varDecls.push(`@group(${entry.group}) @binding(${entry.binding}) var<storage, ${entry.access}> ${entry.name}: array<${entry.elementType}>;`);
+                setValue(entry.name, {type: `array<${entry.elementType}>` as WGSLType, access: entry.name})
+                break;
+            }
             case "texture":
                 varDecls.push(`@group(${entry.group}) @binding(${entry.binding}) var ${entry.name}: ${entry.textureType};`);
                 setValue(entry.name, {type: entry.textureType as WGSLType, access: entry.name})

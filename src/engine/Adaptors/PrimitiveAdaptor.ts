@@ -3,6 +3,7 @@ import {FragmentShaderProducer, VertexShaderProducer} from "../producers/Assembl
 import {schedulePreFrame} from "./PreFrameQueue.ts";
 import {Source} from "./Source.ts";
 import type {FragmentAssemblerBase, VertexAssemblerBase} from "../Assemblers/BaseAssembler.ts";
+import type {MorphPlan} from "../producers/MorphProducer.ts";
 import type {ShaderStageRepresentation} from "../Representations/ShaderStageRepresentation.ts";
 import type {MaterialWrapper} from "../wrappers/MaterialWrapper.ts";
 import type {GeometryWrapper} from "../wrappers/GeometryWrapper.ts";
@@ -68,6 +69,11 @@ export class PrimitiveAdaptor {
         return this.material?.getPipelineSettings();
     }
 
+    /** Set when this primitive's geometry has morph targets: the nodes drawing it then have to bind their active weights. */
+    getMorphPlan(): MorphPlan | null {
+        return this.geometry?.getMorphPlan() ?? null;
+    }
+
     setAssemblers(vertex: VertexAssemblerBase, fragment: FragmentAssemblerBase): void {
         this.vertexAssembler = vertex;
         this.fragmentAssembler = fragment;
@@ -110,11 +116,12 @@ export class PrimitiveAdaptor {
         const bindingPlan = material.getBindingPlan();
         const factorsPlan = material.getFactorsPlan();
         const attributePlan = geometry.getAttributePlan();
+        const morphPlan = geometry.getMorphPlan();
 
         if (this.codeDirty || geometry.getLayoutVersion() !== this.seenLayoutVersion) {
 
             const vertexCode = this.vertexAssembler.assemble(
-                VertexShaderProducer.produce(() => bindingPlan, () => attributePlan),
+                VertexShaderProducer.produce(() => bindingPlan, () => attributePlan, () => morphPlan),
                 VERTEX_ENTRY_POINT,
             );
             this.fillStage(this.internal.vertex, vertexCode, VERTEX_ENTRY_POINT);

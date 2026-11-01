@@ -5,6 +5,7 @@ import {
     type WGSLType
 } from "./utils.ts";
 import {FACTORS_BINDING, type MaterialBindingPlan} from "./BindGroupLayoutProducer.ts";
+import {morphGeometryBindings, morphNodeBindings, type MorphPlan} from "./MorphProducer.ts";
 
 export interface VertexInputField {
     name: string;
@@ -16,6 +17,7 @@ export interface VertexInputField {
 export type BindGroupEntry =
     | BindGroupUniformEntry
     | BindGroupStorageEntry
+    | BindGroupStorageScalarEntry
     | BindGroupTextureEntry
     | BindGroupSamplerEntry;
 
@@ -45,6 +47,16 @@ export interface BindGroupStorageEntry {
     access: "read" | "read_write";
 }
 
+/** A storage buffer that is a flat array of one scalar/vector type (`array<f32>`), with no element struct. */
+export interface BindGroupStorageScalarEntry {
+    kind: "storageScalar";
+    group: number;
+    binding: number;
+    name: string;
+    elementType: WGSLType;
+    access: "read" | "read_write";
+}
+
 export interface BindGroupTextureEntry {
     kind: "texture";
     group: number;
@@ -67,7 +79,9 @@ export interface VertexShaderDescriptor {
     bindings: BindGroupEntry[],
     componentDataMap: Map<string, {
         uv?: string
-    }>
+    }>,
+    /** Set when the geometry has morph targets: the assembler declares the morph helpers and may call them. */
+    morph?: MorphPlan;
 }
 
 export interface FragmentShaderDescriptor {
@@ -116,9 +130,14 @@ export function nodeBindings(): BindGroupEntry[] {
 }
 
 export class VertexShaderProducer {
-    static produce(getMaterialPlan: () => MaterialBindingPlan, getAttributePlan: () => GeometryAttributePlan): VertexShaderDescriptor {
+    static produce(
+        getMaterialPlan: () => MaterialBindingPlan,
+        getAttributePlan: () => GeometryAttributePlan,
+        getMorphPlan?: () => MorphPlan | null,
+    ): VertexShaderDescriptor {
         const plan = getAttributePlan();
         const matPlan = getMaterialPlan();
+        const morph = getMorphPlan?.() ?? undefined;
         const componentDataMap: VertexShaderDescriptor["componentDataMap"] = new Map()
         matPlan.byComponent.forEach((i, name) => {
             if (i.texture) {
@@ -136,7 +155,10 @@ export class VertexShaderProducer {
         }));
 
 
-        return {inputs, componentDataMap, bindings: [...sceneBindings(), ...nodeBindings()]};
+        const bindings = [...sceneBindings(), ...nodeBindings()];
+        if (morph) bindings.push(...morphNodeBindings(), ...morphGeometryBindings());
+
+        return {inputs, componentDataMap, bindings, morph};
     }
 }
 

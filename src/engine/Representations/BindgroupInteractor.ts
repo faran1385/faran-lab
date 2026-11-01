@@ -68,6 +68,17 @@ export class BindgroupInteractor extends BindgroupRepresentation {
         this.layout.setEntry(binding, {binding, buffer: resource, visibility});
     }
 
+    /**
+     * Binds a STORAGE buffer (read-only in shaders). The binding type comes from the buffer's usage flags, exactly as
+     * for setUniform; this only checks that the buffer really is a storage buffer.
+     */
+    setStorage(binding: number, resource: BufferInternal, visibility: GPUShaderStageFlags) {
+        if (!(resource.getUsage() & GPUBufferUsage.STORAGE)) {
+            throw new Error("BindgroupInteractor.setStorage: the buffer needs STORAGE usage");
+        }
+        this.setUniform(binding, resource, visibility);
+    }
+
     /** Removes the entry and its layout entry together, so the two never disagree. */
     removeBinding(binding: number) {
         this.assertUnlocked("removeBinding");

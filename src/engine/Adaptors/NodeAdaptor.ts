@@ -9,6 +9,10 @@ import type {MeshAdaptor} from "./MeshAdaptor.ts";
 import type {PrimitiveAdaptor} from "./PrimitiveAdaptor.ts";
 import type {RenderContext} from "../Renderer/RenderContext.ts";
 import {globalBindgroupInteractor} from "../Representations/GlobalBindgroup.ts";
+import {MORPH_ACTIVE_BINDING} from "../producers/MorphProducer.ts";
+import {getEmptyMorphActiveBuffer} from "../internals/MorphStateInternal.ts";
+import type {MorphStateWrapper} from "../wrappers/MorphStateWrapper.ts";
+import type {MorphStateAdaptor} from "./MorphStateAdaptor.ts";
 
 /** What the adapter reads from a node wrapper to compute its local matrix. */
 export interface TransformSource {
@@ -41,6 +45,8 @@ export class NodeAdaptor {
     private readonly worldTask = () => this.ensureWorld();
 
     private mesh: MeshAdaptor | null = null;
+    private morph: MorphStateAdaptor | null = null;
+    private boundMorphBuffer: BufferInternal | null = null;
     private readonly watchedPrimitives = new Map<string, PrimitiveAdaptor>();
     private readonly task = (ctx: RenderContext) => this.ensure(ctx);
     private readonly onDependencyChange = () => this.invalidate();
@@ -139,6 +145,18 @@ export class NodeAdaptor {
         this.notifyStructureChanged();
     }
 
+    /**
+     * Gives this node its own morph weights (or takes them away with null). Without a state a node that draws morphed
+     * geometry draws the rest pose. Changing a weight later never reaches this adapter: the state rewrites its own
+     * buffer. Only swapping the state object does, because the node then binds a different buffer.
+     */
+    setMorphState(state: MorphStateWrapper | null): void {
+        const next = state?.adaptor ?? null;
+        if (next === this.morph) return;
+        this.morph = next;
+        this.invalidate();
+    }
+
     invalidate() {
         this.dirty = true;
         schedulePreFrame(this.task);
@@ -151,10 +169,35 @@ export class NodeAdaptor {
         const primitives = this.mesh.getPrimitiveAdaptors();
         this.syncWatched(primitives);
         for (const primitive of primitives) primitive.ensure();
+        this.syncMorphBinding(primitives);
 
         if (!this.dirty) return;
         this.dirty = false;
         this.rebuildPipelines(ctx, primitives);
+    }
+
+    /**
+     * A vertex shader generated for a morphed geometry reads the node's active targets at binding 2, so every node that
+     * draws such a geometry has to bind something there: its own state's buffer, or the shared all-zero one. The binding
+     * is a property of the geometry, never of the node's state, so a primitive's shader needs no variant per node.
+     */
+    private syncMorphBinding(primitives: readonly PrimitiveAdaptor[]): void {
+        let needed = false;
+        for (const primitive of primitives) {
+            if (primitive.getMorphPlan()) {
+                needed = true;
+                break;
+            }
+        }
+
+        const wanted = needed ? (this.morph?.internal.activeBuffer ?? getEmptyMorphActiveBuffer()) : null;
+        if (wanted === this.boundMorphBuffer) return;
+
+        const bindgroup = this.internal.bindgroupInteractor;
+        if (wanted) bindgroup.setStorage(MORPH_ACTIVE_BINDING, wanted, GPUShaderStage.VERTEX);
+        else bindgroup.removeBinding(MORPH_ACTIVE_BINDING);
+        this.boundMorphBuffer = wanted;
+        this.dirty = true;
     }
 
     private syncWatched(primitives: readonly PrimitiveAdaptor[]): void {
@@ -205,6 +248,10 @@ export class NodeAdaptor {
                 pipeline.setBindgroup(0, globalBindgroupInteractor);
                 pipeline.setBindgroup(2, material.bindgroupInteractor);
                 pipeline.setBindgroup(1, this.internal.bindgroupInteractor);
+
+                // The geometry's own bind group (morph deltas): only when it has bindings, an empty one is not worth a slot.
+                if (geometry.hasBindings()) pipeline.setBindgroup(geometry.group, geometry.bindgroupInteractor);
+                else if (pipeline.bindgroups.has(geometry.group)) pipeline.removeBindgroup(geometry.group);
             });
 
             this.internal.setPipelines(primitive.uuid, pipelines);

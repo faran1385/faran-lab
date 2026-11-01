@@ -1,6 +1,12 @@
 import {GeometryInternal} from "../internals/GeometryInternal.ts";
 import {AttributeInternal} from "../internals/AttributeInternal.ts";
 import {type GeometryAttributePlan, planGeometryAttributes} from "../producers/utils.ts";
+import {
+    MORPH_DELTAS_BINDING,
+    MORPH_HEADER_BINDING,
+    type MorphPlan,
+    morphPlanKey,
+} from "../producers/MorphProducer.ts";
 import {stableKey} from "../hashing/utils/stableKey.ts";
 import {schedulePreFrame} from "./PreFrameQueue.ts";
 import {Source} from "./Source.ts";
@@ -20,6 +26,8 @@ export class GeometryAdaptor {
     private attributesDirty = true;
 
     private attributePlan: GeometryAttributePlan = {slots: [], byName: new Map()};
+    private morphPlan: MorphPlan | null = null;
+    private morphBound = false;
     private layoutKey = "";
     private layoutVersion = 0;
     private drawKey = "";
@@ -44,7 +52,15 @@ export class GeometryAdaptor {
         return this.attributePlan;
     }
 
-    /** Bumped when names, slots, formats or strides changed, i.e. whenever generated shader code is stale. */
+    /** What the vertex shader needs to know about the morph targets, or null when the geometry has none. */
+    getMorphPlan(): MorphPlan | null {
+        return this.morphPlan;
+    }
+
+    /**
+     * Bumped when names, slots, formats or strides changed, or when the morph targets' shape changed (targets added,
+     * removed, normals/tangents appeared), i.e. whenever generated vertex shader code is stale.
+     */
     getLayoutVersion(): number {
         return this.layoutVersion;
     }
@@ -55,8 +71,10 @@ export class GeometryAdaptor {
 
         const plan = planGeometryAttributes(this.owner);
         this.attributePlan = plan;
+        this.syncMorph(plan);
 
-        const layoutKey = plan.slots.map((s) => `${s.name}:${s.slot}:${s.format}:${s.arrayStride}`).join("|");
+        const layoutKey = plan.slots.map((s) => `${s.name}:${s.slot}:${s.format}:${s.arrayStride}`).join("|")
+            + `#${morphPlanKey(this.morphPlan)}`;
         if (layoutKey !== this.layoutKey) {
             this.layoutKey = layoutKey;
             this.layoutVersion++;
@@ -93,6 +111,41 @@ export class GeometryAdaptor {
         }
 
         this.syncDrawInfo();
+    }
+
+    /**
+     * Keeps the geometry's bind group (group 3) in step with its morph targets: the packed deltas and their header are
+     * bound for the vertex stage. The buffers are the targets' own and never replaced by this adapter, so swapping in
+     * another MorphTargetWrapper is the only thing that changes the bindings.
+     */
+    private syncMorph(plan: GeometryAttributePlan): void {
+        const bindgroup = this.internal.bindgroupInteractor;
+        const targets = this.owner.getMorphTargets();
+
+        if (!targets) {
+            if (this.morphBound) {
+                bindgroup.removeBinding(MORPH_DELTAS_BINDING);
+                bindgroup.removeBinding(MORPH_HEADER_BINDING);
+                this.morphBound = false;
+            }
+            this.morphPlan = null;
+            return;
+        }
+
+        const position = plan.byName.get("position");
+        if (!position || position.format !== "float32x3") {
+            throw new Error("GeometryAdaptor: morph targets need a float32x3 \"position\" attribute to morph");
+        }
+        const vertexCount = this.owner.getAttribute("position")!.getData().byteLength / position.arrayStride;
+        if (vertexCount !== targets.getVertexCount()) {
+            throw new Error(`GeometryAdaptor: the morph targets have ${targets.getVertexCount()} vertices but the position attribute has ${vertexCount}`);
+        }
+
+        const internal = targets.adaptor.internal;
+        bindgroup.setStorage(MORPH_DELTAS_BINDING, internal.deltas, GPUShaderStage.VERTEX);
+        bindgroup.setUniform(MORPH_HEADER_BINDING, internal.header, GPUShaderStage.VERTEX);
+        this.morphBound = true;
+        this.morphPlan = {hasNormal: targets.hasNormal(), hasTangent: targets.hasTangent()};
     }
 
     private syncDrawInfo(): void {
