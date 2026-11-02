@@ -34,7 +34,7 @@ export class AnimationPlayer {
     private readonly lastKey: Int32Array;
     private readonly scratchA = new Float32Array(4);
     private readonly scratchB = new Float32Array(4);
-    private readonly scratchOut = new Float32Array(4);
+    private scratchOut = new Float32Array(4);
 
     constructor(clip: AnimationClipWrapper) {
         this.uuid = uuidv4();
@@ -148,8 +148,13 @@ export class AnimationPlayer {
         const count = times.length;
         if (count === 0) return;
 
+        const node = channel.target;
+        const morphState = channel.path === "weights" ? node.getMorphState() : null;
+        if (channel.path === "weights" && !morphState) return;
+
         const isRotation = channel.path === "rotation";
-        const comps = isRotation ? 4 : 3;
+        const comps = channel.path === "weights" ? morphState!.getTargetCount() : isRotation ? 4 : 3;
+        if (this.scratchOut.length !== comps) this.scratchOut = new Float32Array(comps);
         const out = this.scratchOut;
         const cubic = interpolation === "cubicspline";
         // Value of keyframe k starts at this offset. cubicspline stores (in-tangent, value, out-tangent) per key.
@@ -182,7 +187,8 @@ export class AnimationPlayer {
                 }
                 quat.slerp(out, this.scratchA, this.scratchB, s);
             } else {
-                for (let c = 0; c < 3; c++) out[c] = values[o0 + c] + (values[o1 + c] - values[o0 + c]) * s;
+                // Translation, scale and morph weights are component-wise linear values.
+                for (let c = 0; c < comps; c++) out[c] = values[o0 + c] + (values[o1 + c] - values[o0 + c]) * s;
             }
         } else {
             // glTF cubic Hermite: tangents are scaled by the keyframe interval.
@@ -204,7 +210,6 @@ export class AnimationPlayer {
             if (isRotation) quat.normalize(out, out);
         }
 
-        const node = channel.target;
         switch (channel.path) {
             case "translation":
                 node.setTranslation(out[0], out[1], out[2]);
@@ -214,6 +219,9 @@ export class AnimationPlayer {
                 break;
             case "rotation":
                 node.setRotationQuat(out[0], out[1], out[2], out[3]);
+                break;
+            case "weights":
+                morphState!.setWeights(out);
                 break;
         }
     }

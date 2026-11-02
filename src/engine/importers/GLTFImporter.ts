@@ -798,7 +798,7 @@ function importSkin(gltf: any, buffers: ArrayBuffer[], gltfSkin: any): Skin {
 
 // ── animations ───────────────────────────────────────────────────────────
 
-const ANIMATION_PATHS = new Set<string>(["translation", "rotation", "scale"]);
+const ANIMATION_PATHS = new Set<string>(["translation", "rotation", "scale", "weights"]);
 
 function normalizeInterpolation(mode: string | undefined): AnimationInterpolation {
     switch (mode) {
@@ -815,6 +815,9 @@ function normalizeInterpolation(mode: string | undefined): AnimationInterpolatio
 function importAnimationSampler(gltf: any, buffers: ArrayBuffer[], gltfSampler: any): AnimationSampler {
     const times = readFloatAttribute(gltf, buffers, gltfSampler.input, 1);
     const outputAccessor = gltf.accessors[gltfSampler.output];
+    // Morph-weight outputs use a SCALAR accessor whose values are flattened:
+    // [frame0.target0, frame0.target1, ..., frame1.target0, ...]. CUBICSPLINE
+    // stores three such blocks per key (in-tangent, value, out-tangent).
     const values = readFloatAttribute(gltf, buffers, gltfSampler.output, GLTF_TYPE_COMPONENT_COUNT[outputAccessor.type]);
     return {interpolation: normalizeInterpolation(gltfSampler.interpolation), times, values};
 }
@@ -830,7 +833,7 @@ function importAnimation(gltf: any, buffers: ArrayBuffer[], gltfAnimation: any):
         const nodeIndex: number | undefined = gltfChannel.target?.node;
         if (nodeIndex === undefined) continue; // extension-driven channel, nothing to animate
         if (!ANIMATION_PATHS.has(path)) {
-            // "weights" (morph targets) and "pointer" are deferred, same as morph targets in geometry.
+            // "pointer" and extension-defined targets are not supported.
             console.warn(`GLTFImporter: skipping animation channel with unsupported path "${path}"`);
             continue;
         }
