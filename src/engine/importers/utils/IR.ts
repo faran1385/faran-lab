@@ -145,7 +145,7 @@ export interface Skin {
     skeleton?: number;
 }
 
-export type AnimationPath = "translation" | "rotation" | "scale";
+export type AnimationPath = "translation" | "rotation" | "scale" | "weights";
 export type AnimationInterpolation = "linear" | "step" | "cubicspline";
 
 /**
