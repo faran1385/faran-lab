@@ -271,7 +271,7 @@ export class IRToSceneConvertor {
             wrapper.setMesh(meshes[node.mesh]);
 
             const targets = context.morph.meshTargets[node.mesh];
-            if (targets) wrapper.setMorphState(this.createMorphState(node, context.morph.meshes[node.mesh], targets));
+            if (targets) wrapper.animationHandler.setMorphState(this.createMorphState(node, context.morph.meshes[node.mesh], targets));
         }
 
         if (node.skin !== undefined) {

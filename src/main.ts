@@ -30,11 +30,12 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 const loader = new GLBLoader();
 const {root, clips} = await loader.load("./test.glb")
 const animationPlayer = new AnimationPlayer(clips[0]);
-// animationPlayer.play()
+animationPlayer.play()
 scene.addNode(root);
 root.setScale(0.003, .003, .003)
 root.setTranslation(0, -1, 0)
 window.addEventListener("click", () => {
+
 })
 
 window.addEventListener("resize", () => {
@@ -47,9 +48,9 @@ let lastTime = performance.now();
 
 function frameLoop(): void {
     const now = performance.now();
-    const dt = (now - lastTime) / 1000; // ms → seconds
+    const dt = (now - lastTime) / 1000;
     lastTime = now;
-
+    animationPlayer.update(dt)
     stats.begin();
     controls.update()
     renderer.render(scene, camera);

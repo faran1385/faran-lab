@@ -13,7 +13,7 @@ export interface MorphStateOptions {
      * the active ones only, so this is also the per-vertex cost ceiling. Default 8. Fixed at construction.
      */
     maxActive?: number;
-    /** |weight| at or below this counts as 0 and is not applied. Default 1e-5. */
+    /** |weight| at or below this counts as 0 and is not applied. Default 1e-5 */
     epsilon?: number;
 }
 

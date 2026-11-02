@@ -15,7 +15,6 @@ export class NodeWrapper {
     readonly uuid: string;
     private name?: string;
     private mesh: MeshWrapper | null = null;
-    private morphState: MorphStateWrapper | null = null;
     private children = new Map<string, NodeWrapper>();
     private parent?: NodeWrapper;
 
@@ -40,7 +39,7 @@ export class NodeWrapper {
         this.adaptor = adaptor ?? new NodeAdaptor(new NodeInternal());
 
         if (this.adaptor) this.adaptor.invalidate();
-        this.animationHandler = new AnimationHandler((skin) => this.adaptor.setSkin(skin?.adaptor ?? null));
+        this.animationHandler = new AnimationHandler((skin) => this.adaptor.setSkin(skin?.adaptor ?? null), (state: MorphStateWrapper | null) => this.adaptor.setMorphState(state));
 
         const t = translation ?? [0, 0, 0] as any;
         const r = rotation ?? [0, 0, 0, 1] as any;
@@ -65,19 +64,6 @@ export class NodeWrapper {
     setMesh(mesh: MeshWrapper | null) {
         this.mesh = mesh;
         this.adaptor.setMesh(mesh)
-    }
-
-    getMorphState() {
-        return this.morphState;
-    }
-
-    /**
-     * The morph weights of this node, for the morph targets of its mesh's geometries. Without one, morphed geometry
-     * draws its rest pose. Two nodes that share a mesh can have different states.
-     */
-    setMorphState(state: MorphStateWrapper | null) {
-        this.morphState = state;
-        this.adaptor.setMorphState(state);
     }
 
     setName(name: string | undefined) {
