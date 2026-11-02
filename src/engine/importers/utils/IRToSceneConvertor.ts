@@ -367,6 +367,27 @@ export class IRToSceneConvertor {
                 throw new Error(`IRToSceneConvertor: clip "${clip.name ?? "(unnamed)"}" references missing sampler ${channel.sampler}`);
             }
 
+            if (channel.path === "weights") {
+                const morphState = target.getMorphState();
+                if (!morphState) {
+                    console.warn(
+                        `IRToSceneConvertor: clip "${clip.name ?? "(unnamed)"}" targets morph weights on node ${channel.node}, which has no morph targets; channel skipped`,
+                    );
+                    continue;
+                }
+
+                // glTF stores one scalar per target per keyframe. CUBICSPLINE
+                // stores in-tangent, value and out-tangent for every target.
+                const multiplier = sampler.interpolation === "cubicspline" ? 3 : 1;
+                const expectedValues = sampler.times.length * morphState.getTargetCount() * multiplier;
+                if (sampler.values.length !== expectedValues) {
+                    console.warn(
+                        `IRToSceneConvertor: clip "${clip.name ?? "(unnamed)"}" has ${sampler.values.length} morph-weight values for node ${channel.node}; expected ${expectedValues}; channel skipped`,
+                    );
+                    continue;
+                }
+            }
+
             channels.push({target, path: channel.path, sampler});
         }
 
