@@ -5,6 +5,7 @@ import * as Stats from "stats.js";
 import {OrbitControls} from "./engine/Controls/OrbitControls.ts";
 import {GLBLoader} from "./engine/loaders/GLBLoader.ts";
 import {AnimationPlayer} from "./engine/animation/AnimationPlayer.ts";
+import {DQSSkinning} from "./packages/animations/DQSSkinning.ts";
 
 const canvas = document.getElementById("gpu-canvas") as HTMLCanvasElement;
 if (!canvas) throw new Error('Missing canvas element "#gpu-canvas".');
@@ -28,15 +29,11 @@ await renderer.init();
 renderer.setSize(window.innerWidth, window.innerHeight);
 
 const loader = new GLBLoader();
-const {root, clips} = await loader.load("./test.glb")
+const {root, clips, skins} = await loader.load("./test.glb")
 const animationPlayer = new AnimationPlayer(clips[0]);
 animationPlayer.play()
 scene.addNode(root);
-root.setScale(0.003, .003, .003)
-root.setTranslation(0, -1, 0)
-window.addEventListener("click", () => {
-
-})
+root.setScale(.05,0.05,0.05)
 
 window.addEventListener("resize", () => {
     camera.setAspect(window.innerWidth / window.innerHeight);
@@ -45,6 +42,9 @@ window.addEventListener("resize", () => {
 
 let lastTime = performance.now();
 
+skins.forEach((sk) => {
+    sk.setMethod(new DQSSkinning())
+})
 
 function frameLoop(): void {
     const now = performance.now();

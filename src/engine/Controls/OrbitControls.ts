@@ -79,7 +79,7 @@ export class OrbitControls {
         this.enableZoom = options.enableZoom ?? true;
         this.enablePan = options.enablePan ?? true;
         this.rotateSpeed = options.rotateSpeed ?? 1;
-        this.zoomSpeed = options.zoomSpeed ?? 1;
+        this.zoomSpeed = options.zoomSpeed ?? 10;
         this.panSpeed = options.panSpeed ?? 1;
         this.minDistance = options.minDistance ?? 0.01;
         this.maxDistance = options.maxDistance ?? Infinity;

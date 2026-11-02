@@ -149,7 +149,7 @@ export class AnimationPlayer {
         if (count === 0) return;
 
         const node = channel.target;
-        const morphState = channel.path === "weights" ? node.getMorphState() : null;
+        const morphState = channel.path === "weights" ? node.animationHandler.getMorphState() : null;
         if (channel.path === "weights" && !morphState) return;
 
         const isRotation = channel.path === "rotation";

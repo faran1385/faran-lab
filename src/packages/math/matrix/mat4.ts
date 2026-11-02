@@ -1,8 +1,11 @@
 import {matrixMultiplication, matrixTranspose} from "./utils.ts";
 import {mat3} from "./mat3.ts";
 import {vec3} from "../vector/vec3.ts";
+import {quat} from "../quat/quat.ts";
 
 export class mat4 {
+    private static mat3Spare = mat3.create();
+    private static quatSpare = quat.create();
 
     static create() {
         return new Float32Array([
@@ -234,7 +237,6 @@ export class mat4 {
         )
 
 
-
         matrixMultiplication(out, mat, rotationMat, 4)
 
         return out;
@@ -387,7 +389,7 @@ export class mat4 {
             X[0], Y[0], Z[0], 0,
             X[1], Y[1], Z[1], 0,
             X[2], Y[2], Z[2], 0,
-            0,    0,    0,    1
+            0, 0, 0, 1
         );
 
         const TI = this.fromValues(
@@ -515,22 +517,23 @@ export class mat4 {
         }
 
         // Build a pure rotation matrix
-        const rot = new Float32Array(9);
 
-        rot[0] = mat[0] / sx;
-        rot[1] = mat[1] / sx;
-        rot[2] = mat[2] / sx;
 
-        rot[3] = mat[4] / sy;
-        rot[4] = mat[5] / sy;
-        rot[5] = mat[6] / sy;
+        this.mat3Spare[0] = mat[0] / sx;
+        this.mat3Spare[1] = mat[1] / sx;
+        this.mat3Spare[2] = mat[2] / sx;
 
-        rot[6] = mat[8] / sz;
-        rot[7] = mat[9] / sz;
-        rot[8] = mat[10] / sz;
+        this.mat3Spare[3] = mat[4] / sy;
+        this.mat3Spare[4] = mat[5] / sy;
+        this.mat3Spare[5] = mat[6] / sy;
+
+        this.mat3Spare[6] = mat[8] / sz;
+        this.mat3Spare[7] = mat[9] / sz;
+        this.mat3Spare[8] = mat[10] / sz;
 
         // Convert rotation matrix to quaternion
-        mat3.toQuat(rotationQ, rot);
+        mat3.toQuat(this.quatSpare, this.mat3Spare);
+        quat.normalize(rotationQ, this.quatSpare)
 
         return {
             translation: translationV,

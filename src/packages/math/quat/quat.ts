@@ -108,6 +108,11 @@ export class quat {
     }
 
 
+    static scale(out: Float32Array, fac: number) {
+        vec4.scale(out, out, fac);
+        return out;
+    }
+
     static slerp(out: Float32Array, a: Float32Array, b: Float32Array, t: number) {
         const A = vec4.create();
         this.normalize(A, a);

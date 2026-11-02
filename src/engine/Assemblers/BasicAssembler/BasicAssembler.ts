@@ -55,7 +55,6 @@ export class BasicVertexAssembler extends VertexAssemblerBase {
 
 export class BasicFragmentAssembler extends FragmentAssemblerBase {
     protected fragmentPhase2(
-        _varyingValues: ValueMap,
         _bindingValues: ValueMap,
         componentsMap: ComponentsMap,
         _builtinValues: ValueMap): FragmentPhase2Output {

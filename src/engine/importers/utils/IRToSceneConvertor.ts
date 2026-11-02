@@ -368,7 +368,7 @@ export class IRToSceneConvertor {
             }
 
             if (channel.path === "weights") {
-                const morphState = target.getMorphState();
+                const morphState = target.animationHandler.getMorphState();
                 if (!morphState) {
                     console.warn(
                         `IRToSceneConvertor: clip "${clip.name ?? "(unnamed)"}" targets morph weights on node ${channel.node}, which has no morph targets; channel skipped`,

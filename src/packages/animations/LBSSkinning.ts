@@ -31,7 +31,7 @@ fn skin(pos: vec3f, nrm: vec3f, joints: vec4u, weights: vec4f) -> SkinnedVertex 
 `;
 
     private view?: Float32Array;
-    private readonly scratch = mat4.create();
+    private static readonly scratch = mat4.create();
 
     initialPalette(jointCount: number): ArrayBuffer {
         const data = new Float32Array(jointCount * MAT4_FLOATS);
@@ -47,8 +47,8 @@ fn skin(pos: vec3f, nrm: vec3f, joints: vec4u, weights: vec4f) -> SkinnedVertex 
 
         let index = 0;
         for (const [node, inverseBind] of joints) {
-            mat4.mul(this.scratch, node.getWorldMatrix(), inverseBind);
-            this.view.set(this.scratch, index * MAT4_FLOATS);
+            mat4.mul(LBSSkinning.scratch, node.getWorldMatrix(), inverseBind);
+            this.view.set(LBSSkinning.scratch, index * MAT4_FLOATS);
             index++;
         }
     }
