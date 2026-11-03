@@ -54,7 +54,7 @@ export class GeometryAdaptor {
         this.attributePlanDirty = true;
         this.attributeBindingsDirty = true;
         this.drawInfoDirty = true;
-        if (name === "position" || name === undefined) {
+        if (name === "position") {
             this.morphCompatibilityDirty = true;
         }
         schedulePreFrame(this.task);
