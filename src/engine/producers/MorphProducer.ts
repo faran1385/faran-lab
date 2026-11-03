@@ -7,7 +7,7 @@ import type {GeometryBindingPlan} from "./BindGroupLayoutProducer.ts";
  *
  * Morph targets are split by who owns the data:
  *   - the packed deltas never change after load and belong to the geometry, so every node drawing the geometry shares
- *     one GPU buffer: group 3 (the geometry's bind group), bindings 0 and 1
+ *     one GPU buffer: group 3 (the geometry's bind group), at the slots assigned by GeometryBindingPlan
  *   - the active weights change per node and per frame, so they live in the node's bind group: group 1, binding 2
  *     (binding 0 is the world matrix, binding 1 the skin palette)
  */
