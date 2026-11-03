@@ -2,12 +2,12 @@ import {GeometryInternal} from "../internals/GeometryInternal.ts";
 import {AttributeInternal} from "../internals/AttributeInternal.ts";
 import {type GeometryAttributePlan, planGeometryAttributes} from "../producers/utils.ts";
 import {
-    MORPH_DELTAS_BINDING,
-    MORPH_HEADER_BINDING,
     type MorphPlan,
     morphPlanKey,
 } from "../producers/MorphProducer.ts";
 import {stableKey} from "../hashing/utils/stableKey.ts";
+import {planGeometryBindings} from "../producers/utils.ts";
+import type {GeometryBindingPlan} from "../producers/BindGroupLayoutProducer.ts";
 import {schedulePreFrame} from "./PreFrameQueue.ts";
 import {Source} from "./Source.ts";
 import type {GeometryWrapper} from "../wrappers/GeometryWrapper.ts";
@@ -33,7 +33,9 @@ export class GeometryAdaptor {
 
     private attributePlan: GeometryAttributePlan = {slots: [], byName: new Map()};
     private morphPlan: MorphPlan | null = null;
+    private geometryBindingPlan: GeometryBindingPlan = {signature: "geometry:none"};
     private boundMorphTargets?: MorphTargetWrapper;
+    private boundBindings = new Set<number>();
     private layoutKey = "";
     private layoutVersion = 0;
     private drawKey = "";
@@ -90,6 +92,11 @@ export class GeometryAdaptor {
         return this.morphPlan;
     }
 
+    /** Dynamic resource bindings for this geometry; read after ensure(). */
+    getBindingPlan(): GeometryBindingPlan {
+        return this.geometryBindingPlan;
+    }
+
     /**
      * Bumped when names, slots, formats or strides changed, or when the morph targets' shape changed (targets added,
      * removed, normals/tangents appeared), i.e. whenever generated vertex shader code is stale.
@@ -127,6 +134,7 @@ export class GeometryAdaptor {
         }
 
         if (syncMorphTarget) {
+            this.geometryBindingPlan = planGeometryBindings(!!this.owner.getMorphTargets());
             this.syncMorphTarget();
         } else if (validateMorph) {
             this.validateMorphCompatibility();
@@ -172,8 +180,8 @@ export class GeometryAdaptor {
     }
 
     /**
-     * Synchronizes the geometry's group-3 morph bindings only when the target wrapper identity changes.
-     * The target wrapper owns these buffers; this adaptor does not replace them.
+     * Synchronizes geometry-owned resources using centrally planned binding numbers. The target wrapper owns
+     * the buffers; this adaptor only installs/removes their references.
      */
     private syncMorphTarget(): void {
         const targets = this.owner.getMorphTargets();
@@ -182,17 +190,17 @@ export class GeometryAdaptor {
         if (targets) {
             this.validateMorphCompatibility();
             const internal = targets.adaptor.internal;
-            bindgroup.setStorage(MORPH_DELTAS_BINDING, internal.deltas, GPUShaderStage.VERTEX);
-            bindgroup.setUniform(MORPH_HEADER_BINDING, internal.header, GPUShaderStage.VERTEX);
+            const slots = this.geometryBindingPlan.morph!;
+            bindgroup.setStorage(slots.deltas, internal.deltas, GPUShaderStage.VERTEX);
+            bindgroup.setUniform(slots.header, internal.header, GPUShaderStage.VERTEX);
+            this.boundBindings = new Set([slots.deltas, slots.header]);
             this.morphPlan = {hasNormal: targets.hasNormal(), hasTangent: targets.hasTangent()};
             this.boundMorphTargets = targets;
             return;
         }
 
-        if (this.boundMorphTargets) {
-            bindgroup.removeBinding(MORPH_DELTAS_BINDING);
-            bindgroup.removeBinding(MORPH_HEADER_BINDING);
-        }
+        for (const binding of this.boundBindings) bindgroup.removeBinding(binding);
+        this.boundBindings.clear();
         this.boundMorphTargets = undefined;
         this.morphPlan = null;
     }
@@ -213,7 +221,7 @@ export class GeometryAdaptor {
 
     private updateLayoutVersion(): void {
         const layoutKey = this.attributePlan.slots.map((s) => `${s.name}:${s.slot}:${s.format}:${s.arrayStride}`).join("|")
-            + `#${morphPlanKey(this.morphPlan)}`;
+            + `#${morphPlanKey(this.morphPlan)}#${this.geometryBindingPlan.signature}`;
         if (layoutKey !== this.layoutKey) {
             this.layoutKey = layoutKey;
             this.layoutVersion++;
