@@ -1,12 +1,11 @@
 import {GeometryInternal} from "../internals/GeometryInternal.ts";
 import {AttributeInternal} from "../internals/AttributeInternal.ts";
-import {type GeometryAttributePlan, planGeometryAttributes} from "../producers/utils.ts";
+import {type GeometryAttributePlan, planGeometryAttributes, planGeometryBindings} from "../producers/utils.ts";
 import {
     type MorphPlan,
     morphPlanKey,
 } from "../producers/MorphProducer.ts";
 import {stableKey} from "../hashing/utils/stableKey.ts";
-import {planGeometryBindings} from "../producers/utils.ts";
 import type {GeometryBindingPlan} from "../producers/BindGroupLayoutProducer.ts";
 import {schedulePreFrame} from "./PreFrameQueue.ts";
 import {Source} from "./Source.ts";
@@ -34,7 +33,6 @@ export class GeometryAdaptor {
     private attributePlan: GeometryAttributePlan = {slots: [], byName: new Map()};
     private morphPlan: MorphPlan | null = null;
     private geometryBindingPlan: GeometryBindingPlan = {signature: "geometry:none"};
-    private boundMorphTargets?: MorphTargetWrapper;
     private boundBindings = new Set<number>();
     private layoutKey = "";
     private layoutVersion = 0;
@@ -193,15 +191,17 @@ export class GeometryAdaptor {
             const slots = this.geometryBindingPlan.morph!;
             bindgroup.setStorage(slots.deltas, internal.deltas, GPUShaderStage.VERTEX);
             bindgroup.setUniform(slots.header, internal.header, GPUShaderStage.VERTEX);
-            this.boundBindings = new Set([slots.deltas, slots.header]);
+            const wanted = new Set([slots.deltas, slots.header]);
+            for (const binding of this.boundBindings) {
+                if (!wanted.has(binding)) bindgroup.removeBinding(binding);
+            }
+            this.boundBindings = wanted;
             this.morphPlan = {hasNormal: targets.hasNormal(), hasTangent: targets.hasTangent()};
-            this.boundMorphTargets = targets;
             return;
         }
 
         for (const binding of this.boundBindings) bindgroup.removeBinding(binding);
         this.boundBindings.clear();
-        this.boundMorphTargets = undefined;
         this.morphPlan = null;
     }
 
