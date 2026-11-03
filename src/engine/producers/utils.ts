@@ -2,7 +2,8 @@ import {
     type BindingSlot,
     type ComponentBindings,
     FACTORS_BINDING,
-    type MaterialBindingPlan
+    type MaterialBindingPlan,
+    type GeometryBindingPlan
 } from "./BindGroupLayoutProducer.ts";
 import type {MaterialComponentWrapper} from "../wrappers/MaterialComponentWrapper.ts";
 import type {GeometryWrapper} from "../wrappers/GeometryWrapper.ts";
@@ -209,6 +210,16 @@ export function planGeometryAttributes(geometry: GeometryWrapper): GeometryAttri
     });
 
     return {slots, byName: new Map(slots.map((s) => [s.name, s]))};
+}
+
+/**
+ * Allocates geometry-owned optional resources in a stable order. Keep feature-specific WGSL declarations
+ * and adaptor bindings driven by this result rather than duplicating binding numbers.
+ */
+export function planGeometryBindings(hasMorphTargets: boolean): GeometryBindingPlan {
+    let next = 0;
+    const morph = hasMorphTargets ? {deltas: next++, header: next++} : undefined;
+    return {morph, signature: morph ? `morph:${morph.deltas},${morph.header}` : "geometry:none"};
 }
 
 export function planMaterialBindings(sorted: MaterialComponentWrapper[]): MaterialBindingPlan {
