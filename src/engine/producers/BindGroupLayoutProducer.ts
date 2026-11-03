@@ -11,6 +11,12 @@ export interface MaterialBindingPlan {
     signature: string;
 }
 
+/** Optional resources owned by a geometry. Binding numbers are allocated centrally, just like material resources. */
+export interface GeometryBindingPlan {
+    morph?: {deltas: number; header: number};
+    signature: string;
+}
+
 
 export class BindGroupLayoutProducer {
     /** Pure translation of a layout representation into a descriptor. Entries are written in binding order. */
