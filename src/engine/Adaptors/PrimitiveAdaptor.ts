@@ -128,7 +128,7 @@ export class PrimitiveAdaptor {
         if (this.codeDirty || geometry.getLayoutVersion() !== this.seenLayoutVersion) {
 
             const vertexCode = this.vertexAssembler.assemble(
-                VertexShaderProducer.produce(() => bindingPlan, () => attributePlan, undefined, () => morphPlan),
+                VertexShaderProducer.produce(() => bindingPlan, () => attributePlan, undefined, () => morphPlan, () => geometry.getBindingPlan()),
                 VERTEX_ENTRY_POINT,
             );
             this.fillStage(this.internal.vertex, vertexCode, VERTEX_ENTRY_POINT);
@@ -175,6 +175,7 @@ export class PrimitiveAdaptor {
                 () => geometry.getAttributePlan(),
                 skin,
                 () => geometry.getMorphPlan(),
+                () => geometry.getBindingPlan(),
             ),
             VERTEX_ENTRY_POINT,
         );
