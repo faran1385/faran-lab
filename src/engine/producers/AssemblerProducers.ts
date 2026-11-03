@@ -4,7 +4,7 @@ import {
     getWGSLTypeFromVertexFormat,
     type WGSLType
 } from "./utils.ts";
-import {FACTORS_BINDING, type MaterialBindingPlan} from "./BindGroupLayoutProducer.ts";
+import {FACTORS_BINDING, type MaterialBindingPlan, type GeometryBindingPlan} from "./BindGroupLayoutProducer.ts";
 import {morphGeometryBindings, morphNodeBindings, type MorphPlan} from "./MorphProducer.ts";
 
 export interface VertexInputField {
@@ -168,6 +168,7 @@ export class VertexShaderProducer {
         getAttributePlan: () => GeometryAttributePlan,
         skin?: SkinShaderInfo,
         getMorphPlan?: () => MorphPlan | null,
+        getGeometryBindingPlan?: () => GeometryBindingPlan,
     ): VertexShaderDescriptor {
         const plan = getAttributePlan();
         const matPlan = getMaterialPlan();
@@ -191,7 +192,7 @@ export class VertexShaderProducer {
 
         const bindings = [...sceneBindings(), ...nodeBindings()];
         if (skin) bindings.push(paletteBinding(skin.paletteElement));
-        if (morph) bindings.push(...morphNodeBindings(), ...morphGeometryBindings());
+        if (morph) bindings.push(...morphNodeBindings(), ...morphGeometryBindings(getGeometryBindingPlan?.() ?? {signature: "geometry:none"}));
 
         return {inputs, componentDataMap, bindings, skin, morph};
     }
