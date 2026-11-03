@@ -1,4 +1,5 @@
 import type {BindGroupEntry} from "./AssemblerProducers.ts";
+import type {GeometryBindingPlan} from "./BindGroupLayoutProducer.ts";
 
 /**
  * The binding contract of the morph system, shared by the adapters (which bind buffers) and the shader producers (which
@@ -11,8 +12,6 @@ import type {BindGroupEntry} from "./AssemblerProducers.ts";
  *     (binding 0 is the world matrix, binding 1 the skin palette)
  */
 export const MORPH_GEOMETRY_GROUP = 3;
-export const MORPH_DELTAS_BINDING = 0;
-export const MORPH_HEADER_BINDING = 1;
 
 export const MORPH_NODE_GROUP = 1;
 export const MORPH_ACTIVE_BINDING = 2;
@@ -41,12 +40,13 @@ export function morphPlanKey(plan: MorphPlan | null): string {
 }
 
 /** Group 3: the packed deltas and the header that tells the shader how they are laid out. */
-export function morphGeometryBindings(): BindGroupEntry[] {
+export function morphGeometryBindings(plan: GeometryBindingPlan): BindGroupEntry[] {
+    if (!plan.morph) return [];
     return [
         {
             kind: "storageScalar",
             group: MORPH_GEOMETRY_GROUP,
-            binding: MORPH_DELTAS_BINDING,
+            binding: plan.morph.deltas,
             name: MORPH_DELTAS_VAR,
             elementType: "f32",
             access: "read",
@@ -54,7 +54,7 @@ export function morphGeometryBindings(): BindGroupEntry[] {
         {
             kind: "uniform",
             group: MORPH_GEOMETRY_GROUP,
-            binding: MORPH_HEADER_BINDING,
+            binding: plan.morph.header,
             name: MORPH_HEADER_VAR,
             structName: "MorphHeaderUniforms",
             fields: [
