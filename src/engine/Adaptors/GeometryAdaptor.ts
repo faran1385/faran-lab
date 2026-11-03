@@ -10,6 +10,7 @@ import type {GeometryBindingPlan} from "../producers/BindGroupLayoutProducer.ts"
 import {schedulePreFrame} from "./PreFrameQueue.ts";
 import {Source} from "./Source.ts";
 import type {GeometryWrapper} from "../wrappers/GeometryWrapper.ts";
+import {VATTextureWrapper} from "../wrappers/VATTextureWrapper.ts";
 
 /**
  * Translates a GeometryWrapper (attributes keyed by name) into a GeometryInternal (vertex buffers keyed by slot, plus
@@ -27,16 +28,22 @@ export class GeometryAdaptor {
     private attributeBindingsDirty = true;
     private drawInfoDirty = true;
     private morphTargetDirty = true;
+    private vatDirty = true;
     private morphCompatibilityDirty = true;
 
     private attributePlan: GeometryAttributePlan = {slots: [], byName: new Map()};
     private morphPlan: MorphPlan | null = null;
-    private geometryBindingPlan: GeometryBindingPlan = {signature: "geometry:none"};
+    private geometryBindingPlan: GeometryBindingPlan = {
+        byComponent: new Map(),
+        signature: "",
+        vatKeys: new Map()
+    };
     private boundBindings = new Set<number>();
     private layoutKey = "";
     private layoutVersion = 0;
     private drawKey = "";
     private readonly attributes = new Map<string, AttributeInternal>();
+    private sortedVats: [string, VATTextureWrapper][] = [];
 
     constructor(owner: GeometryWrapper) {
         this.owner = owner;
@@ -59,6 +66,10 @@ export class GeometryAdaptor {
         schedulePreFrame(this.task);
     }
 
+    private sortVat() {
+        this.sortedVats = Array.from(this.owner.getVATs()).sort((a, b) => a[0].localeCompare(b[0]));
+    }
+
     /** Index-buffer changes affect the draw command, not the vertex attribute plan. */
     invalidateIndices(): void {
         this.markDirty();
@@ -74,9 +85,17 @@ export class GeometryAdaptor {
         schedulePreFrame(this.task);
     }
 
+    /** A VAT has been added or removed */
+    invalidateVATs(): void {
+        this.sortVat();
+        this.markDirty();
+        this.vatDirty = true;
+        schedulePreFrame(this.task);
+    }
+
     private markDirty(): void {
         const wasClean = !this.attributePlanDirty && !this.attributeBindingsDirty && !this.drawInfoDirty
-            && !this.morphTargetDirty && !this.morphCompatibilityDirty;
+            && !this.morphTargetDirty && !this.morphCompatibilityDirty && !this.vatDirty;
         if (wasClean) this.changed.notify();
     }
 
@@ -111,12 +130,14 @@ export class GeometryAdaptor {
         const syncDrawInfo = this.drawInfoDirty;
         const syncMorphTarget = this.morphTargetDirty;
         const validateMorph = this.morphCompatibilityDirty;
+        const vat = this.vatDirty;
 
         this.attributePlanDirty = false;
         this.attributeBindingsDirty = false;
         this.drawInfoDirty = false;
         this.morphTargetDirty = false;
         this.morphCompatibilityDirty = false;
+        this.vatDirty = false;
 
         if (rebuildPlan) {
             this.attributePlan = planGeometryAttributes(this.owner);
@@ -130,17 +151,22 @@ export class GeometryAdaptor {
             this.syncDrawInfo();
         }
 
+        if (syncMorphTarget || vat) {
+            this.geometryBindingPlan = planGeometryBindings(this.owner.getMorphTarget(), this.sortedVats);
+            this.syncBindings();
+        }
+
         if (syncMorphTarget) {
-            this.geometryBindingPlan = planGeometryBindings(!!this.owner.getMorphTargets());
             this.syncMorphTarget();
         } else if (validateMorph) {
             this.validateMorphCompatibility();
         }
 
-        if (rebuildPlan || syncMorphTarget) {
+        if (rebuildPlan || syncMorphTarget || vat) {
             this.updateLayoutVersion();
         }
     }
+
 
     private syncAttributeBindings(): void {
         const plan = this.attributePlan;
@@ -176,36 +202,44 @@ export class GeometryAdaptor {
         }
     }
 
+    private syncBindings() {
+        const wanted = new Set<number>();
+        const bindgroup = this.internal.bindgroupInteractor;
+
+        for (const [_, {binding, resource}] of this.geometryBindingPlan.byComponent) {
+            wanted.add(binding);
+            if (resource.type === "uniform-buffer") {
+                bindgroup.setUniform(binding, resource.value, resource.visibility)
+            } else if (resource.type === "storage-buffer") {
+                bindgroup.setStorage(binding, resource.value, resource.visibility)
+            } else if (resource.type === "texture-binding") {
+                bindgroup.setTexture(binding, resource.value, resource.visibility)
+            }
+        }
+
+        for (const binding of this.boundBindings) {
+            if (!wanted.has(binding)) bindgroup.removeBinding(binding);
+        }
+    }
+
     /**
      * Synchronizes geometry-owned resources using centrally planned binding numbers. The target wrapper owns
      * the buffers; this adaptor only installs/removes their references.
      */
     private syncMorphTarget(): void {
-        const targets = this.owner.getMorphTargets();
-        const bindgroup = this.internal.bindgroupInteractor;
+        const targets = this.owner.getMorphTarget();
 
         if (targets) {
             this.validateMorphCompatibility();
-            const internal = targets.adaptor.internal;
-            const slots = this.geometryBindingPlan.morph!;
-            bindgroup.setStorage(slots.deltas, internal.deltas, GPUShaderStage.VERTEX);
-            bindgroup.setUniform(slots.header, internal.header, GPUShaderStage.VERTEX);
-            const wanted = new Set([slots.deltas, slots.header]);
-            for (const binding of this.boundBindings) {
-                if (!wanted.has(binding)) bindgroup.removeBinding(binding);
-            }
-            this.boundBindings = wanted;
             this.morphPlan = {hasNormal: targets.hasNormal(), hasTangent: targets.hasTangent()};
             return;
         }
 
-        for (const binding of this.boundBindings) bindgroup.removeBinding(binding);
-        this.boundBindings.clear();
         this.morphPlan = null;
     }
 
     private validateMorphCompatibility(): void {
-        const targets = this.owner.getMorphTargets();
+        const targets = this.owner.getMorphTarget();
         if (!targets) return;
 
         const position = this.attributePlan.byName.get("position");
@@ -220,7 +254,7 @@ export class GeometryAdaptor {
 
     private updateLayoutVersion(): void {
         const layoutKey = this.attributePlan.slots.map((s) => `${s.name}:${s.slot}:${s.format}:${s.arrayStride}`).join("|")
-            + `#${morphPlanKey(this.morphPlan)}#${this.geometryBindingPlan.signature}`;
+            + `#${morphPlanKey(this.morphPlan)}#${this.sortedVats.map(i => i[0]).join("|")}`;
         if (layoutKey !== this.layoutKey) {
             this.layoutKey = layoutKey;
             this.layoutVersion++;

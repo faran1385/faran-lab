@@ -1,10 +1,21 @@
 import type {BindgroupLayoutRepresentation} from "../Representations/BindgroupLayoutRepresentation.ts";
 import {bufferBindingTypeOf, textureSampleTypeOf} from "../Representations/bindingTypes.ts";
+import type {BufferInternal} from "../internals/BufferInternal.ts";
+import type {ImageWrapper} from "../wrappers/ImageWrapper.ts";
 
 export const FACTORS_BINDING = 0;
 
-export interface BindingSlot { binding: number; kind: "texture" | "sampler" }
-export interface ComponentBindings { texture: number; sampler: number; texCoord: string }
+export interface BindingSlot {
+    binding: number;
+    kind: "texture" | "sampler"
+}
+
+export interface ComponentBindings {
+    texture: number;
+    sampler: number;
+    texCoord: string
+}
+
 export interface MaterialBindingPlan {
     slots: BindingSlot[];
     byComponent: Map<string, ComponentBindings>;
@@ -13,7 +24,23 @@ export interface MaterialBindingPlan {
 
 /** Optional resources owned by a geometry. Binding numbers are allocated centrally, just like material resources. */
 export interface GeometryBindingPlan {
-    morph?: {deltas: number; header: number};
+    byComponent: Map<string, {
+        binding: number,
+        resource: {
+            type: "uniform-buffer",
+            value: BufferInternal,
+            visibility: GPUShaderStageFlags
+        } | {
+            type: "storage-buffer",
+            value: BufferInternal,
+            visibility: GPUShaderStageFlags
+        } | {
+            type: "texture-binding",
+            value: ImageWrapper,
+            visibility: GPUShaderStageFlags
+        }
+    }>,
+    vatKeys: Map<"position" | "normal" | "tangent", string>,
     signature: string;
 }
 

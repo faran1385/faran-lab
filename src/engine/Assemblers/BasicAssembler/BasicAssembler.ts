@@ -5,28 +5,32 @@ import {
     type ValueMap,
     VertexAssemblerBase, type VertexMorph, type VertexPhase2Output, type VertexSkin
 } from "../BaseAssembler.ts";
+import type {VertexVAT} from "../VATCode.ts";
 
 export class BasicVertexAssembler extends VertexAssemblerBase {
-    protected vertexPhase2(
+    vertexPhase2(
         inputValues: ValueMap,
         bindingValues: ValueMap,
         dataMap: Map<string, ComponentData>,
         builtinValues: ValueMap,
         skin?: VertexSkin,
         morph?: VertexMorph,
+        vat?: VertexVAT
     ): VertexPhase2Output {
         const position = inputValues.get("position")?.access;
         const normal = inputValues.get("normal")?.access;
         const vertexIndex = builtinValues.get("vertex_index")?.access;
-        const viewProjection = `${bindingValues.get("projection")?.access} * ${bindingValues.get("view")?.access}`;
+        const camera = bindingValues.get("camera")?.access;
 
-        // Morph targets come first: they move the vertex in model space, on the rest pose. Skinning then deforms the
-        // morphed vertex, which is the order glTF defines.
+        const viewProjection = `${camera}.projection * ${camera}.view`;
+
         const morphedPosition = morph && position && vertexIndex ? morph.position(position, vertexIndex) : position;
         const morphedNormal = morph?.normal && normal && vertexIndex ? morph.normal(normal, vertexIndex) : normal;
 
-        // A skinned vertex comes out of the Skinning method already in world space: no world matrix on top of it.
-        const place = skin
+        const vatPosition = vat && vat.position && position && vertexIndex ? vat.position(vertexIndex) : position;
+
+
+        const place = vatPosition ? `let pos=${vatPosition};` : skin
             ? `let skinned = ${skin.call(morphedPosition ?? "vec3f(0.)", morphedNormal ?? "vec3f(0., 1., 0.)")};
             let pos = ${viewProjection} * vec4f(skinned.position, 1.);`
             : `let pos = ${viewProjection} * ${bindingValues.get("worldMatrix")?.access} * vec4f(${morphedPosition}, 1.);`;
@@ -54,7 +58,7 @@ export class BasicVertexAssembler extends VertexAssemblerBase {
 }
 
 export class BasicFragmentAssembler extends FragmentAssemblerBase {
-    protected fragmentPhase2(
+    fragmentPhase2(
         _bindingValues: ValueMap,
         componentsMap: ComponentsMap,
         _builtinValues: ValueMap): FragmentPhase2Output {

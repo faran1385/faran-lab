@@ -8,6 +8,8 @@ import {
 import type {MaterialComponentWrapper} from "../wrappers/MaterialComponentWrapper.ts";
 import type {GeometryWrapper} from "../wrappers/GeometryWrapper.ts";
 import type {MaterialWrapper} from "../wrappers/MaterialWrapper.ts";
+import type {MorphTargetWrapper} from "../wrappers/MorphTargetWrapper.ts";
+import type {VATTextureWrapper} from "../wrappers/VATTextureWrapper.ts";
 
 export type WGSLType =
     | 'f32'
@@ -216,10 +218,76 @@ export function planGeometryAttributes(geometry: GeometryWrapper): GeometryAttri
  * Allocates geometry-owned optional resources in a stable order. Keep feature-specific WGSL declarations
  * and adaptor bindings driven by this result rather than duplicating binding numbers.
  */
-export function planGeometryBindings(hasMorphTargets: boolean): GeometryBindingPlan {
-    let next = 0;
-    const morph = hasMorphTargets ? {deltas: next++, header: next++} : undefined;
-    return {morph, signature: morph ? `morph:${morph.deltas},${morph.header}` : "geometry:none"};
+export function planGeometryBindings(morphTarget: MorphTargetWrapper | undefined, vats: [string, VATTextureWrapper][]): GeometryBindingPlan {
+    let binding = 0;
+
+    const plan: GeometryBindingPlan = {
+        signature: "",
+        byComponent: new Map(),
+        vatKeys: new Map()
+    }
+
+    const deduplicatedVatMap = new Map<VATTextureWrapper, string[]>();
+
+    for (const [name, vat] of vats) {
+        if (deduplicatedVatMap.has(vat)) {
+            deduplicatedVatMap.get(vat)!.push(name)
+        } else {
+            deduplicatedVatMap.set(vat, [name])
+        }
+    }
+
+    for (const [vat, name] of deduplicatedVatMap) {
+        const nameString = name.map(i => i).join('-');
+        name.forEach((name) => plan.vatKeys.set(name as any, nameString))
+        plan.byComponent.set(`vat-header-${nameString}`, {
+            binding,
+            resource: {
+                type: "uniform-buffer",
+                value: vat.headerBuffer,
+                visibility: GPUShaderStage.VERTEX
+            }
+        })
+        binding++;
+
+        plan.byComponent.set(`vat-texture-${nameString}`, {
+            binding,
+            resource: {
+                type: "texture-binding",
+                value: vat.texture,
+                visibility: GPUShaderStage.VERTEX
+            }
+        })
+        binding++;
+
+        plan.signature += `vat-${nameString}`;
+    }
+
+    if (morphTarget) {
+        plan.byComponent.set(`morph-delta`, {
+            resource: {
+                type: "storage-buffer",
+                value: morphTarget.adaptor.internal.deltas,
+                visibility: GPUShaderStage.VERTEX
+            },
+            binding: binding
+        })
+        binding++;
+
+        plan.byComponent.set(`morph-header`, {
+            resource: {
+                value: morphTarget.adaptor.internal.header,
+                type: "uniform-buffer",
+                visibility: GPUShaderStage.VERTEX
+            },
+            binding: binding
+        })
+        binding++;
+
+        plan.signature += `morph`
+    }
+
+    return plan;
 }
 
 export function planMaterialBindings(sorted: MaterialComponentWrapper[]): MaterialBindingPlan {
@@ -244,21 +312,21 @@ export function planMaterialBindings(sorted: MaterialComponentWrapper[]): Materi
         if (t === undefined) {
             t = next++;
             imageBinding.set(image.uuid, t);
-            slots.push({ binding: t, kind: "texture" });
+            slots.push({binding: t, kind: "texture"});
         }
 
         let s = samplerBinding.get(sampler.uuid);
         if (s === undefined) {
             s = next++;
             samplerBinding.set(sampler.uuid, s);
-            slots.push({ binding: s, kind: "sampler" });
+            slots.push({binding: s, kind: "sampler"});
         }
 
-        byComponent.set(c.name, { texture: t, sampler: s, texCoord: slot.texCoord });
+        byComponent.set(c.name, {texture: t, sampler: s, texCoord: slot.texCoord});
         parts.push(`${c.name}:${t},${s},${slot.texCoord}`);
     }
 
-    return { slots, byComponent, signature: parts.join("|") };
+    return {slots, byComponent, signature: parts.join("|")};
 }
 
 type FactorsPlanEntry = {

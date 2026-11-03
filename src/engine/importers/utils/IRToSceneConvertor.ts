@@ -104,7 +104,7 @@ export class IRToSceneConvertor {
                 // Per IR mesh: the morph targets of its first morphed primitive, or undefined when it has none.
                 meshTargets: ir.meshes.map((mesh) => {
                     for (const primitiveIndex of mesh.primitives) {
-                        const targets = geometries[ir.primitives[primitiveIndex].geometry].getMorphTargets();
+                        const targets = geometries[ir.primitives[primitiveIndex].geometry].getMorphTarget();
                         if (targets) return targets;
                     }
                     return undefined;
@@ -144,7 +144,7 @@ export class IRToSceneConvertor {
         }
 
         if (geometry.morphTargets && geometry.morphTargets.length > 0) {
-            wrapper.setMorphTargets(
+            wrapper.setMorphTarget(
                 this.createMorphTargetWrapper(geometry.morphTargets, geometry.attributes.position, attributePool),
             );
         }

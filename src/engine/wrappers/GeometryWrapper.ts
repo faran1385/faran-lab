@@ -3,6 +3,7 @@ import type {AttributeWrapper} from "./AttributeWrapper.ts";
 import type {IndexAttributeWrapper} from "./IndexWrapper.ts";
 import type {MorphTargetWrapper} from "./MorphTargetWrapper.ts";
 import {GeometryAdaptor} from "../Adaptors/GeometryAdaptor.ts";
+import {VATTextureWrapper} from "./VATTextureWrapper.ts";
 
 export class GeometryWrapper {
     readonly uuid: string;
@@ -10,12 +11,44 @@ export class GeometryWrapper {
 
     private attributes: Map<string, AttributeWrapper> = new Map();
     private indices?: IndexAttributeWrapper;
-    private morphTargets?: MorphTargetWrapper;
-
+    private morphTarget?: MorphTargetWrapper;
+    private VATTextures = new Map<string, VATTextureWrapper>();
 
     constructor() {
         this.uuid = uuidv4();
+
     }
+
+    private setVATTexture(name: string, vatWrapper: VATTextureWrapper) {
+        this.VATTextures.set(name, vatWrapper);
+        this.adaptor.invalidateVATs();
+    }
+
+    private removeVATTexture(name: string) {
+        this.VATTextures.delete(name);
+        this.adaptor.invalidateVATs();
+    }
+
+    getVATs(): ReadonlyMap<string, VATTextureWrapper> {
+        return this.VATTextures;
+    }
+
+    setPositionVAT(vat: VATTextureWrapper) {
+        this.setVATTexture("position", vat);
+    }
+
+    setNormalVAT(vat: VATTextureWrapper) {
+        this.setVATTexture("normal", vat);
+    }
+
+    removePositionVAT() {
+        this.removeVATTexture("position")
+    }
+
+    removeNormalVAT() {
+        this.removeVATTexture("normal")
+    }
+
 
     setAttribute(attribute: AttributeWrapper) {
         const current = this.attributes.get(attribute.name);
@@ -57,15 +90,15 @@ export class GeometryWrapper {
      * position/normal/tangent attributes, so the vertex count must match the position attribute. The targets are shared
      * data (one GPU buffer for every node drawing this geometry); per-node weights live in a MorphStateWrapper on the node.
      */
-    setMorphTargets(targets: MorphTargetWrapper | null) {
-        const next = targets ?? undefined;
-        if (this.morphTargets === next) return;
-        this.morphTargets = next;
+    setMorphTarget(target: MorphTargetWrapper | null) {
+        const next = target ?? undefined;
+        if (this.morphTarget === next) return;
+        this.morphTarget = next;
         this.adaptor.invalidateMorphTargets();
     }
 
-    getMorphTargets() {
-        return this.morphTargets;
+    getMorphTarget() {
+        return this.morphTarget;
     }
 
     getAttributes() {

@@ -5,10 +5,11 @@ import type {
 import {buildBindingDecls} from "./utils.ts";
 import {buildMorphCode, type VertexMorph} from "./MorphCode.ts";
 import type {WGSLType} from "../producers/utils.ts";
+import {buildVATCode, type VertexVAT} from "./VATCode.ts";
 
 export type {VertexMorph} from "./MorphCode.ts";
 
-type AccessibleValue = { type: WGSLType; access: string };
+type AccessibleValue = { access: string };
 export type ValueMap = Map<string, AccessibleValue>;
 
 type ComponentAccess = {
@@ -52,8 +53,9 @@ function buildComponentsMap(
         const entry: ComponentAccess = {};
 
         if (data.hasFactor) {
-            const value = bindingValues.get(componentName);
-            if (value) entry.factor = value;
+            entry.factor = {
+                access: `material.${componentName}`
+            };
         }
         if (data.textureBindingName) {
             const value = bindingValues.get(data.textureBindingName);
@@ -98,12 +100,12 @@ export type VertexPhase2Output = { body: string; usedBuiltins: UsedBuiltin[]; ou
 
 export abstract class VertexAssemblerBase {
     assemble(d: VertexShaderDescriptor, entryPoint: string): string {
-        const {preamble, inputValues, bindingValues, dataMap, builtinValues, skin, morph} = this.vertexPhase1(d);
+        const {preamble, inputValues, bindingValues, vat, dataMap, builtinValues, skin, morph} = this.vertexPhase1(d);
         const {
             body,
             usedBuiltins,
             outputs,
-        } = this.vertexPhase2(inputValues, bindingValues, dataMap, builtinValues, skin, morph);
+        } = this.vertexPhase2(inputValues, bindingValues, dataMap, builtinValues, skin, morph, vat);
         return this.vertexPhase3(preamble, body, usedBuiltins, outputs, entryPoint);
     }
 
@@ -115,13 +117,14 @@ export abstract class VertexAssemblerBase {
 
 
         const inputLines = d.inputs.map((f) => {
-            inputValues.set(f.name, {type: f.type, access: `input.${f.id}`});
+            inputValues.set(f.name, {access: `input.${f.id}`});
             return `  @location(${f.location}) ${f.id}: ${f.type},`;
         });
         parts.push(`struct VertexInput {\n${inputLines.join("\n")}\n};`);
 
-        const {bindingCode, values} = buildBindingDecls(d.bindings);
+        const {bindingCode, structCode, values} = buildBindingDecls(d.bindings, d.structs);
         const bindingValues = toValueMap(values);
+        parts.push(structCode);
         parts.push(bindingCode);
 
 
@@ -136,9 +139,7 @@ export abstract class VertexAssemblerBase {
             if (!joints || !weights) {
                 throw new Error("VertexAssemblerBase: a skinned vertex shader needs the joints0 and weights0 attributes");
             }
-            if (joints.type !== "vec4u" || weights.type !== "vec4f") {
-                throw new Error(`VertexAssemblerBase: skinning expects joints0: vec4u and weights0: vec4f, got ${joints.type} and ${weights.type}`);
-            }
+
             parts.push(SKINNED_VERTEX_STRUCT, d.skin.code);
             skin = {call: (position, normal) => `skin(${position}, ${normal}, ${joints.access}, ${weights.access})`};
         }
@@ -151,6 +152,15 @@ export abstract class VertexAssemblerBase {
             morph = built.access;
         }
 
+        let vat: VertexVAT | undefined;
+        if (d.vat) {
+            console.log(d.vat)
+            const built = buildVATCode(d.vat);
+            parts.push(built.code);
+            vat = built.access;
+        }
+
+
         d.componentDataMap.forEach((component, i) => {
             const value: ComponentData = {}
 
@@ -160,21 +170,27 @@ export abstract class VertexAssemblerBase {
 
             dataMap.set(i, value)
         })
-
-        return {preamble: parts.join("\n\n"), dataMap, inputValues, bindingValues, builtinValues, skin, morph};
+        return {preamble: parts.join("\n\n"), vat, dataMap, inputValues, bindingValues, builtinValues, skin, morph};
     }
 
     /**
+     * @param inputValues
+     * @param bindingValues
+     * @param dataMap
+     * @param builtinValues
+     * @param skin
      * @param morph set when the geometry has morph targets. An assembler that ignores it simply draws the rest pose;
      * one that uses it must also list `vertex_index` in `usedBuiltins`, because the morph functions take it.
+     * @param vat
      */
-    protected abstract vertexPhase2(
+    abstract vertexPhase2(
         inputValues: ValueMap,
         bindingValues: ValueMap,
         dataMap: Map<string, ComponentData>,
         builtinValues: ValueMap,
         skin?: VertexSkin,
         morph?: VertexMorph,
+        vat?: VertexVAT,
     ): VertexPhase2Output;
 
     protected vertexPhase3(preamble: string, body: string, usedBuiltins: UsedBuiltin[], outputs: OutputFieldDecl[], entryPoint: string): string {
@@ -215,8 +231,9 @@ export abstract class FragmentAssemblerBase {
     protected fragmentPhase1(d: FragmentShaderDescriptor) {
         const parts: string[] = [];
 
-        const {bindingCode, values} = buildBindingDecls(d.bindings);
+        const {bindingCode, structCode, values} = buildBindingDecls(d.bindings, d.structs);
         const bindingValues = toValueMap(values);
+        parts.push(structCode);
         parts.push(bindingCode);
 
         const componentsMap = buildComponentsMap(d.componentDataMap, bindingValues);
@@ -228,7 +245,7 @@ export abstract class FragmentAssemblerBase {
         return {preamble: parts.join("\n\n"), bindingValues, componentsMap, builtinValues};
     }
 
-    protected abstract fragmentPhase2(
+    abstract fragmentPhase2(
         bindingValues: ValueMap,
         componentsMap: ComponentsMap,
         builtinValues: ValueMap,

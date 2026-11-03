@@ -1,14 +1,20 @@
 // --- shader-binding-codegen.ts (shared, not owned by either base) ---------
 
 import type {WGSLType} from "../producers/utils.ts";
-import type {BindGroupEntry} from "../producers/AssemblerProducers.ts";
+import type {BindGroupEntry, Struct} from "../producers/AssemblerProducers.ts";
 
 export interface AccessibleValue {
     type: WGSLType;
     access: string;
 }
 
-export function buildBindingDecls(entries: BindGroupEntry[]): {
+export function buildStruct(struct: Struct) {
+    const fieldLines = struct.fields.map((f) => `  ${f.name}: ${f.type},`);
+    return `struct ${struct.structName} {\n${fieldLines.join("\n")}\n};`;
+}
+
+export function buildBindingDecls(entries: BindGroupEntry[], structs: Struct[]): {
+    structCode: string;
     bindingCode: string;
     values: Record<string, AccessibleValue>
 } {
@@ -16,34 +22,31 @@ export function buildBindingDecls(entries: BindGroupEntry[]): {
     const varDecls: string[] = [];
     const values: Record<string, AccessibleValue> = {};
 
+    let structCode = ``
+
+
     const setValue = (key: string, v: AccessibleValue) => {
         if (key in values) throw new Error(`buildBindingDecls: duplicate value name "${key}"`);
         values[key] = v;
     };
 
+    structs.forEach(struct => {
+        structCode += buildStruct(struct) + '\n'
+    })
+
     for (const entry of entries) {
         switch (entry.kind) {
             case "uniform": {
-                const fieldLines = entry.fields.map((f) => `  ${f.name}: ${f.type},`);
-                structDefs.push(`struct ${entry.structName} {\n${fieldLines.join("\n")}\n};`);
-                varDecls.push(`@group(${entry.group}) @binding(${entry.binding}) var<uniform> ${entry.name}: ${entry.structName};`);
-                for (const f of entry.fields) {
 
-                    setValue(f.name, {type: f.type, access: `${entry.name}.${f.name}`})
-                }
+                varDecls.push(`@group(${entry.group}) @binding(${entry.binding}) var<uniform> ${entry.name}: ${entry.uniformType};`);
+                setValue(entry.name, {type: `${entry.uniformType}` as WGSLType, access: entry.name})
+
                 break;
             }
             case "storage": {
-                const fieldLines = entry.elementFields.map((f) => `  ${f.name}: ${f.type},`);
-                structDefs.push(`struct ${entry.elementStructName} {\n${fieldLines.join("\n")}\n};`);
-                varDecls.push(`@group(${entry.group}) @binding(${entry.binding}) var<storage, ${entry.access}> ${entry.name}: array<${entry.elementStructName}>;`);
-                setValue(entry.name, {type: `array<${entry.elementStructName}>` as WGSLType, access: entry.name})
+                varDecls.push(`@group(${entry.group}) @binding(${entry.binding}) var<storage, ${entry.access}> ${entry.name}: array<${entry.storageType}>;`);
+                setValue(entry.name, {type: `${entry.storageType}` as WGSLType, access: entry.name})
 
-                break;
-            }
-            case "storageScalar": {
-                varDecls.push(`@group(${entry.group}) @binding(${entry.binding}) var<storage, ${entry.access}> ${entry.name}: array<${entry.elementType}>;`);
-                setValue(entry.name, {type: `array<${entry.elementType}>` as WGSLType, access: entry.name})
                 break;
             }
             case "texture":
@@ -58,5 +61,5 @@ export function buildBindingDecls(entries: BindGroupEntry[]): {
         }
     }
 
-    return {bindingCode: [...structDefs, ...varDecls].join("\n"), values};
+    return {bindingCode: [...structDefs, ...varDecls].join("\n"), values, structCode};
 }

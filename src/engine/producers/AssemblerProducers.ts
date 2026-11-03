@@ -6,6 +6,7 @@ import {
 } from "./utils.ts";
 import {FACTORS_BINDING, type MaterialBindingPlan, type GeometryBindingPlan} from "./BindGroupLayoutProducer.ts";
 import {morphGeometryBindings, morphNodeBindings, type MorphPlan} from "./MorphProducer.ts";
+import {getVATGeometryBindings, type VATPlan} from "./VATProducer.ts";
 
 export interface VertexInputField {
     name: string;
@@ -17,7 +18,6 @@ export interface VertexInputField {
 export type BindGroupEntry =
     | BindGroupUniformEntry
     | BindGroupStorageEntry
-    | BindGroupStorageScalarEntry
     | BindGroupTextureEntry
     | BindGroupSamplerEntry;
 
@@ -31,9 +31,8 @@ export interface BindGroupUniformEntry {
     kind: "uniform";
     group: number;
     binding: number;
-    name: string;        // WGSL variable name
-    structName: string;  // WGSL struct type name
-    fields: StructField[];
+    name: string;
+    uniformType: string,
     size: number;         // total struct byte size
 }
 
@@ -42,20 +41,10 @@ export interface BindGroupStorageEntry {
     group: number;
     binding: number;
     name: string;
-    elementStructName: string;
-    elementFields: StructField[];
+    storageType: string,
     access: "read" | "read_write";
 }
 
-/** A storage buffer that is a flat array of one scalar/vector type (`array<f32>`), with no element struct. */
-export interface BindGroupStorageScalarEntry {
-    kind: "storageScalar";
-    group: number;
-    binding: number;
-    name: string;
-    elementType: WGSLType;
-    access: "read" | "read_write";
-}
 
 export interface BindGroupTextureEntry {
     kind: "texture";
@@ -99,8 +88,7 @@ export function paletteBinding(element: Struct): BindGroupStorageEntry {
         group: 1,
         binding: PALETTE_BINDING,
         name: "palette",
-        elementStructName: element.structName,
-        elementFields: element.fields,
+        storageType: element.structName,
         access: "read",
     };
 }
@@ -108,6 +96,7 @@ export function paletteBinding(element: Struct): BindGroupStorageEntry {
 export interface VertexShaderDescriptor {
     inputs: VertexInputField[];
     bindings: BindGroupEntry[],
+    structs: Struct[]
     componentDataMap: Map<string, {
         uv?: string
     }>,
@@ -115,10 +104,7 @@ export interface VertexShaderDescriptor {
     skin?: SkinShaderInfo;
     /** Set when the geometry has morph targets: the assembler declares the morph helpers and may call them. */
     morph?: MorphPlan;
-}
-
-export interface FragmentShaderDescriptor {
-    bindings: BindGroupEntry[];
+    vat?: VATPlan
 }
 
 
@@ -127,39 +113,56 @@ function toWgslIdentifier(name: string): string {
     return /^[A-Za-z]/.test(id) ? id : `a_${id}`;
 }
 
-export function sceneBindings(): BindGroupEntry[] {
-    return [
-        {
-            kind: "uniform",
-            group: 0,
-            binding: 0,
-            name: "camera",
+export function sceneBindings(): {
+    entries: BindGroupEntry[],
+    structs: Struct[]
+} {
+    return {
+        entries: [
+            {
+                kind: "uniform",
+                group: 0,
+                binding: 0,
+                name: "camera",
+                uniformType: "CameraUniforms",
+                size: 128,
+            },
+        ],
+        structs: [{
             structName: "CameraUniforms",
             fields: [
                 {name: "view", type: "mat4x4f", offset: 0},
                 {name: "projection", type: "mat4x4f", offset: 64},
             ],
-            size: 128,
-        },
-    ];
+        }]
+    }
 }
 
 // --- Group 2 (per-primitive/node) — fixed shape for now -------------------
 
-export function nodeBindings(): BindGroupEntry[] {
-    return [
-        {
-            kind: "uniform",
-            group: 1,
-            binding: 0,
-            name: "node",
+export function nodeBindings(): {
+    entries: BindGroupEntry[],
+    structs: Struct[]
+} {
+
+    return {
+        entries: [
+            {
+                kind: "uniform",
+                group: 1,
+                binding: 0,
+                name: "node",
+                uniformType: "NodeUniforms",
+                size: 64,
+            },
+        ],
+        structs: [{
             structName: "NodeUniforms",
             fields: [
                 {name: "worldMatrix", type: "mat4x4f", offset: 0},
             ],
-            size: 64,
-        },
-    ];
+        }]
+    }
 }
 
 export class VertexShaderProducer {
@@ -173,6 +176,13 @@ export class VertexShaderProducer {
         const plan = getAttributePlan();
         const matPlan = getMaterialPlan();
         const morph = getMorphPlan?.() ?? undefined;
+        const geoPlan = getGeometryBindingPlan?.() ?? undefined;
+        const scene = sceneBindings();
+        const node = nodeBindings();
+
+        const bindings = [...scene.entries, ...node.entries];
+        const structs: Struct[] = [...scene.structs, ...node.structs];
+
         const componentDataMap: VertexShaderDescriptor["componentDataMap"] = new Map()
         matPlan.byComponent.forEach((i, name) => {
             if (i.texture) {
@@ -190,26 +200,56 @@ export class VertexShaderProducer {
         }));
 
 
-        const bindings = [...sceneBindings(), ...nodeBindings()];
-        if (skin) bindings.push(paletteBinding(skin.paletteElement));
-        if (morph) bindings.push(...morphNodeBindings(), ...morphGeometryBindings(getGeometryBindingPlan?.() ?? {signature: "geometry:none"}));
+        if (skin) {
+            structs.push(skin.paletteElement)
+            bindings.push(paletteBinding(skin.paletteElement));
+        }
 
-        return {inputs, componentDataMap, bindings, skin, morph};
+        if (morph && geoPlan) {
+            const morphDelta = geoPlan.byComponent.get("morph-delta");
+            const morphHeader = geoPlan.byComponent.get("morph-header");
+            if (morphDelta && morphHeader) {
+                const nodeBindings = morphNodeBindings();
+                const geometryBindings = morphGeometryBindings(geoPlan);
+
+                structs.push(...nodeBindings.structs, ...geometryBindings.structs)
+                bindings.push(...nodeBindings.entries, ...geometryBindings.entries);
+            }
+        }
+        let vatPlan: undefined | VATPlan;
+        if (geoPlan) {
+            const vatBindings = getVATGeometryBindings(geoPlan)
+
+            if(vatBindings){
+                vatPlan = vatBindings.plan;
+                structs.push(...vatBindings.structs);
+                bindings.push(...vatBindings.entries);
+            }
+        }
+
+        return {inputs, componentDataMap, structs, bindings, skin, morph, vat: vatPlan};
     }
 }
 
-function materialBindings(bindingPlan: MaterialBindingPlan, factorPlan: MaterialFactorsPlan): BindGroupEntry[] {
+function materialBindings(bindingPlan: MaterialBindingPlan, factorPlan: MaterialFactorsPlan) {
     const FactorFields: StructField[] = [];
     let FactorSize = 0;
+    const structs: Struct[] = []
+
     factorPlan.forEach((item, name) => {
         FactorFields.push({offset: item.offset, type: item.wgslType, name});
         FactorSize += typeof item.factor === "number" ? 1 : item.factor.length;
     });
 
+    structs.push({
+        structName: 'MaterialUniforms',
+        fields: FactorFields
+    })
+
     const entries: BindGroupEntry[] = [{
         kind: "uniform", group: 2, binding: FACTORS_BINDING,
-        name: "material", structName: "MaterialUniforms",
-        fields: FactorFields, size: FactorSize,
+        name: "material", uniformType: "MaterialUniforms",
+        size: FactorSize,
     }];
 
     const owner = new Map<number, { componentName: string; texCoord: string }>();
@@ -237,7 +277,10 @@ function materialBindings(bindingPlan: MaterialBindingPlan, factorPlan: Material
                 }
         );
     }
-    return entries;
+    return {
+        entries,
+        structs
+    };
 }
 
 export interface FragmentComponentData {
@@ -249,7 +292,8 @@ export interface FragmentComponentData {
 
 export interface FragmentShaderDescriptor {
     bindings: BindGroupEntry[];
-    componentDataMap: Map<string, FragmentComponentData>;
+    componentDataMap: Map<string, FragmentComponentData>,
+    structs: Struct[],
 }
 
 function fragmentComponentDataMap(
@@ -259,7 +303,7 @@ function fragmentComponentDataMap(
     const map = new Map<string, FragmentComponentData>();
     const touch = (name: string) => {
         let entry = map.get(name);
-        if (!entry) map.set(name, (entry = { hasFactor: false }));
+        if (!entry) map.set(name, (entry = {hasFactor: false}));
         return entry;
     };
 
@@ -267,7 +311,7 @@ function fragmentComponentDataMap(
         touch(name).hasFactor = true;
     }
 
-    for (const [name, { texture, sampler, texCoord }] of bindingPlan.byComponent) {
+    for (const [name, {texture, sampler, texCoord}] of bindingPlan.byComponent) {
         const entry = touch(name);
         entry.textureBindingName = `texture${texture}`;
         entry.samplerBindingName = `sampler${sampler}`;
@@ -284,8 +328,13 @@ export class FragmentShaderProducer {
     ): FragmentShaderDescriptor {
         const bindingPlan = getBindingPlan();
         const factorPlan = getFactorsPlan();
+
+        const scene = sceneBindings();
+        const material = materialBindings(bindingPlan, factorPlan);
+
         return {
-            bindings: [...sceneBindings(), ...materialBindings(bindingPlan, factorPlan)],
+            structs: [...scene.structs, ...material.structs],
+            bindings: [...scene.entries, ...material.entries],
             componentDataMap: fragmentComponentDataMap(bindingPlan, factorPlan),
         };
     }

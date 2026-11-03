@@ -1,4 +1,4 @@
-import type {BindGroupEntry} from "./AssemblerProducers.ts";
+import type {BindGroupEntry, Struct} from "./AssemblerProducers.ts";
 import type {GeometryBindingPlan} from "./BindGroupLayoutProducer.ts";
 
 /**
@@ -40,22 +40,16 @@ export function morphPlanKey(plan: MorphPlan | null): string {
 }
 
 /** Group 3: the packed deltas and the header that tells the shader how they are laid out. */
-export function morphGeometryBindings(plan: GeometryBindingPlan): BindGroupEntry[] {
-    if (!plan.morph) return [];
-    return [
-        {
-            kind: "storageScalar",
-            group: MORPH_GEOMETRY_GROUP,
-            binding: plan.morph.deltas,
-            name: MORPH_DELTAS_VAR,
-            elementType: "f32",
-            access: "read",
-        },
-        {
-            kind: "uniform",
-            group: MORPH_GEOMETRY_GROUP,
-            binding: plan.morph.header,
-            name: MORPH_HEADER_VAR,
+export function morphGeometryBindings(plan: GeometryBindingPlan): {
+    entries: BindGroupEntry[],
+    structs: Struct[]
+} {
+    const morphDelta = plan.byComponent.get("morph-delta")!;
+    const morphHeader = plan.byComponent.get("morph-header")!;
+
+
+    return {
+        structs: [{
             structName: "MorphHeaderUniforms",
             fields: [
                 {name: "morphVertexCount", type: "u32", offset: 0},
@@ -64,25 +58,46 @@ export function morphGeometryBindings(plan: GeometryBindingPlan): BindGroupEntry
                 {name: "morphNormalOffset", type: "u32", offset: 12},
                 {name: "morphTangentOffset", type: "u32", offset: 16},
             ],
+        }],
+        entries: [{
+            kind: "storage",
+            group: MORPH_GEOMETRY_GROUP,
+            binding: morphDelta.binding,
+            name: MORPH_DELTAS_VAR,
+            storageType: "array<f32>",
+            access: "read",
+        }, {
+            kind: "uniform",
+            group: MORPH_GEOMETRY_GROUP,
+            binding: morphHeader.binding,
+            name: MORPH_HEADER_VAR,
+            uniformType: "MorphHeaderUniforms",
             size: 20,
-        },
-    ];
+        }]
+    }
 }
 
 /** Group 1, binding 2: this node's active targets. Entries after the last active one have weight 0. */
-export function morphNodeBindings(): BindGroupEntry[] {
-    return [
-        {
+export function morphNodeBindings(): {
+    entries: BindGroupEntry[],
+    structs: Struct[]
+} {
+
+    return {
+        structs: [{
+            structName: "MorphActiveEntry",
+            fields: [
+                {name: "index", type: "u32", offset: 0},
+                {name: "weight", type: "f32", offset: 4},
+            ],
+        }],
+        entries: [{
             kind: "storage",
             group: MORPH_NODE_GROUP,
             binding: MORPH_ACTIVE_BINDING,
             name: MORPH_ACTIVE_VAR,
-            elementStructName: "MorphActiveEntry",
-            elementFields: [
-                {name: "index", type: "u32", offset: 0},
-                {name: "weight", type: "f32", offset: 4},
-            ],
+            storageType: "array<MorphActiveEntry>",
             access: "read",
-        },
-    ];
+        },]
+    }
 }
