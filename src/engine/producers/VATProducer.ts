@@ -39,15 +39,15 @@ export function getVATGeometryBindings(plan: GeometryBindingPlan) {
     const vatPlan = {
         position: positionVATKey ? {
             header: `VATHeader${plan.byComponent.get(`vat-header-${positionVATKey}`)!.binding}`,
-            texture: `VATTexture${plan.byComponent.get(`vat-header-${positionVATKey}`)!.binding}`,
+            texture: `VATTexture${plan.byComponent.get(`vat-texture-${positionVATKey}`)!.binding}`,
         } : undefined,
         normal: normalVATKey ? {
             header: `VATHeader${plan.byComponent.get(`vat-header-${normalVATKey}`)!.binding}`,
-            texture: `VATTexture${plan.byComponent.get(`vat-header-${normalVATKey}`)!.binding}`,
+            texture: `VATTexture${plan.byComponent.get(`vat-texture-${normalVATKey}`)!.binding}`,
         } : undefined,
         tangent: tangentVATKey ? {
             header: `VATHeader${plan.byComponent.get(`vat-header-${tangentVATKey}`)!.binding}`,
-            texture: `VATTexture${plan.byComponent.get(`vat-header-${tangentVATKey}`)!.binding}`,
+            texture: `VATTexture${plan.byComponent.get(`vat-texture-${tangentVATKey}`)!.binding}`,
         } : undefined,
     }
 

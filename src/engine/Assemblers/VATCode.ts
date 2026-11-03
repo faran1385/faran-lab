@@ -11,7 +11,7 @@ export type VertexVAT = {
 export function buildVATCode(plan: VATPlan): { code: string; access: VertexVAT } {
     const parts: string[] = [];
 
-    parts.push(`fn getVATData(vatTexture:texture_2d<f32>,vatHeaders:VATHeaderUniforms,vertexIndex:u32,vatHeader:VATHeaderUniforms) -> vec4f {
+    parts.push(`fn getVATData(vatTexture:texture_2d<f32>,vatHeaders:VATHeaderUniforms,vertexIndex:u32) -> vec4f {
         let u=vertexIndex;
         let v=vatHeaders.frame;
         let uv=vec2u(u,v);

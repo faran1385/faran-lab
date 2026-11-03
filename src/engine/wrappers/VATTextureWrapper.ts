@@ -9,6 +9,14 @@ export class VATTextureWrapper {
 
     constructor(data: ArrayBuffer, width: number, height: number, format?: GPUTextureFormat) {
         this.texture = new ImageWrapper(data, width, height, format);
-        this.headerBuffer = new BufferInternal(new Float32Array([0, width, height, 0]).buffer, GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM);
+
+        this.headerBuffer = new BufferInternal(new Uint32Array([0, width, height, 0]).buffer, GPUBufferUsage.COPY_DST | GPUBufferUsage.UNIFORM);
+    }
+
+    setFrame(frame: number): void {
+        const dimensions = this.texture.getDimensions();
+        this.headerBuffer.setData(
+            new Uint32Array([frame, dimensions.width, dimensions.height, 0]).buffer
+        );
     }
 }

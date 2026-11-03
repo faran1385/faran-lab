@@ -30,7 +30,13 @@ export class BasicVertexAssembler extends VertexAssemblerBase {
         const vatPosition = vat && vat.position && position && vertexIndex ? vat.position(vertexIndex) : position;
 
 
-        const place = vatPosition ? `let pos=${vatPosition};` : skin
+        const place = vatPosition ? `
+        let localPosition = ${vat?.position?.(vertexIndex ?? "")}.xyz;
+        
+        let pos = ${viewProjection}
+            * node.worldMatrix
+            * vec4f(localPosition, 1.0);
+        ` : skin
             ? `let skinned = ${skin.call(morphedPosition ?? "vec3f(0.)", morphedNormal ?? "vec3f(0., 1., 0.)")};
             let pos = ${viewProjection} * vec4f(skinned.position, 1.);`
             : `let pos = ${viewProjection} * ${bindingValues.get("worldMatrix")?.access} * vec4f(${morphedPosition}, 1.);`;
@@ -43,7 +49,7 @@ export class BasicVertexAssembler extends VertexAssemblerBase {
 
         return {
             body: codeBody,
-            usedBuiltins: morph ? [{name: "vertex_index", type: "u32"}] : [],
+            usedBuiltins: morph || vat ? [{name: "vertex_index", type: "u32"}] : [],
             outputs: [{
                 type: "vec4f",
                 name: "position",

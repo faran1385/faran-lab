@@ -122,8 +122,14 @@ export class GeometryAdaptor {
     }
 
     ensure(): void {
-        if (!this.attributePlanDirty && !this.attributeBindingsDirty && !this.drawInfoDirty
-            && !this.morphTargetDirty && !this.morphCompatibilityDirty) return;
+        if (
+            !this.attributePlanDirty &&
+            !this.attributeBindingsDirty &&
+            !this.drawInfoDirty &&
+            !this.morphTargetDirty &&
+            !this.morphCompatibilityDirty &&
+            !this.vatDirty
+        ) return;
 
         const rebuildPlan = this.attributePlanDirty;
         const syncAttributes = this.attributeBindingsDirty;
@@ -220,6 +226,8 @@ export class GeometryAdaptor {
         for (const binding of this.boundBindings) {
             if (!wanted.has(binding)) bindgroup.removeBinding(binding);
         }
+
+        this.boundBindings = wanted;
     }
 
     /**
