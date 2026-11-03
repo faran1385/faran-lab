@@ -11,6 +11,7 @@ import {stableKey} from "../hashing/utils/stableKey.ts";
 import {schedulePreFrame} from "./PreFrameQueue.ts";
 import {Source} from "./Source.ts";
 import type {GeometryWrapper} from "../wrappers/GeometryWrapper.ts";
+import type {MorphTargetWrapper} from "../wrappers/MorphTargetWrapper.ts";
 
 /**
  * Translates a GeometryWrapper (attributes keyed by name) into a GeometryInternal (vertex buffers keyed by slot, plus
@@ -23,11 +24,16 @@ export class GeometryAdaptor {
 
     private readonly owner: GeometryWrapper;
     private readonly task = () => this.ensure();
-    private attributesDirty = true;
+
+    private attributePlanDirty = true;
+    private attributeBindingsDirty = true;
+    private drawInfoDirty = true;
+    private morphTargetDirty = true;
+    private morphCompatibilityDirty = true;
 
     private attributePlan: GeometryAttributePlan = {slots: [], byName: new Map()};
     private morphPlan: MorphPlan | null = null;
-    private morphBound = false;
+    private boundMorphTargets?: MorphTargetWrapper;
     private layoutKey = "";
     private layoutVersion = 0;
     private drawKey = "";
@@ -39,13 +45,40 @@ export class GeometryAdaptor {
         schedulePreFrame(this.task);
     }
 
-    /** Called by the wrapper when attributes or indices were added, removed or replaced. */
-    invalidate() {
-        if (!this.attributesDirty) {
-            this.attributesDirty = true;
-            this.changed.notify();
+    /**
+     * Attribute structure changed. Rebuild the plan and vertex bindings; only a position change can invalidate
+     * morph compatibility, but every attribute change can affect vertex counts used by draw info.
+     */
+    invalidateAttributes(name?: string): void {
+        this.markDirty();
+        this.attributePlanDirty = true;
+        this.attributeBindingsDirty = true;
+        this.drawInfoDirty = true;
+        if (name === "position" || name === undefined) {
+            this.morphCompatibilityDirty = true;
         }
         schedulePreFrame(this.task);
+    }
+
+    /** Index-buffer changes affect the draw command, not the vertex attribute plan. */
+    invalidateIndices(): void {
+        this.markDirty();
+        this.drawInfoDirty = true;
+        schedulePreFrame(this.task);
+    }
+
+    /** A different morph target wrapper changes morph bindings, compatibility and shader shape. */
+    invalidateMorphTargets(): void {
+        this.markDirty();
+        this.morphTargetDirty = true;
+        this.morphCompatibilityDirty = true;
+        schedulePreFrame(this.task);
+    }
+
+    private markDirty(): void {
+        const wasClean = !this.attributePlanDirty && !this.attributeBindingsDirty && !this.drawInfoDirty
+            && !this.morphTargetDirty && !this.morphCompatibilityDirty;
+        if (wasClean) this.changed.notify();
     }
 
     getAttributePlan(): GeometryAttributePlan {
@@ -66,21 +99,48 @@ export class GeometryAdaptor {
     }
 
     ensure(): void {
-        if (!this.attributesDirty) return;
-        this.attributesDirty = false;
+        if (!this.attributePlanDirty && !this.attributeBindingsDirty && !this.drawInfoDirty
+            && !this.morphTargetDirty && !this.morphCompatibilityDirty) return;
 
-        const plan = planGeometryAttributes(this.owner);
-        this.attributePlan = plan;
-        this.syncMorph(plan);
+        const rebuildPlan = this.attributePlanDirty;
+        const syncAttributes = this.attributeBindingsDirty;
+        const syncDrawInfo = this.drawInfoDirty;
+        const syncMorphTarget = this.morphTargetDirty;
+        const validateMorph = this.morphCompatibilityDirty;
 
-        const layoutKey = plan.slots.map((s) => `${s.name}:${s.slot}:${s.format}:${s.arrayStride}`).join("|")
-            + `#${morphPlanKey(this.morphPlan)}`;
-        if (layoutKey !== this.layoutKey) {
-            this.layoutKey = layoutKey;
-            this.layoutVersion++;
+        this.attributePlanDirty = false;
+        this.attributeBindingsDirty = false;
+        this.drawInfoDirty = false;
+        this.morphTargetDirty = false;
+        this.morphCompatibilityDirty = false;
+
+        if (rebuildPlan) {
+            this.attributePlan = planGeometryAttributes(this.owner);
         }
 
+        if (syncAttributes) {
+            this.syncAttributeBindings();
+        }
+
+        if (syncDrawInfo) {
+            this.syncDrawInfo();
+        }
+
+        if (syncMorphTarget) {
+            this.syncMorphTarget();
+        } else if (validateMorph) {
+            this.validateMorphCompatibility();
+        }
+
+        if (rebuildPlan || syncMorphTarget) {
+            this.updateLayoutVersion();
+        }
+    }
+
+    private syncAttributeBindings(): void {
+        const plan = this.attributePlan;
         const live = new Set<string>();
+
         for (const slot of plan.slots) {
             live.add(slot.name);
             const source = this.owner.getAttribute(slot.name)!;
@@ -109,30 +169,39 @@ export class GeometryAdaptor {
         for (const slot of Array.from(this.internal.getVertexAttributes().keys())) {
             if (slot >= plan.slots.length) this.internal.removeVertexAttribute(slot);
         }
-
-        this.syncDrawInfo();
     }
 
     /**
-     * Keeps the geometry's bind group (group 3) in step with its morph targets: the packed deltas and their header are
-     * bound for the vertex stage. The buffers are the targets' own and never replaced by this adapter, so swapping in
-     * another MorphTargetWrapper is the only thing that changes the bindings.
+     * Synchronizes the geometry's group-3 morph bindings only when the target wrapper identity changes.
+     * The target wrapper owns these buffers; this adaptor does not replace them.
      */
-    private syncMorph(plan: GeometryAttributePlan): void {
-        const bindgroup = this.internal.bindgroupInteractor;
+    private syncMorphTarget(): void {
         const targets = this.owner.getMorphTargets();
+        const bindgroup = this.internal.bindgroupInteractor;
 
-        if (!targets) {
-            if (this.morphBound) {
-                bindgroup.removeBinding(MORPH_DELTAS_BINDING);
-                bindgroup.removeBinding(MORPH_HEADER_BINDING);
-                this.morphBound = false;
-            }
-            this.morphPlan = null;
+        if (targets) {
+            this.validateMorphCompatibility();
+            const internal = targets.adaptor.internal;
+            bindgroup.setStorage(MORPH_DELTAS_BINDING, internal.deltas, GPUShaderStage.VERTEX);
+            bindgroup.setUniform(MORPH_HEADER_BINDING, internal.header, GPUShaderStage.VERTEX);
+            this.morphPlan = {hasNormal: targets.hasNormal(), hasTangent: targets.hasTangent()};
+            this.boundMorphTargets = targets;
             return;
         }
 
-        const position = plan.byName.get("position");
+        if (this.boundMorphTargets) {
+            bindgroup.removeBinding(MORPH_DELTAS_BINDING);
+            bindgroup.removeBinding(MORPH_HEADER_BINDING);
+        }
+        this.boundMorphTargets = undefined;
+        this.morphPlan = null;
+    }
+
+    private validateMorphCompatibility(): void {
+        const targets = this.owner.getMorphTargets();
+        if (!targets) return;
+
+        const position = this.attributePlan.byName.get("position");
         if (!position || position.format !== "float32x3") {
             throw new Error("GeometryAdaptor: morph targets need a float32x3 \"position\" attribute to morph");
         }
@@ -140,12 +209,15 @@ export class GeometryAdaptor {
         if (vertexCount !== targets.getVertexCount()) {
             throw new Error(`GeometryAdaptor: the morph targets have ${targets.getVertexCount()} vertices but the position attribute has ${vertexCount}`);
         }
+    }
 
-        const internal = targets.adaptor.internal;
-        bindgroup.setStorage(MORPH_DELTAS_BINDING, internal.deltas, GPUShaderStage.VERTEX);
-        bindgroup.setUniform(MORPH_HEADER_BINDING, internal.header, GPUShaderStage.VERTEX);
-        this.morphBound = true;
-        this.morphPlan = {hasNormal: targets.hasNormal(), hasTangent: targets.hasTangent()};
+    private updateLayoutVersion(): void {
+        const layoutKey = this.attributePlan.slots.map((s) => `${s.name}:${s.slot}:${s.format}:${s.arrayStride}`).join("|")
+            + `#${morphPlanKey(this.morphPlan)}`;
+        if (layoutKey !== this.layoutKey) {
+            this.layoutKey = layoutKey;
+            this.layoutVersion++;
+        }
     }
 
     private syncDrawInfo(): void {
