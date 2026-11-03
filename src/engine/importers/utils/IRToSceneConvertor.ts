@@ -28,7 +28,7 @@ import {PrimitiveWrapper} from "../../wrappers/PrimitiveWrapper.ts";
 import {MeshWrapper} from "../../wrappers/MeshWrapper.ts";
 import {NodeWrapper} from "../../wrappers/NodeWrapper.ts";
 import {SkinWrapper} from "../../wrappers/SkinWrapper.ts";
-import {AnimationClipWrapper, type AnimationChannelWrapper} from "../../animation/AnimationClipWrapper.ts";
+import {AnimationClipWrapper, type AnimationChannelWrapper} from "../../Animation/AnimationClipWrapper.ts";
 import {MorphTargetWrapper, type MorphTargetDeltas} from "../../wrappers/MorphTargetWrapper.ts";
 import {MorphStateWrapper} from "../../wrappers/MorphStateWrapper.ts";
 import {MORPH_MAX_ACTIVE} from "../../producers/MorphProducer.ts";
@@ -36,7 +36,7 @@ import {MORPH_MAX_ACTIVE} from "../../producers/MorphProducer.ts";
 
 export type ConvertedIRResult = {
     root: NodeWrapper
-    /** One per skin in the file. Skinned nodes already hold theirs in their animation handler. */
+    /** One per skin in the file. Skinned nodes already hold theirs in their Animation handler. */
     skins: SkinWrapper[]
     /** The file's animations ("walk", "run", ...). A clip drives nodes, it is not owned by a skin. */
     clips: AnimationClipWrapper[]
@@ -347,7 +347,7 @@ export class IRToSceneConvertor {
         }
     }
 
-    // -- animation clips -------------------------------------------------
+    // -- Animation clips -------------------------------------------------
 
     private static createClipWrapper(clip: AnimationClip, context: NodeBuildContext): AnimationClipWrapper {
         const channels: AnimationChannelWrapper[] = [];

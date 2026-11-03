@@ -10,8 +10,8 @@ export class PrimitiveInternal {
     readonly uuid: string;
 
     /**
-     * Vertex stages generated for skinned nodes, keyed by the skinning method's id. The plain `vertex` stage has no
-     * skinning; which one a node draws with depends on the node's skin, not on the primitive.
+     * Vertex stages generated for skinned nodes, keyed by the Skinning method's id. The plain `vertex` stage has no
+     * Skinning; which one a node draws with depends on the node's skin, not on the primitive.
      */
     private readonly vertexVariants = new Map<string, ShaderStageRepresentation>();
     /** The geometry carries joints0 and weights0, so a skinned node can deform it. Set by the primitive adaptor. */
@@ -41,7 +41,7 @@ export class PrimitiveInternal {
 
     /**
      * The vertex stage a node draws this primitive with. Without a skin (or when the geometry can't be skinned) it is
-     * the plain stage. Under a skinning method it is that method's variant, or undefined while it was not generated yet.
+     * the plain stage. Under a Skinning method it is that method's variant, or undefined while it was not generated yet.
      */
     getVertexStage(methodId?: string): ShaderStageRepresentation | undefined {
         if (methodId === undefined || !this.skinnable) return this.vertex;

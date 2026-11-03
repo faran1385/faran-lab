@@ -119,7 +119,7 @@ export interface Mesh {
 }
 
 export interface Node {
-    /** The node's index in the source file's nodes[]. Skin joints and animation channels refer to nodes by it. */
+    /** The node's index in the source file's nodes[]. Skin joints and Animation channels refer to nodes by it. */
     index: number;
     name?: string;
     mesh?: number;

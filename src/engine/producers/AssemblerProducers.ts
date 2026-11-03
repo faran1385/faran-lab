@@ -81,7 +81,7 @@ export interface Struct {
 }
 
 /**
- * What the vertex shader needs from a node's skinning method (see SkinningMethod for the WGSL contract). `id` keys the
+ * What the vertex shader needs from a node's Skinning method (see SkinningMethod for the WGSL contract). `id` keys the
  * vertex stage variants a primitive keeps, so it must change whenever `code` or `paletteElement` does.
  */
 export interface SkinShaderInfo {

@@ -3,7 +3,7 @@ import {SkinInternal} from "../internals/SkinInternal.ts";
 import {schedulePreFrame} from "./PreFrameQueue.ts";
 import {Source} from "./Source.ts";
 import type {SkinWrapper} from "../wrappers/SkinWrapper.ts";
-import type {SkinningMethod} from "../skinning/SkinningMethod.ts";
+import type {SkinningMethod} from "../Skinning/SkinningMethod.ts";
 import type {SkinShaderInfo} from "../producers/AssemblerProducers.ts";
 
 /**

@@ -472,7 +472,7 @@ function importGeometry(
         // Skinning: JOINTS_n -> joints{n} (uint16x4), WEIGHTS_n -> weights{n}
         // (float32x4, dequantized if stored as normalized ubyte/ushort).
         // Joint indices refer to positions in the owning skin's joints[].
-        // Only influence set 0 (4 joints per vertex) is imported: the skinning methods read joints0/weights0.
+        // Only influence set 0 (4 joints per vertex) is imported: the Skinning methods read joints0/weights0.
         const jointsMatch = /^JOINTS_(\d+)$/.exec(semantic);
         if (jointsMatch) {
             if (+jointsMatch[1] > 0) {

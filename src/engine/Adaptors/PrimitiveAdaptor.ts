@@ -43,7 +43,7 @@ export class PrimitiveAdaptor {
     private seenLayoutVersion = -1;
     /** Bumped whenever the plain vertex code is regenerated: skinned variants older than it are stale. */
     private vertexCodeVersion = 0;
-    /** Per skinning method id: the vertexCodeVersion its variant was generated at. */
+    /** Per Skinning method id: the vertexCodeVersion its variant was generated at. */
     private readonly variantVersions = new Map<string, number>();
 
     constructor() {

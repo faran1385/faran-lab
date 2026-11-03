@@ -82,7 +82,7 @@ function renderStruct(structName: string, fields: OutputFieldDecl[]): string {
 }
 
 /**
- * Handed to a skinned node's phase 2. `call` writes the WGSL call of the skinning method: the result is a
+ * Handed to a skinned node's phase 2. `call` writes the WGSL call of the Skinning method: the result is a
  * `SkinnedVertex` (position and normal) in WORLD space, so the node's world matrix must not be applied on top of it.
  */
 export type VertexSkin = {

@@ -25,7 +25,7 @@ export class BasicVertexAssembler extends VertexAssemblerBase {
         const morphedPosition = morph && position && vertexIndex ? morph.position(position, vertexIndex) : position;
         const morphedNormal = morph?.normal && normal && vertexIndex ? morph.normal(normal, vertexIndex) : normal;
 
-        // A skinned vertex comes out of the skinning method already in world space: no world matrix on top of it.
+        // A skinned vertex comes out of the Skinning method already in world space: no world matrix on top of it.
         const place = skin
             ? `let skinned = ${skin.call(morphedPosition ?? "vec3f(0.)", morphedNormal ?? "vec3f(0., 1., 0.)")};
             let pos = ${viewProjection} * vec4f(skinned.position, 1.);`

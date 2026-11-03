@@ -2,14 +2,14 @@ import {v4 as uuidv4} from "uuid";
 import {SkinAdaptor} from "../Adaptors/SkinAdaptor.ts";
 import {LBSSkinning} from "../../packages/animations/LBSSkinning.ts";
 import type {NodeWrapper} from "./NodeWrapper.ts";
-import type {SkinningMethod} from "../skinning/SkinningMethod.ts";
+import type {SkinningMethod} from "../Skinning/SkinningMethod.ts";
 
 /**
  * A skin as it exists in a live scene: the joint nodes with their inverse bind matrices, plus the SkinningMethod that
  * decides how the palette is computed and which shader code reads it.
  *
  * One skin per skin of an imported file. Every node whose mesh uses it points at the same SkinWrapper (through its
- * animation handler), so they share one palette.
+ * Animation handler), so they share one palette.
  */
 export class SkinWrapper {
     readonly uuid: string;

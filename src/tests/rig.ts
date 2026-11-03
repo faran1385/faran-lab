@@ -427,7 +427,7 @@ export class Rig {
 
     /**
      * `count` frames back to back. Returns the CPU cost of every render() call plus how long the GPU needed to drain
-     * the whole batch afterwards. `between` runs before each frame (an animation tick).
+     * the whole batch afterwards. `between` runs before each frame (an Animation tick).
      */
     async timedFrames(count: number, between?: (index: number) => void): Promise<{ cpu: number[]; drainMs: number }> {
         const cpu: number[] = [];

@@ -1,11 +1,11 @@
 import {mat4} from "../math/matrix/mat4.ts";
-import type {SkinJoints, SkinningMethod} from "../../engine/skinning/SkinningMethod.ts";
+import type {SkinJoints, SkinningMethod} from "../../engine/Skinning/SkinningMethod.ts";
 
 const MAT4_FLOATS = 16;
 const MAT4_BYTES = MAT4_FLOATS * 4;
 
 /**
- * Linear blend skinning. Palette: one column-major mat4 per joint, `jointWorld * inverseBind`, so a skinned vertex is
+ * Linear blend Skinning. Palette: one column-major mat4 per joint, `jointWorld * inverseBind`, so a skinned vertex is
  * already in world space.
  */
 export class LBSSkinning implements SkinningMethod {

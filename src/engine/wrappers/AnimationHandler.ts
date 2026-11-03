@@ -2,7 +2,7 @@ import type {SkinWrapper} from "./SkinWrapper.ts";
 import type {MorphStateWrapper} from "./MorphStateWrapper.ts";
 
 /**
- * Everything animation-related a node carries, kept out of NodeWrapper itself. Today that is the skin the node's mesh is
+ * Everything Animation-related a node carries, kept out of NodeWrapper itself. Today that is the skin the node's mesh is
  * skinned with. Setting, replacing or removing it goes through `onSkinChange`, which the owning node uses to update
  * its adapter (palette binding, vertex shader).
  */

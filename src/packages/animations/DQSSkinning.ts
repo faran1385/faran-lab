@@ -1,5 +1,5 @@
 import {mat4} from "../math/matrix/mat4.ts";
-import type {SkinJoints, SkinningMethod} from "../../engine/skinning/SkinningMethod.ts";
+import type {SkinJoints, SkinningMethod} from "../../engine/Skinning/SkinningMethod.ts";
 import {vec3} from "../math/vector/vec3.ts";
 import {quat} from "../math/quat/quat.ts";
 import {vec4} from "../math/vector/vec4.ts";

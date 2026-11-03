@@ -15,7 +15,7 @@ export class NodeInternal {
 
     /**
      * Keyed by primitive uuid. The value is an array because one primitive can need several pipelines (a double-sided
-     * blended material draws two cull variants) and, later, skinning can change the node's layout.
+     * blended material draws two cull variants) and, later, Skinning can change the node's layout.
      */
     private pipelines = new Map<string, PipelineInteractor[]>();
     private frame: PipelineFrame | null = null;

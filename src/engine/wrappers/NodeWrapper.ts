@@ -10,7 +10,7 @@ import type {MorphStateWrapper} from "./MorphStateWrapper.ts";
 
 export class NodeWrapper {
     readonly adaptor: NodeAdaptor;
-    /** Everything animation-related this node carries (its skin). */
+    /** Everything Animation-related this node carries (its skin). */
     readonly animationHandler: AnimationHandler;
     readonly uuid: string;
     private name?: string;
@@ -92,7 +92,7 @@ export class NodeWrapper {
         this.adaptor.invalidateWorld();
     }
 
-    /** Sets the rotation from a quaternion directly (setRotation takes Euler angles). Used by animation. */
+    /** Sets the rotation from a quaternion directly (setRotation takes Euler angles). Used by Animation. */
     setRotationQuat(x: number, y: number, z: number, w: number) {
         quat.set(this.rotation, x, y, z, w);
         this.adaptor.invalidateWorld();

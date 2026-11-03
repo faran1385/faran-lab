@@ -13,7 +13,7 @@ import {
  * `normal` and `tangent` exist only when the targets carry them. The normal result is renormalized and the tangent
  * keeps its w, as glTF requires. The assembler has to request `vertex_index` in `usedBuiltins` to be able to call them.
  *
- * Morphing happens first: skinning (when a node has it) is applied to the morphed vertex.
+ * Morphing happens first: Skinning (when a node has it) is applied to the morphed vertex.
  */
 export type VertexMorph = {
     position: (base: string, vertexIndex: string) => string;
