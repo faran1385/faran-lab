@@ -29,22 +29,23 @@ export class GeometryWrapper {
         }
 
         this.attributes.set(attribute.name, attribute);
-        this.adaptor.invalidate();
+        this.adaptor.invalidateAttributes(attribute.name);
     }
 
     removeAttribute(name: string) {
-        this.attributes.delete(name)
-        this.adaptor.invalidate();
+        if (!this.attributes.delete(name)) return;
+        this.adaptor.invalidateAttributes(name);
     }
 
     setIndices(indices: IndexAttributeWrapper) {
         this.indices = indices;
-        this.adaptor.invalidate();
+        this.adaptor.invalidateIndices();
     }
 
     clearIndices() {
+        if (!this.indices) return;
         this.indices = undefined;
-        this.adaptor.invalidate();
+        this.adaptor.invalidateIndices();
     }
 
     getIndices() {
@@ -57,8 +58,10 @@ export class GeometryWrapper {
      * data (one GPU buffer for every node drawing this geometry); per-node weights live in a MorphStateWrapper on the node.
      */
     setMorphTargets(targets: MorphTargetWrapper | null) {
-        this.morphTargets = targets ?? undefined;
-        this.adaptor.invalidate();
+        const next = targets ?? undefined;
+        if (this.morphTargets === next) return;
+        this.morphTargets = next;
+        this.adaptor.invalidateMorphTargets();
     }
 
     getMorphTargets() {
