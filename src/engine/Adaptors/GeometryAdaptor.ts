@@ -10,7 +10,6 @@ import type {GeometryBindingPlan} from "../producers/BindGroupLayoutProducer.ts"
 import {schedulePreFrame} from "./PreFrameQueue.ts";
 import {Source} from "./Source.ts";
 import type {GeometryWrapper} from "../wrappers/GeometryWrapper.ts";
-import type {MorphTargetWrapper} from "../wrappers/MorphTargetWrapper.ts";
 
 /**
  * Translates a GeometryWrapper (attributes keyed by name) into a GeometryInternal (vertex buffers keyed by slot, plus
